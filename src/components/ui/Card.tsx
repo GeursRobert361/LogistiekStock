@@ -2,21 +2,26 @@ import { cn } from '@/lib/utils'
 
 type CardProps = React.HTMLAttributes<HTMLDivElement>
 
+/**
+ * Een bordje op het beton. De witte vulling doet het werk: omdat de
+ * achtergrond grijs is, staat een kaart er zichtbaar op zonder dat er een
+ * zware rand of slagschaduw aan te pas komt.
+ */
 export function Card({ className, ...props }: CardProps) {
   return (
     <div
-      className={cn('rounded-xl border border-gray-200 bg-white shadow-sm', className)}
+      className={cn('rounded-xl border border-concrete-line bg-plate shadow-plate', className)}
       {...props}
     />
   )
 }
 
 export function CardHeader({ className, ...props }: CardProps) {
-  return <div className={cn('border-b border-gray-100 px-4 py-3', className)} {...props} />
+  return <div className={cn('border-b border-concrete-line px-4 py-3', className)} {...props} />
 }
 
 export function CardTitle({ className, ...props }: React.HTMLAttributes<HTMLHeadingElement>) {
-  return <h3 className={cn('text-base font-semibold text-gray-900', className)} {...props} />
+  return <h3 className={cn('text-base font-semibold text-ink', className)} {...props} />
 }
 
 export function CardContent({ className, ...props }: CardProps) {
@@ -24,10 +29,5 @@ export function CardContent({ className, ...props }: CardProps) {
 }
 
 export function CardFooter({ className, ...props }: CardProps) {
-  return (
-    <div
-      className={cn('border-t border-gray-100 px-4 py-3', className)}
-      {...props}
-    />
-  )
+  return <div className={cn('border-t border-concrete-line px-4 py-3', className)} {...props} />
 }

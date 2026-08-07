@@ -25,6 +25,12 @@ import { PERMISSIONS } from '@/lib/permissions'
 import { RestockRoundStatus } from '@/types'
 import type { Event, Incident, Kiosk, Product, RestockRound } from '@/types'
 import { formatDate } from '@/lib/utils'
+import {
+  IconCount,
+  IconDashboard,
+  IconRestock,
+  IconUsers,
+} from '@/components/layout/NavIcons'
 
 interface DashboardData {
   event: Event | null
@@ -130,7 +136,7 @@ export default function DashboardPage() {
       <div className="space-y-5 p-4">
         <div>
           <h2 className="text-lg font-bold text-gray-900">
-            Hallo, {profile?.displayName?.split(' ')[0]} 👋
+            Hallo, {profile?.displayName?.split(' ')[0]}
           </h2>
           <p className="text-sm text-gray-600">
             {new Intl.DateTimeFormat('nl-NL', {
@@ -198,7 +204,7 @@ export default function DashboardPage() {
             {canCount && resumableSessions.length === 0 && (
               <Link href={`/events/${event.id}/count/start`} className="block">
                 <Button size="lg" className="w-full">
-                  📋 Telronde starten
+                  Telronde starten
                 </Button>
               </Link>
             )}
@@ -318,10 +324,10 @@ export default function DashboardPage() {
                   Beheer
                 </h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <ShortcutCard href="/admin/products" icon="📦" label="Producten" />
-                  <ShortcutCard href="/admin/standards" icon="📊" label="Normen" />
-                  <ShortcutCard href="/admin/kiosks" icon="🏪" label="Kiosken" />
-                  <ShortcutCard href="/admin/users" icon="👥" label="Gebruikers" />
+                  <ShortcutCard href="/admin/products" Icon={IconRestock} label="Producten" />
+                  <ShortcutCard href="/admin/standards" Icon={IconCount} label="Normen" />
+                  <ShortcutCard href="/admin/kiosks" Icon={IconDashboard} label="Kiosken" />
+                  <ShortcutCard href="/admin/users" Icon={IconUsers} label="Gebruikers" />
                 </div>
               </section>
             )}
@@ -335,7 +341,7 @@ export default function DashboardPage() {
                   Beheer
                 </h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <ShortcutCard href="/admin/standards" icon="📊" label="Normen" />
+                  <ShortcutCard href="/admin/standards" Icon={IconCount} label="Normen" />
                 </div>
               </section>
             )}
@@ -346,15 +352,21 @@ export default function DashboardPage() {
   )
 }
 
-function ShortcutCard({ href, icon, label }: { href: string; icon: string; label: string }) {
+function ShortcutCard({
+  href,
+  Icon,
+  label,
+}: {
+  href: string
+  Icon: React.ComponentType<{ className?: string }>
+  label: string
+}) {
   return (
     <Link href={href}>
-      <Card className="active:bg-gray-100">
-        <CardContent className="flex min-h-20 flex-col items-center justify-center py-4 text-center">
-          <span className="mb-1 text-2xl" aria-hidden="true">
-            {icon}
-          </span>
-          <span className="text-sm font-medium text-gray-800">{label}</span>
+      <Card className="active:bg-concrete-light">
+        <CardContent className="flex min-h-20 flex-col items-center justify-center gap-1.5 py-4 text-center">
+          <Icon className="h-6 w-6 text-ink-muted" />
+          <span className="text-sm font-semibold text-ink">{label}</span>
         </CardContent>
       </Card>
     </Link>

@@ -43,45 +43,40 @@ export function ProductCountRow({
   const isFull = result !== null && result.restockQuantity === 0
   const isAboveNorm = countedQty !== undefined && targetQty > 0 && countedQty > targetQty * 1.2
 
+  /*
+   * De staat blijkt uit een streep aan de zijkant plus de tekst rechts, niet
+   * uit een gekleurd vlak. Grote gekleurde vlakken maken een lijst van
+   * vijftien producten onrustig, en kleur alleen is geen betrouwbaar signaal.
+   */
+  const statusBar = !isCounted
+    ? 'bg-concrete-deep'
+    : isFull
+      ? 'bg-emerald-600'
+      : 'bg-amber-500'
+
   return (
-    <div
-      className={cn(
-        'rounded-xl border p-3',
-        !isCounted
-          ? 'border-dashed border-gray-300 bg-white'
-          : isFull
-            ? 'border-green-300 bg-green-50'
-            : 'border-orange-200 bg-orange-50/40'
-      )}
-    >
-      <div className="mb-2 flex items-start justify-between gap-2">
+    <div className={cn('relative py-3 pl-4 pr-3', !isCounted && 'bg-concrete-light/60')}>
+      <span className={cn('absolute left-0 top-0 h-full w-1', statusBar)} aria-hidden="true" />
+
+      <div className="mb-2 flex items-baseline justify-between gap-3">
         <div className="min-w-0">
-          <p className="font-semibold text-gray-900">{product.name}</p>
-          <p className="text-xs text-gray-600">
-            Norm: {formatQuantity(targetQty)} {product.packagingUnit}
-            {' · '}
-            Aanwezig: {countedQty === undefined ? '—' : formatQuantity(countedQty)}
+          <p className="truncate font-semibold text-ink">{product.name}</p>
+          <p className="text-xs text-ink-muted">
+            Norm {formatQuantity(targetQty)} {product.packagingUnit} · aanwezig{' '}
+            <span className="tabular font-medium text-ink">
+              {countedQty === undefined ? '—' : formatQuantity(countedQty)}
+            </span>
           </p>
         </div>
 
-        <div
+        <p
           className={cn(
-            'flex-shrink-0 whitespace-nowrap rounded-lg px-2.5 py-1 text-sm font-bold',
-            !isCounted
-              ? 'bg-gray-100 text-gray-600'
-              : isFull
-                ? 'bg-green-100 text-green-800'
-                : result !== null && result.restockQuantity >= 5
-                  ? 'bg-red-100 text-red-800'
-                  : 'bg-orange-100 text-orange-800'
+            'tabular flex-shrink-0 whitespace-nowrap text-sm font-bold',
+            !isCounted ? 'text-ink-faint' : isFull ? 'text-emerald-700' : 'text-amber-700'
           )}
         >
-          {!isCounted
-            ? 'Nog tellen'
-            : isFull
-              ? '✓ Vol'
-              : `Bijvullen +${result?.restockQuantity ?? 0}`}
-        </div>
+          {!isCounted ? 'Nog tellen' : isFull ? 'Vol' : `+${result?.restockQuantity ?? 0}`}
+        </p>
       </div>
 
       <QuarterQuantityInput
@@ -93,9 +88,9 @@ export function ProductCountRow({
       />
 
       {isCounted && result !== null && !isFull && (
-        <p className="mt-2 text-xs text-gray-600">
-          Effectief {formatQuantity(result.effectiveQuantity)} → bijvullen{' '}
-          <span className="font-semibold">
+        <p className="mt-1.5 text-xs text-ink-muted">
+          Effectief {formatQuantity(result.effectiveQuantity)} — bijvullen{' '}
+          <span className="font-semibold text-ink">
             {result.restockQuantity} {product.packagingUnit}
           </span>
         </p>
@@ -103,10 +98,10 @@ export function ProductCountRow({
 
       {isAboveNorm && (
         <p
-          className="mt-2 rounded-lg bg-yellow-50 px-3 py-1.5 text-xs font-medium text-yellow-800"
+          className="mt-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900"
           role="alert"
         >
-          ⚠️ Geteld aantal ligt meer dan 20% boven de norm
+          Geteld aantal ligt meer dan 20% boven de norm
         </p>
       )}
     </div>

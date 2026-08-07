@@ -34,8 +34,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center bg-gray-50 p-4">
-      <div className="w-full max-w-sm rounded-2xl bg-white p-8 shadow-lg">
+    <main className="flex min-h-screen flex-col items-center justify-center bg-concrete p-4">
+      <div className="w-full max-w-sm rounded-2xl border border-concrete-line bg-plate p-8 shadow-plate-raised">
         {/* Logo / titel */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-arena-red">

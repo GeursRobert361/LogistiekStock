@@ -20,13 +20,13 @@ export function AppHeader({ title, backHref, actions }: AppHeaderProps) {
   }
 
   return (
-    <header className="sticky top-0 z-40 border-b border-gray-200 bg-white">
+    <header className="sticky top-0 z-40 border-b border-concrete-line bg-plate">
       <div className="flex h-14 items-center gap-3 px-4">
         {backHref && (
           <Link
             href={backHref}
             aria-label="Terug"
-            className="flex h-10 w-10 items-center justify-center rounded-lg text-gray-500 hover:bg-gray-100"
+            className="flex h-10 w-10 items-center justify-center rounded-lg text-ink-muted active:bg-concrete-light"
           >
             ←
           </Link>
@@ -34,9 +34,11 @@ export function AppHeader({ title, backHref, actions }: AppHeaderProps) {
 
         <div className="flex-1 overflow-hidden">
           {title ? (
-            <h1 className="truncate text-base font-semibold text-gray-900">{title}</h1>
+            <h1 className="truncate text-base font-semibold text-ink">{title}</h1>
           ) : (
-            <span className="text-base font-bold text-arena-red">LogistiekStock</span>
+            <span className="text-base font-bold tracking-tight text-ink">
+              Logistiek<span className="text-arena-red">Stock</span>
+            </span>
           )}
         </div>
 

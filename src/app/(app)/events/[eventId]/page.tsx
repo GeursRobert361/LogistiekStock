@@ -121,7 +121,7 @@ export default function EventDetailPage({
           {canCount && (
             <Link href={`/events/${eventId}/count/start`} className="block">
               <Button className="w-full" size="lg" variant={resumable.length > 0 ? 'secondary' : 'primary'}>
-                📋 Nieuwe telronde starten
+                Nieuwe telronde starten
               </Button>
             </Link>
           )}
@@ -130,13 +130,13 @@ export default function EventDetailPage({
             <>
               <Link href={`/events/${eventId}/count/review`} className="block">
                 <Button variant="secondary" className="w-full" size="lg">
-                  🔍 Tellingen controleren
+                  Tellingen controleren
                 </Button>
               </Link>
 
               <Link href={`/events/${eventId}/restock`} className="block">
                 <Button variant="secondary" className="w-full" size="lg">
-                  📦 Vulplanning
+                  Vulplanning
                 </Button>
               </Link>
             </>

@@ -6,6 +6,7 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { DeliveryProductRow } from '@/components/restock/DeliveryProductRow'
+import { KioskPlate } from '@/components/shared/KioskPlate'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -124,17 +125,13 @@ export default function RestockStopPage({
     <>
       <AppHeader title={stopPlan.round.name} backHref={`/restock-rounds/${roundId}`} />
 
-      {/* Groot kiosknummer — dit is waar de vuller op stuurt */}
-      <div className="sticky top-14 z-30 border-b border-gray-200 bg-white px-4 py-3 text-center">
-        <p className="text-xs font-medium text-gray-600">
-          Stop {stopPlan.stopNumber} van {stopPlan.totalStops}
-        </p>
-        <h2 className="text-5xl font-black leading-none text-arena-red">
-          {kiosk?.number ?? ''}
-        </h2>
-        {stopPlan.isCompleted && (
-          <p className="mt-1 text-xs font-semibold text-green-700">✓ Afgerond</p>
-        )}
+      {/* Het kiosknummer als bord — dit is waar de vuller op stuurt */}
+      <div className="sticky top-14 z-30 border-b border-concrete-line bg-concrete px-4 py-2.5">
+        <KioskPlate
+          number={kiosk?.number}
+          eyebrow={`Stop ${stopPlan.stopNumber} van ${stopPlan.totalStops}`}
+          status={stopPlan.isCompleted ? 'Afgerond' : undefined}
+        />
       </div>
 
       <div className="space-y-3 p-4">

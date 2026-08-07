@@ -31,12 +31,12 @@ test.describe('Volledige workflow', () => {
     await fillAllCounts(page, '1')
 
     await page.getByRole('button', { name: '0', exact: true }).first().click()
-    await expect(page.getByText('Bijvullen +15').first()).toBeVisible()
+    await expect(page.getByText('+15').first()).toBeVisible()
 
     const firstInput = page.locator('input[inputmode="decimal"]').first()
     await firstInput.fill('4,5')
     await firstInput.blur()
-    await expect(page.getByText('Bijvullen +11').first()).toBeVisible()
+    await expect(page.getByText('+11').first()).toBeVisible()
 
     await page.getByRole('button', { name: /Kiosk afronden/ }).click()
     await page.waitForURL(/\/kiosk\/kiosk-124/)

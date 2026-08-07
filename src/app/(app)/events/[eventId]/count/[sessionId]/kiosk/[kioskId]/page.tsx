@@ -7,6 +7,7 @@ import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
 import { CategoryAccordion } from '@/components/counting/CategoryAccordion'
 import { SkipKioskDialog } from '@/components/counting/SkipKioskDialog'
+import { KioskPlate } from '@/components/shared/KioskPlate'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import {
@@ -301,19 +302,14 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
 
   return (
     <>
-      <AppHeader title={`Kiosk ${kiosk?.number ?? ''}`} backHref={`/events/${eventId}`} />
+      {/* Het bord toont het kiosknummer al; de titel herhaalt dat niet. */}
+      <AppHeader title="Tellen" backHref={`/events/${eventId}`} />
 
-      {/* Voortgang + groot kiosknummer */}
-      <div className="sticky top-14 z-30 border-b border-gray-200 bg-white px-4 py-2">
-        <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs font-medium text-gray-600">
-            Stop {stopNumber} van {totalKiosks}
-          </span>
-          <span className="text-xs font-semibold text-gray-700">{progress}%</span>
-        </div>
-        <div className="h-2 overflow-hidden rounded-full bg-gray-200">
+      {/* Voortgang + het kiosknummer als bord */}
+      <div className="sticky top-14 z-30 border-b border-concrete-line bg-concrete px-4 py-2.5">
+        <div className="h-1.5 overflow-hidden rounded-full bg-concrete-deep">
           <div
-            className="h-full rounded-full bg-arena-red"
+            className="h-full rounded-full bg-arena-red transition-[width] duration-300"
             style={{ width: `${progress}%` }}
             role="progressbar"
             aria-valuenow={progress}
@@ -323,30 +319,36 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
           />
         </div>
 
-        <div className="mt-2 flex items-center justify-between">
+        <div className="mt-2 flex items-center gap-3">
           <button
             type="button"
             onClick={() => void navigateToRouteIndex(routeIndex - 1)}
             disabled={routeIndex <= 0}
             aria-label="Vorige kiosk"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 disabled:opacity-30"
+            className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg text-ink-muted disabled:opacity-25"
           >
             ◀
           </button>
-          <div className="text-center">
-            <h2 className="text-5xl font-black leading-none text-arena-red">{kiosk?.number}</h2>
-            {isDone && (
-              <p className="mt-1 text-xs font-semibold text-green-700">
-                {kioskCount?.status === KioskCountStatus.SKIPPED ? 'Overgeslagen' : '✓ Afgerond'}
-              </p>
-            )}
-          </div>
+
+          <KioskPlate
+            className="flex-1"
+            number={kiosk?.number}
+            eyebrow={`Stop ${stopNumber} van ${totalKiosks}`}
+            status={
+              isDone
+                ? kioskCount?.status === KioskCountStatus.SKIPPED
+                  ? 'Overgeslagen'
+                  : 'Afgerond'
+                : undefined
+            }
+          />
+
           <button
             type="button"
             onClick={() => void navigateToRouteIndex(routeIndex + 1)}
             disabled={routeIndex < 0 || routeIndex >= totalKiosks - 1}
             aria-label="Volgende kiosk"
-            className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 disabled:opacity-30"
+            className="flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-lg text-ink-muted disabled:opacity-25"
           >
             ▶
           </button>
@@ -405,7 +407,7 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
               onClick={() => setShowNotes(true)}
               className="min-h-11 w-full text-left text-sm font-medium text-gray-700"
             >
-              📝 Notitie toevoegen
+              Notitie toevoegen
             </button>
           )}
         </div>
@@ -415,7 +417,7 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
           className="block"
         >
           <Button variant="outline" size="md" className="w-full">
-            ⚠️ Storing melden
+            Storing melden
           </Button>
         </Link>
       </div>

@@ -89,7 +89,7 @@ export function QuarterQuantityInput({
   return (
     <div className={cn('flex flex-col gap-2', className)}>
       {label && (
-        <label htmlFor={inputId} className="text-sm font-medium text-gray-700">
+        <label htmlFor={inputId} className="text-sm font-medium text-ink">
           {label}
         </label>
       )}
@@ -102,8 +102,8 @@ export function QuarterQuantityInput({
           aria-label={`Verminder met ${formatQuantity(step)}`}
           className={cn(
             'flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl text-2xl font-bold',
-            'border border-gray-300 bg-white text-gray-700',
-            'active:bg-gray-200 disabled:opacity-40'
+            'border border-concrete-deep bg-plate text-ink',
+            'active:bg-concrete disabled:opacity-30'
           )}
         >
           −
@@ -131,14 +131,14 @@ export function QuarterQuantityInput({
             aria-invalid={error != null}
             aria-describedby={error ? `${inputId}-error` : undefined}
             className={cn(
-              'h-14 w-full rounded-xl border text-center text-2xl font-bold text-gray-900',
-              'placeholder:font-normal placeholder:text-gray-400',
+              'tabular h-14 w-full rounded-xl border text-center text-2xl font-bold text-ink',
+              'placeholder:font-normal placeholder:text-ink-faint',
               'focus:border-arena-red focus:outline-none focus:ring-2 focus:ring-arena-red/30',
               error
-                ? 'border-red-400 bg-red-50'
+                ? 'border-arena-red bg-red-50'
                 : isCounted
-                  ? 'border-gray-300 bg-white'
-                  : 'border-dashed border-gray-300 bg-gray-50',
+                  ? 'border-concrete-deep bg-plate'
+                  : 'border-dashed border-concrete-deep bg-concrete-light',
               'disabled:opacity-50'
             )}
           />
@@ -151,8 +151,8 @@ export function QuarterQuantityInput({
           aria-label={`Verhoog met ${formatQuantity(step)}`}
           className={cn(
             'flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl text-2xl font-bold',
-            'border border-gray-300 bg-white text-gray-700',
-            'active:bg-gray-200 disabled:opacity-40'
+            'border border-concrete-deep bg-plate text-ink',
+            'active:bg-concrete disabled:opacity-30'
           )}
         >
           +
@@ -174,7 +174,7 @@ export function QuarterQuantityInput({
             setError(null)
           }}
           disabled={disabled}
-          className="min-h-11 flex-1 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-700 active:bg-gray-100 disabled:opacity-40"
+          className="min-h-11 flex-1 rounded-lg border border-concrete-deep bg-plate text-sm font-semibold text-ink active:bg-concrete disabled:opacity-30"
         >
           0
         </button>
@@ -186,7 +186,7 @@ export function QuarterQuantityInput({
             setError(null)
           }}
           disabled={disabled}
-          className="min-h-11 flex-1 rounded-lg border border-green-300 bg-green-50 text-sm font-semibold text-green-800 active:bg-green-100 disabled:opacity-40"
+          className="min-h-11 flex-1 rounded-lg border border-emerald-600/40 bg-plate text-sm font-semibold text-emerald-800 active:bg-emerald-50 disabled:opacity-30"
         >
           Vol ({formatQuantity(targetQuantity)})
         </button>
@@ -199,7 +199,7 @@ export function QuarterQuantityInput({
               setError(null)
             }}
             disabled={disabled}
-            className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-600 active:bg-gray-100 disabled:opacity-40"
+            className="min-h-11 rounded-lg border border-concrete-deep bg-plate px-3 text-sm font-medium text-ink-muted active:bg-concrete disabled:opacity-30"
           >
             Wissen
           </button>

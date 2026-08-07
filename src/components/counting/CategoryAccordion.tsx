@@ -43,32 +43,32 @@ export function CategoryAccordion({
   const isComplete = filledCount === products.length
 
   return (
-    <div className="overflow-hidden rounded-xl border border-gray-200">
+    <div className="overflow-hidden rounded-xl border border-concrete-line bg-plate shadow-plate">
       <button
         type="button"
         onClick={() => setIsOpen((o) => !o)}
         aria-expanded={isOpen}
-        className="flex min-h-14 w-full items-center justify-between bg-gray-50 px-4 py-3"
+        className="flex min-h-14 w-full items-center justify-between border-b border-concrete-line bg-plate px-4 py-3"
       >
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-gray-900">{categoryName}</span>
+          <span className="font-semibold text-ink">{categoryName}</span>
           <span
             className={cn(
-              'rounded-full px-2 py-0.5 text-xs font-semibold',
-              isComplete ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
+              'tabular rounded-full px-2 py-0.5 text-xs font-semibold',
+              isComplete ? 'bg-emerald-50 text-emerald-800' : 'bg-concrete text-ink-muted'
             )}
           >
             {isComplete ? '✓ ' : ''}
             {filledCount}/{products.length}
           </span>
         </div>
-        <span aria-hidden="true" className="text-gray-500">
+        <span aria-hidden="true" className="text-ink-faint">
           {isOpen ? '▲' : '▼'}
         </span>
       </button>
 
       {isOpen && (
-        <div className="divide-y divide-gray-100 bg-white">
+        <div className="divide-y divide-concrete-line bg-plate">
           {products.map((product) => {
             const std = standards.get(product.id)
             return (
@@ -76,7 +76,7 @@ export function CategoryAccordion({
                 key={product.id}
                 id={`product-${product.id}`}
                 className={cn(
-                  'p-3',
+                  '',
                   focusProductId === product.id && 'ring-2 ring-inset ring-arena-red'
                 )}
               >

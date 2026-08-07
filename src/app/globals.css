@@ -2,23 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-body {
-  color: #171717;
-  background: #ffffff;
-  font-family: Arial, Helvetica, sans-serif;
+@layer base {
+  html,
+  body {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  body {
+    @apply bg-concrete text-ink;
+    font-family: var(--font-plex), system-ui, sans-serif;
+    /* Voorkomt dat iOS tekst opblaast in landschap. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /*
+   * Cijfers moeten onder elkaar uitlijnen: een kolom aantallen die verspringt
+   * omdat de 1 smaller is dan de 8 kost leestijd tijdens het tellen.
+   */
+  input,
+  table,
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* Minimale aanraakvlakken — de app wordt staand en in beweging gebruikt. */
+  button,
+  a,
+  [role='button'] {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Zichtbare toetsenbordfocus op elke ondergrond. */
+  :focus-visible {
+    @apply outline-none ring-2 ring-arena-red ring-offset-2 ring-offset-concrete;
+  }
 }
 
-/* Prevent horizontal scrolling on mobile */
-html,
-body {
-  overflow-x: hidden;
-  max-width: 100vw;
-}
+@layer utilities {
+  /*
+   * Het kiosknummer: hoe de bordjes in de ArenA er zelf uitzien. Donker vlak,
+   * smal wit cijfer. Donker in plaats van wit scheelt ook licht in de gangen.
+   */
+  .plate-sign {
+    @apply bg-ink text-plate;
+    font-family: var(--font-plex-condensed), var(--font-plex), sans-serif;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.02em;
+  }
 
-/* Minimum tap target size */
-button,
-a,
-[role='button'] {
-  min-height: 44px;
-  min-width: 44px;
+  .pb-safe {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
 }

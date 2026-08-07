@@ -33,7 +33,7 @@ test.describe('Telflow', () => {
     // Expliciet 0 levert wél een advies op.
     await page.getByRole('button', { name: '0', exact: true }).first().click()
     await expect(firstInput).toHaveValue('0')
-    await expect(page.getByText('Bijvullen +15').first()).toBeVisible()
+    await expect(page.getByText('+15').first()).toBeVisible()
   })
 
   test('4,5 bij norm 15 geeft 11 bijvullen', async ({ page }) => {
@@ -43,8 +43,8 @@ test.describe('Telflow', () => {
     await input.fill('4,5')
     await input.blur()
 
-    await expect(page.getByText('Bijvullen +11').first()).toBeVisible()
-    await expect(page.getByText(/Effectief 4 → bijvullen/).first()).toBeVisible()
+    await expect(page.getByText('+11').first()).toBeVisible()
+    await expect(page.getByText(/Effectief 4 — bijvullen/).first()).toBeVisible()
   })
 
   test('14,5 bij norm 15 geeft 0 bijvullen', async ({ page }) => {
@@ -54,7 +54,7 @@ test.describe('Telflow', () => {
     await input.fill('14,5')
     await input.blur()
 
-    await expect(page.getByText('✓ Vol').first()).toBeVisible()
+    await expect(page.getByText('Vol', { exact: true }).first()).toBeVisible()
   })
 
   test('afronden kan niet zolang er producten ontbreken', async ({ page }) => {
@@ -141,14 +141,14 @@ test.describe('Offline', () => {
     const input = page.locator('input[inputmode="decimal"]').first()
     await input.fill('4,5')
     await input.blur()
-    await expect(page.getByText('Bijvullen +11').first()).toBeVisible()
+    await expect(page.getByText('+11').first()).toBeVisible()
 
     // Verbinding eruit en de pagina opnieuw laden.
     await context.setOffline(true)
     await page.reload()
 
     await expect(page.locator('input[inputmode="decimal"]').first()).toHaveValue('4,5')
-    await expect(page.getByText('Bijvullen +11').first()).toBeVisible()
+    await expect(page.getByText('+11').first()).toBeVisible()
 
     // Offline verder tellen kan gewoon.
     const second = page.locator('input[inputmode="decimal"]').nth(1)
