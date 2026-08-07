@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seedDb.ts",
     "db:migrate": "tsx scripts/migrate.ts",
-    "seed:testcount": "tsx scripts/seedTestCount.ts"
+    "seed:testcount": "tsx scripts/seedTestCount.ts",
+    "seed:testseason": "tsx scripts/seedTestSeason.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
