@@ -14,7 +14,8 @@
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
     "seed": "tsx scripts/seedDb.ts",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "seed:testcount": "tsx scripts/seedTestCount.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
