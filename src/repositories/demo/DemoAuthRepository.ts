@@ -43,4 +43,8 @@ export class DemoAuthRepository implements IAuthRepository {
     const session = await this.getCurrentSession()
     return session?.profile ?? null
   }
+
+  async listProfiles(): Promise<Profile[]> {
+    return [...demoProfiles]
+  }
 }

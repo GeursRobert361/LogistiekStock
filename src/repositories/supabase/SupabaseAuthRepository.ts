@@ -59,6 +59,25 @@ export class SupabaseAuthRepository implements IAuthRepository {
     return session?.profile ?? null
   }
 
+  async listProfiles(): Promise<Profile[]> {
+    const supabase = getSupabaseClient()
+    const [profileRows, roleRows] = await Promise.all([
+      unwrapList(await supabase.from('profiles').select('*').order('display_name')),
+      unwrapList(await supabase.from('user_roles').select('profile_id, role')),
+    ])
+
+    const rolesByProfile = new Map<string, UserRole[]>()
+    for (const row of roleRows as Array<{ profile_id: string; role: string }>) {
+      const role = row.role as UserRole
+      if (!Object.values(UserRole).includes(role)) continue
+      rolesByProfile.set(row.profile_id, [...(rolesByProfile.get(row.profile_id) ?? []), role])
+    }
+
+    return (profileRows as Array<Record<string, unknown>>).map((row) =>
+      mapProfile(row, rolesByProfile.get(String(row.id)) ?? [])
+    )
+  }
+
   /**
    * Roept `handler` aan bij elke wijziging van de auth-status
    * (login, logout, verlopen sessie, token-refresh).
