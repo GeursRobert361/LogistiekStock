@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { Button } from '@/components/ui/Button'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ListSkeleton } from '@/components/shared/LoadingSkeleton'
 import { repositories } from '@/repositories'
@@ -68,12 +69,20 @@ export default function RestockRoundsPage() {
     <>
       <AppHeader title="Vulrondes" />
       <div className="space-y-5 p-4">
+        {/* Pakken en rijden in één scherm; de lijst eronder is voor pallets
+            die iemand anders heeft klaargezet. */}
+        <Link href="/restock-rounds/new" className="block">
+          <Button size="lg" className="w-full">
+            Pallet pakken →
+          </Button>
+        </Link>
+
         {isLoading ? (
           <ListSkeleton count={3} />
         ) : rounds.length === 0 ? (
           <EmptyState
             title="Geen vulrondes"
-            description="Zodra een planner een pallet heeft samengesteld, verschijnt die hier."
+            description="Pak zelf een pallet, of wacht tot een planner er een klaarzet."
             icon="📦"
           />
         ) : (

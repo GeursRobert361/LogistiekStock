@@ -272,6 +272,13 @@ export default function DashboardPage() {
                 >
                   Vulrondes
                 </h3>
+                {/* Zelf een pallet pakken is de snelste weg naar de vloer en
+                    staat daarom boven de lijst met wat er al klaarstaat. */}
+                <Link href="/restock-rounds/new" className="mb-2 block">
+                  <Button size="lg" className="w-full">
+                    Pallet pakken →
+                  </Button>
+                </Link>
                 {rounds.length === 0 ? (
                   <p className="rounded-xl border border-gray-200 bg-white px-3 py-4 text-center text-sm text-gray-600">
                     Er staat nog geen pallet klaar.

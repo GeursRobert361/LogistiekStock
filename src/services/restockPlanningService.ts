@@ -187,6 +187,60 @@ export async function createMixedPalletRound(params: {
   })
 }
 
+export interface PalletRoundResult {
+  round: RestockRound
+  /** Eerste halte, of null als er met deze lading nergens heen te rijden valt. */
+  firstStopId: string | null
+}
+
+/**
+ * Een pallet pakken en er meteen mee weglopen.
+ *
+ * Dit doet in één keer wat anders over drie schermen verdeeld is: ronde maken,
+ * de lading vastleggen, de ronde aannemen en starten. Wie bij de pallet staat
+ * heeft die tussenstappen niet nodig — die weet al wat erop ligt.
+ *
+ * De aantallen zijn de voorgestelde: alles wat er nog open staat voor deze
+ * producten in deze ring. Klopt dat niet met wat er werkelijk op de pallet
+ * ligt, dan past de vuller het onderweg aan op de rondepagina.
+ */
+export async function startPalletRound(params: {
+  eventId: string
+  ringId: string
+  productIds: string[]
+  productNames: Map<string, string>
+  userId: string
+  sequenceNumber: number
+}): Promise<PalletRoundResult> {
+  const { eventId, ringId, productIds, productNames, userId, sequenceNumber } = params
+
+  // Eén product is een productronde, meer is een gemengde pallet. Dat scheelt
+  // later zoeken: de naam zegt dan wat er op de pallet lag.
+  const single = productIds.length === 1 ? productIds[0] : undefined
+  const round = await createRound({
+    eventId,
+    ringId,
+    productIds,
+    createdById: userId,
+    name: single
+      ? `Productronde ${productNames.get(single) ?? single}`
+      : `Gemengde pallet #${sequenceNumber}`,
+    roundType: single ? RestockRoundType.PRODUCT_ROUND : RestockRoundType.MIXED_PALLET,
+  })
+
+  const restock = repositories.restock()
+  const items = await restock.getRoundItems(round.id)
+  await setLoadedQuantities(round.id, roundItemsToLoadMap(items))
+
+  await claimRound(round.id, userId)
+  const started = await startRound(round.id)
+
+  const stops = [...(await restock.getRoundStops(round.id))].sort(
+    (a, b) => a.sortOrder - b.sortOrder
+  )
+  return { round: started, firstStopId: stops[0]?.id ?? null }
+}
+
 /**
  * Legt vast wat er werkelijk geladen is en bouwt de route.
  *

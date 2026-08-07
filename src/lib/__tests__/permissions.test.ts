@@ -53,6 +53,13 @@ describe('rolrechten', () => {
     expect(hasPermission(VULLER, 'INCIDENTS')).toBe(true)
   })
 
+  it('een vuller stelt zijn eigen pallet samen, maar plant niet', () => {
+    // Zelf pakken en rijden mag; het planningsoverzicht van álle tekorten
+    // blijft bij de planner.
+    expect(hasPermission(VULLER, 'COMPOSE_PALLET')).toBe(true)
+    expect(hasPermission(VULLER, 'PLAN_RESTOCK')).toBe(false)
+  })
+
   it('een planner kan reviewen en plannen, maar geen stamdata beheren', () => {
     expect(hasPermission(PLANNER, 'REVIEW_COUNTS')).toBe(true)
     expect(hasPermission(PLANNER, 'PLAN_RESTOCK')).toBe(true)

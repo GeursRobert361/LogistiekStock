@@ -41,6 +41,7 @@ const {
   createProductRound,
   createMixedPalletRound,
   setLoadedQuantities,
+  startPalletRound,
   cancelRound,
   claimRound,
   startRound,
@@ -288,6 +289,94 @@ describe('gemengde pallet', () => {
     const plan = await getRoundPlan(round.id)
     const snack = plan.stopItems.filter((i) => i.productId === 'snackbakjes')
     expect(snack.reduce((sum, i) => sum + i.plannedPackages, 0)).toBe(6)
+  })
+})
+
+describe('pallet pakken en meteen rijden', () => {
+  it('levert een gestarte ronde met een eerste halte op', async () => {
+    await seedRequirements('water', [6, 0, 4])
+    await seedRequirements('servetten', [3])
+
+    const result = await startPalletRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productIds: ['water', 'servetten'],
+      productNames: new Map([
+        ['water', 'Water'],
+        ['servetten', 'Servetten'],
+      ]),
+      userId: VULLER,
+      sequenceNumber: 1,
+    })
+
+    expect(result.round.status).toBe(RestockRoundStatus.IN_PROGRESS)
+    expect(result.round.assignedUserId).toBe(VULLER)
+    expect(result.firstStopId).not.toBeNull()
+
+    // De eerste halte is de eerste kiosk met vraag, niet zomaar de eerste kiosk.
+    const stops = await fakeRestockRepo.getRoundStops(result.round.id)
+    const first = stops.find((stop) => stop.id === result.firstStopId)!
+    expect(first.kioskId).toBe('kiosk-101')
+    expect(stops.map((s) => s.kioskId).sort()).toEqual(['kiosk-101', 'kiosk-103'])
+  })
+
+  it('laadt alles wat er open staat, zonder tussenstap', async () => {
+    await seedRequirements('water', [6, 4])
+
+    const result = await startPalletRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productIds: ['water'],
+      productNames: new Map([['water', 'Water']]),
+      userId: VULLER,
+      sequenceNumber: 1,
+    })
+
+    const items = await fakeRestockRepo.getRoundItems(result.round.id)
+    expect(items).toHaveLength(1)
+    expect(items[0]!.loadedPackages).toBe(10)
+
+    const plan = await getRoundPlan(result.round.id)
+    expect(plan.stopItems.reduce((sum, i) => sum + i.plannedPackages, 0)).toBe(10)
+  })
+
+  it('noemt één product een productronde en meerdere een gemengde pallet', async () => {
+    await seedRequirements('water', [6])
+    await seedRequirements('servetten', [3])
+
+    const solo = await startPalletRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productIds: ['water'],
+      productNames: new Map([['water', 'Water']]),
+      userId: VULLER,
+      sequenceNumber: 1,
+    })
+    expect(solo.round.roundType).toBe(RestockRoundType.PRODUCT_ROUND)
+    expect(solo.round.name).toBe('Productronde Water')
+
+    const mixed = await startPalletRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productIds: ['servetten'],
+      productNames: new Map([['servetten', 'Servetten']]),
+      userId: VULLER,
+      sequenceNumber: 2,
+    })
+    expect(mixed.round.roundType).toBe(RestockRoundType.PRODUCT_ROUND)
+  })
+
+  it('weigert een pallet waar niets meer op kan', async () => {
+    await expect(
+      startPalletRound({
+        eventId: EVENT_ID,
+        ringId: RING_ID,
+        productIds: ['water'],
+        productNames: new Map(),
+        userId: VULLER,
+        sequenceNumber: 1,
+      })
+    ).rejects.toThrow(/niets meer te plannen/)
   })
 })
 

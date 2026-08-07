@@ -14,8 +14,13 @@ export const PERMISSIONS = {
   COUNT: [UserRole.ADMIN, UserRole.PLANNER, UserRole.TELLER],
   /** Tellingen controleren en goedkeuren. */
   REVIEW_COUNTS: [UserRole.ADMIN, UserRole.PLANNER],
-  /** Vulrondes plannen en pallets samenstellen. */
+  /** De vulplanning: overzicht van alle tekorten en wat er nog te verdelen is. */
   PLAN_RESTOCK: [UserRole.ADMIN, UserRole.PLANNER],
+  /**
+   * Zelf een pallet samenstellen. Ook de vuller: die staat bij de pallet en
+   * weet wat hij pakt — daar hoeft geen planner tussen te zitten.
+   */
+  COMPOSE_PALLET: [UserRole.ADMIN, UserRole.PLANNER, UserRole.VULLER],
   /** Vulrondes uitvoeren. */
   EXECUTE_RESTOCK: [UserRole.ADMIN, UserRole.PLANNER, UserRole.VULLER],
   /** Voorraadnormen beheren. */

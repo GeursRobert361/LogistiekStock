@@ -113,6 +113,15 @@ describe('rechten per rol via de API', () => {
     expect(mag(VULLER, 'restock', 'releaseReservation')).toBe(true)
   })
 
+  it('laat een vuller zelf een pallet samenstellen', () => {
+    // De hele keten achter "pallet pakken": ronde, reservering, route.
+    expect(mag(VULLER, 'restock', 'createRound')).toBe(true)
+    expect(mag(VULLER, 'restock', 'createReservation')).toBe(true)
+    expect(mag(VULLER, 'restock', 'createRoundStops')).toBe(true)
+    expect(mag(VULLER, 'restock', 'deleteRoundStops')).toBe(true)
+    expect(mag(VULLER, 'restock', 'createStopItems')).toBe(true)
+  })
+
   it('laat een vuller geen telling schrijven of goedkeuren', () => {
     expect(mag(VULLER, 'count', 'upsertCountEntry')).toBe(false)
     expect(mag(VULLER, 'restock', 'bulkUpsertRequirements')).toBe(false)

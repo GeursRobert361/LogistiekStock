@@ -146,10 +146,10 @@ export const demoProducts: Product[] = [
   product('chips-oranje', CAT_CHIPS_ID, 'Chips Oranje', 'Chips Oranje', 'zak', 'dozen', 32, SMALL),
 
   // ── Post-mix ───────────────────────────────────────────────────────────
-  product('cola', CAT_POSTMIX_ID, 'Coca-Cola', 'Cola', 'BIB', 'BIB', 40),
-  product('cola-zero', CAT_POSTMIX_ID, 'Coca-Cola Zero', 'Zero', 'BIB', 'BIB', 41),
-  product('fanta', CAT_POSTMIX_ID, 'Fanta', 'Fanta', 'BIB', 'BIB', 42, SMALL),
-  product('sprite', CAT_POSTMIX_ID, 'Sprite', 'Sprite', 'BIB', 'BIB', 43, SMALL),
+  product('cola', CAT_POSTMIX_ID, 'Coca-Cola', 'Cola', 'pak', 'pakken', 40),
+  product('cola-zero', CAT_POSTMIX_ID, 'Coca-Cola Zero', 'Zero', 'pak', 'pakken', 41),
+  product('fanta', CAT_POSTMIX_ID, 'Fanta', 'Fanta', 'pak', 'pakken', 42, SMALL),
+  product('sprite', CAT_POSTMIX_ID, 'Sprite', 'Sprite', 'pak', 'pakken', 43, SMALL),
   product('koolzuur', CAT_POSTMIX_ID, 'Koolzuur', 'Koolzuur', 'cilinder', 'cilinders', 44, {
     productSize: ProductSize.LARGE,
     estimatedPalletLoad: 3,
@@ -204,9 +204,10 @@ export const demoProducts: Product[] = [
   // ── Sauzen ─────────────────────────────────────────────────────────────
   product('mayo-emmers', CAT_SAUZEN_ID, 'Mayo Emmers', 'Mayo emmer', 'emmer', 'emmers', 80, SMALL),
   product('ketchup-emmers', CAT_SAUZEN_ID, 'Ketchup Emmers', 'Ketchup emmer', 'emmer', 'emmers', 81, SMALL),
-  product('mayo-flessen', CAT_SAUZEN_ID, 'Mayo Flessen', 'Mayo fles', 'fles', 'dozen', 82, SMALL),
-  product('ketchup-flessen', CAT_SAUZEN_ID, 'Ketchup Flessen', 'Ketchup fles', 'fles', 'dozen', 83, SMALL),
-  product('mosterd-flessen', CAT_SAUZEN_ID, 'Mosterd Flessen', 'Mosterd fles', 'fles', 'dozen', 84, SMALL),
+  // Flessen worden per pak geteld, niet per fles: een norm staat dus in pakken.
+  product('mayo-flessen', CAT_SAUZEN_ID, 'Mayo Flessen', 'Mayo', 'pak', 'pakken', 82, SMALL),
+  product('ketchup-flessen', CAT_SAUZEN_ID, 'Ketchup Flessen', 'Ketchup', 'pak', 'pakken', 83, SMALL),
+  product('mosterd-flessen', CAT_SAUZEN_ID, 'Mosterd Flessen', 'Mosterd', 'pak', 'pakken', 84, SMALL),
 
   // ── Schoonmaak ─────────────────────────────────────────────────────────
   product('tork-rol', CAT_SCHOONMAAK_ID, 'Tork Rol', 'Tork', 'rol', 'rollen', 90, SMALL),

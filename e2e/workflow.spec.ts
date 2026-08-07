@@ -159,6 +159,15 @@ test.describe('Volledige workflow', () => {
     await expect(
       page.getByText(`Totaal: ${shortfall} `, { exact: false }).first()
     ).toBeVisible()
+
+    // ── 14. Het restant zelf oppakken: pallet pakken en meteen rijden ──────
+    await page.goto('/restock-rounds/new')
+    await page.getByRole('button', { name: new RegExp(roundProductName!) }).click()
+    await page.getByRole('button', { name: /Rijden —/ }).click()
+
+    // Geen tussenschermen: van aanvinken direct naar de kiosk.
+    await page.waitForURL(/\/stop\//)
+    await expect(page.getByText(/Stop 1 van/)).toBeVisible()
   })
 })
 
