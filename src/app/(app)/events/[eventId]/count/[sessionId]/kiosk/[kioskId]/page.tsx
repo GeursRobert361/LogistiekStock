@@ -1,21 +1,27 @@
 'use client'
 
-import { use, useEffect, useState, useCallback, useRef } from 'react'
+import { use, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { v4 as uuidv4 } from 'uuid'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
 import { CategoryAccordion } from '@/components/counting/CategoryAccordion'
-import { ConfirmDialog } from '@/components/ui/Dialog'
+import { SkipKioskDialog } from '@/components/counting/SkipKioskDialog'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import {
-  getLocalSession,
-  saveKioskCountLocally,
-  saveCountEntryLocally,
-} from '@/lib/db/offlineDb'
-import { calculateRestockQuantity } from '@/domain/counting/calculateRestock'
-import { fromQuarterUnits } from '@/lib/quarterUnits'
+  clearCount,
+  completeKiosk,
+  flushPendingCountWrites,
+  getCompleteness,
+  loadEntries,
+  loadOrCreateKioskCount,
+  loadSession,
+  saveCount,
+  saveKioskNotes,
+  skipKiosk,
+} from '@/services/countingService'
+import { finishSessionIfComplete, pauseSession } from '@/services/countSessionService'
 import { KioskCountStatus } from '@/types'
 import type {
   Kiosk,
@@ -43,176 +49,271 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
   const [categories, setCategories] = useState<ProductCategory[]>([])
   const [standards, setStandards] = useState<Map<string, KioskProductStandard>>(new Map())
   const [counts, setCounts] = useState<Map<string, number>>(new Map())
+  const [kioskCount, setKioskCount] = useState<KioskCount | null>(null)
+  const [notes, setNotes] = useState('')
+  const [showNotes, setShowNotes] = useState(false)
   const [isLoading, setIsLoading] = useState(true)
   const [isSaving, setIsSaving] = useState(false)
   const [showSkipDialog, setShowSkipDialog] = useState(false)
-  const [kioskCount, setKioskCount] = useState<KioskCount | null>(null)
+  const [focusProductId, setFocusProductId] = useState<string | null>(null)
+  const [saveError, setSaveError] = useState<string | null>(null)
 
-  const autosaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const profileId = profile?.id
 
   useEffect(() => {
+    let cancelled = false
+
     async function load() {
-      const [kioskData, stdList, prodList, catList, storedSession] = await Promise.all([
-        repositories.kiosk().getKioskById(kioskId),
-        repositories.product().getStandards(kioskId),
-        repositories.product().getProducts({ activeOnly: true }),
-        repositories.product().getCategories(),
-        getLocalSession(sessionId),
-      ])
+      setIsLoading(true)
+      const [kioskData, standardList, productList, categoryList, storedSession] =
+        await Promise.all([
+          repositories.kiosk().getKioskById(kioskId),
+          repositories.product().getStandards(kioskId),
+          repositories.product().getProducts({ activeOnly: true }),
+          repositories.product().getCategories(),
+          loadSession(sessionId),
+        ])
+
+      if (cancelled) return
 
       setKiosk(kioskData)
-      setSession(storedSession ?? null)
-      setProducts(prodList)
-      setCategories(catList)
+      setSession(storedSession)
+      setProducts(productList)
+      setCategories(categoryList)
+      setStandards(new Map(standardList.map((s) => [s.productId, s])))
 
-      const stdMap = new Map(stdList.map((s) => [s.productId, s]))
-      setStandards(stdMap)
+      if (!profileId) return
 
-      // Create/load KioskCount
-      const existingCounts = await repositories.count().getKioskCountsForSession(sessionId)
-      let kc = existingCounts.find((c) => c.kioskId === kioskId)
-      if (!kc && profile) {
-        kc = {
-          id: uuidv4(),
-          countSessionId: sessionId,
-          kioskId,
-          startedAt: new Date().toISOString(),
-          counterId: profile.id,
-          status: KioskCountStatus.IN_PROGRESS,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
-        }
-        await saveKioskCountLocally(kc)
-        try {
-          await repositories.count().upsertKioskCount(kc)
-        } catch {
-          // offline
-        }
-      }
-      setKioskCount(kc ?? null)
+      const currentKioskCount = await loadOrCreateKioskCount({
+        sessionId,
+        kioskId,
+        counterId: profileId,
+      })
+      if (cancelled) return
 
-      // Load existing count entries
-      if (kc) {
-        const entries = await repositories.count().getEntriesForKioskCount(kc.id)
-        const countMap = new Map(entries.map((e) => [e.productId, e.countedQuantityQuarters]))
-        setCounts(countMap)
-      }
+      setKioskCount(currentKioskCount)
+      setNotes(currentKioskCount.generalNotes ?? '')
+      setShowNotes(Boolean(currentKioskCount.generalNotes))
 
+      const entries = await loadEntries(currentKioskCount.id)
+      if (cancelled) return
+
+      setCounts(new Map([...entries].map(([productId, e]) => [productId, e.countedQuantityQuarters])))
       setIsLoading(false)
     }
-    load()
-  }, [kioskId, sessionId, profile])
+
+    load().catch((error: unknown) => {
+      console.error('[telling] Laden van het telscherm mislukt.', error)
+      if (!cancelled) setIsLoading(false)
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [kioskId, sessionId, profileId])
+
+  // Wegnavigeren (ook via de browser) mag nooit een wijziging kwijtmaken.
+  useEffect(() => {
+    function flushNow() {
+      void flushPendingCountWrites()
+    }
+    window.addEventListener('pagehide', flushNow)
+    return () => {
+      window.removeEventListener('pagehide', flushNow)
+      flushNow()
+    }
+  }, [])
 
   const handleCountChange = useCallback(
-    async (productId: string, quarters: number) => {
+    (productId: string, quarters: number) => {
+      // Optimistisch renderen: de teller ziet het cijfer meteen staan.
       setCounts((prev) => new Map(prev).set(productId, quarters))
+      setFocusProductId(null)
 
-      // Debounced autosave
-      if (autosaveTimer.current) clearTimeout(autosaveTimer.current)
-      autosaveTimer.current = setTimeout(async () => {
-        if (!kioskCount || !profile) return
-        const std = standards.get(productId)
-        const targetQU = std?.targetQuantityQuarters ?? 0
-        const result = calculateRestockQuantity({
-          targetQuantity: fromQuarterUnits(targetQU),
-          countedQuantity: fromQuarterUnits(quarters),
-          halfPackageThresholdPercentage: std?.halfPackageThresholdPercentage ?? 80,
-        })
+      if (!kioskCount || !profileId) return
+      const standard = standards.get(productId)
+      if (!standard) return
 
-        const entry = {
-          id: uuidv4(),
-          kioskCountId: kioskCount.id,
-          productId,
-          targetQuantityQuarters: targetQU,
-          countedQuantityQuarters: quarters,
-          effectiveQuantityQuarters: Math.round(result.effectiveQuantity * 4),
-          restockQuantityPackages: result.restockQuantity,
-          appliedFractionRule: result.appliedFractionRule,
-          lastModifiedAt: new Date().toISOString(),
-          lastModifiedById: profile.id,
-        }
-
-        await saveCountEntryLocally(entry)
-        try {
-          await repositories.count().upsertCountEntry(entry)
-        } catch {
-          // offline
-        }
-      }, 500)
+      saveCount({
+        kioskCountId: kioskCount.id,
+        productId,
+        standard,
+        countedQuarters: quarters,
+        userId: profileId,
+      }).catch((error: unknown) => {
+        console.error('[telling] Opslaan van een telling mislukt.', error)
+        setSaveError('Opslaan is mislukt. Probeer de waarde opnieuw in te voeren.')
+      })
     },
-    [kioskCount, profile, standards]
+    [kioskCount, profileId, standards]
   )
 
-  async function handleComplete() {
-    if (!kioskCount || !profile) return
-    setIsSaving(true)
+  const handleCountClear = useCallback(
+    (productId: string) => {
+      setCounts((prev) => {
+        const next = new Map(prev)
+        next.delete(productId)
+        return next
+      })
 
-    const completedKc = {
-      ...kioskCount,
-      status: KioskCountStatus.COMPLETED,
-      completedAt: new Date().toISOString(),
-    }
-    await saveKioskCountLocally(completedKc)
-    try {
-      await repositories.count().upsertKioskCount(completedKc)
-    } catch {
-      // offline
-    }
+      if (!kioskCount || !profileId) return
+      clearCount(kioskCount.id, productId, profileId).catch((error: unknown) => {
+        console.error('[telling] Wissen van een telling mislukt.', error)
+        setSaveError('Wissen is mislukt. Probeer het opnieuw.')
+      })
+    },
+    [kioskCount, profileId]
+  )
 
-    // Navigeer naar volgende kiosk
-    if (session) {
-      const routeIndex = session.kioskRoute.indexOf(kioskId)
-      const nextKioskId = session.kioskRoute[routeIndex + 1]
-      if (nextKioskId) {
-        router.push(`/events/${eventId}/count/${sessionId}/kiosk/${nextKioskId}`)
-      } else {
-        // Laatste kiosk — terug naar evenement
-        router.push(`/events/${eventId}/count/review`)
-      }
-    }
-    setIsSaving(false)
+  const categoriesWithProducts = useMemo(
+    () =>
+      categories
+        .map((cat) => ({
+          ...cat,
+          products: products
+            .filter((p) => p.categoryId === cat.id && standards.has(p.id))
+            .sort((a, b) => a.sortOrder - b.sortOrder),
+        }))
+        .filter((cat) => cat.products.length > 0),
+    [categories, products, standards]
+  )
+
+  /** Verplicht te tellen: elk actief product met een norm voor deze kiosk. */
+  const requiredProductIds = useMemo(
+    () => categoriesWithProducts.flatMap((cat) => cat.products.map((p) => p.id)),
+    [categoriesWithProducts]
+  )
+
+  const completeness = useMemo(
+    () => getCompleteness(requiredProductIds, counts),
+    [requiredProductIds, counts]
+  )
+
+  const routeIndex = session ? session.kioskRoute.indexOf(kioskId) : -1
+  const totalKiosks = session?.kioskRoute.length ?? 0
+  const stopNumber = routeIndex >= 0 ? routeIndex + 1 : 1
+  const progress = totalKiosks > 0 ? Math.round((stopNumber / totalKiosks) * 100) : 0
+
+  const navigateToRouteIndex = useCallback(
+    async (index: number) => {
+      if (!session) return
+      const targetKioskId = session.kioskRoute[index]
+      if (!targetKioskId) return
+      await flushPendingCountWrites()
+      router.push(`/events/${eventId}/count/${sessionId}/kiosk/${targetKioskId}`)
+    },
+    [session, router, eventId, sessionId]
+  )
+
+  function jumpToFirstMissing() {
+    const first = completeness.missingProductIds[0]
+    if (!first) return
+    setFocusProductId(first)
+    // De accordeon klapt zelf open; daarna kunnen we scrollen.
+    requestAnimationFrame(() => {
+      document.getElementById(`product-${first}`)?.scrollIntoView({ block: 'center' })
+    })
   }
 
-  // Voortgang in de route
-  const routeIndex = session ? session.kioskRoute.indexOf(kioskId) : 0
-  const totalKiosks = session?.kioskRoute.length ?? 1
-  const progress = Math.round(((routeIndex + 1) / totalKiosks) * 100)
+  async function handleComplete() {
+    if (!kioskCount || !session || !completeness.isComplete) return
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      const completed = await completeKiosk(kioskCount)
+      setKioskCount(completed)
+      await goToNextStop()
+    } catch (error) {
+      console.error('[telling] Kiosk afronden mislukt.', error)
+      setSaveError('Afronden is mislukt. Probeer het opnieuw.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
 
-  // Groepeer producten per categorie
-  const categoriesWithProducts = categories
-    .map((cat) => ({
-      ...cat,
-      products: products.filter((p) => p.categoryId === cat.id && standards.has(p.id)),
-    }))
-    .filter((cat) => cat.products.length > 0)
+  async function handleSkip(reason: string) {
+    if (!kioskCount) return
+    setShowSkipDialog(false)
+    setIsSaving(true)
+    setSaveError(null)
+    try {
+      const skipped = await skipKiosk(kioskCount, reason)
+      setKioskCount(skipped)
+      await goToNextStop()
+    } catch (error) {
+      console.error('[telling] Kiosk overslaan mislukt.', error)
+      setSaveError('Overslaan is mislukt. Probeer het opnieuw.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  /** Volgende halte, of naar de review wanneer de ronde klaar is. */
+  async function goToNextStop() {
+    if (!session) return
+    await flushPendingCountWrites()
+
+    const finished = await finishSessionIfComplete(session)
+    if (finished) {
+      router.push(`/events/${eventId}/count/review?session=${session.id}`)
+      return
+    }
+
+    const nextKioskId = session.kioskRoute[routeIndex + 1]
+    if (nextKioskId) {
+      router.push(`/events/${eventId}/count/${sessionId}/kiosk/${nextKioskId}`)
+      return
+    }
+    router.push(`/events/${eventId}/count/review?session=${session.id}`)
+  }
+
+  async function handlePause() {
+    if (!session) return
+    await flushPendingCountWrites()
+    await pauseSession(session)
+    router.push(`/events/${eventId}`)
+  }
+
+  async function handleNotesBlur() {
+    if (!kioskCount) return
+    if ((kioskCount.generalNotes ?? '') === notes.trim()) return
+    try {
+      const updated = await saveKioskNotes(kioskCount, notes)
+      setKioskCount(updated)
+    } catch (error) {
+      console.error('[telling] Opslaan van de kiosknotitie mislukt.', error)
+      setSaveError('De notitie kon niet worden opgeslagen.')
+    }
+  }
 
   if (isLoading) {
     return (
       <>
-        <AppHeader title={`Kiosk ${kioskId}`} backHref={`/events/${eventId}`} />
+        <AppHeader title="Kiosk" backHref={`/events/${eventId}`} />
         <div className="p-4 text-center text-gray-500">Laden…</div>
       </>
     )
   }
 
+  const isDone =
+    kioskCount?.status === KioskCountStatus.COMPLETED ||
+    kioskCount?.status === KioskCountStatus.SKIPPED
+
   return (
     <>
-      <AppHeader
-        title={`Kiosk ${kiosk?.number ?? ''}`}
-        backHref={`/events/${eventId}`}
-      />
+      <AppHeader title={`Kiosk ${kiosk?.number ?? ''}`} backHref={`/events/${eventId}`} />
 
-      {/* Kiosk voortgangsbalk */}
+      {/* Voortgang + groot kiosknummer */}
       <div className="sticky top-14 z-30 border-b border-gray-200 bg-white px-4 py-2">
         <div className="mb-1 flex items-center justify-between">
-          <span className="text-xs text-gray-500">
-            Kiosk {routeIndex + 1} van {totalKiosks}
+          <span className="text-xs font-medium text-gray-600">
+            Stop {stopNumber} van {totalKiosks}
           </span>
           <span className="text-xs font-semibold text-gray-700">{progress}%</span>
         </div>
         <div className="h-2 overflow-hidden rounded-full bg-gray-200">
           <div
-            className="h-full rounded-full bg-arena-red transition-all"
+            className="h-full rounded-full bg-arena-red"
             style={{ width: `${progress}%` }}
             role="progressbar"
             aria-valuenow={progress}
@@ -222,30 +323,30 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
           />
         </div>
 
-        {/* Kiosknummer groot */}
         <div className="mt-2 flex items-center justify-between">
           <button
             type="button"
-            onClick={() => {
-              const prevId = session?.kioskRoute[routeIndex - 1]
-              if (prevId) router.push(`/events/${eventId}/count/${sessionId}/kiosk/${prevId}`)
-            }}
-            disabled={routeIndex === 0}
+            onClick={() => void navigateToRouteIndex(routeIndex - 1)}
+            disabled={routeIndex <= 0}
             aria-label="Vorige kiosk"
-            className="rounded-lg p-1 text-gray-400 disabled:opacity-30"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 disabled:opacity-30"
           >
             ◀
           </button>
-          <h2 className="text-4xl font-black text-arena-red">{kiosk?.number}</h2>
+          <div className="text-center">
+            <h2 className="text-5xl font-black leading-none text-arena-red">{kiosk?.number}</h2>
+            {isDone && (
+              <p className="mt-1 text-xs font-semibold text-green-700">
+                {kioskCount?.status === KioskCountStatus.SKIPPED ? 'Overgeslagen' : '✓ Afgerond'}
+              </p>
+            )}
+          </div>
           <button
             type="button"
-            onClick={() => {
-              const nextId = session?.kioskRoute[routeIndex + 1]
-              if (nextId) router.push(`/events/${eventId}/count/${sessionId}/kiosk/${nextId}`)
-            }}
-            disabled={routeIndex === totalKiosks - 1}
+            onClick={() => void navigateToRouteIndex(routeIndex + 1)}
+            disabled={routeIndex < 0 || routeIndex >= totalKiosks - 1}
             aria-label="Volgende kiosk"
-            className="rounded-lg p-1 text-gray-400 disabled:opacity-30"
+            className="flex h-11 w-11 items-center justify-center rounded-lg text-gray-500 disabled:opacity-30"
           >
             ▶
           </button>
@@ -253,9 +354,15 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
       </div>
 
       <div className="space-y-3 p-4">
+        {saveError && (
+          <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+            {saveError}
+          </p>
+        )}
+
         {categoriesWithProducts.length === 0 ? (
-          <p className="py-8 text-center text-gray-500">
-            Geen normen ingesteld voor deze kiosk
+          <p className="py-8 text-center text-gray-600">
+            Geen voorraadnormen ingesteld voor deze kiosk.
           </p>
         ) : (
           categoriesWithProducts.map((cat) => (
@@ -266,53 +373,102 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
               standards={standards}
               counts={counts}
               onCountChange={handleCountChange}
+              onCountClear={handleCountClear}
+              focusProductId={focusProductId}
             />
           ))
         )}
 
-        {/* Acties */}
-        <div className="space-y-2 pt-2">
-          <Button
-            size="lg"
-            className="w-full"
-            onClick={handleComplete}
-            disabled={isSaving}
-          >
-            {isSaving ? 'Opslaan…' : 'Kiosk afronden ✓'}
-          </Button>
+        {/* Kiosknotitie */}
+        <div className="rounded-xl border border-gray-200 bg-white p-3">
+          {showNotes ? (
+            <>
+              <label
+                htmlFor="kiosk-notes"
+                className="mb-1 block text-sm font-medium text-gray-700"
+              >
+                Notitie bij deze kiosk
+              </label>
+              <textarea
+                id="kiosk-notes"
+                value={notes}
+                onChange={(e) => setNotes(e.target.value)}
+                onBlur={handleNotesBlur}
+                rows={3}
+                placeholder="Bijv. koeling links defect, voorraad staat deels achterin"
+                className="w-full rounded-xl border border-gray-300 p-3 text-base text-gray-900 placeholder:text-gray-400 focus:border-arena-red focus:outline-none focus:ring-2 focus:ring-arena-red/30"
+              />
+            </>
+          ) : (
+            <button
+              type="button"
+              onClick={() => setShowNotes(true)}
+              className="min-h-11 w-full text-left text-sm font-medium text-gray-700"
+            >
+              📝 Notitie toevoegen
+            </button>
+          )}
+        </div>
 
+        <Link
+          href={`/incidents/new?eventId=${eventId}&kioskId=${kioskId}`}
+          className="block"
+        >
+          <Button variant="outline" size="md" className="w-full">
+            ⚠️ Storing melden
+          </Button>
+        </Link>
+      </div>
+
+      {/* Acties — onder handbereik, boven de bottom navigation */}
+      <div className="sticky bottom-[5.5rem] z-30 space-y-2 border-t border-gray-200 bg-white p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+        {!completeness.isComplete && requiredProductIds.length > 0 && (
+          <button
+            type="button"
+            onClick={jumpToFirstMissing}
+            className="min-h-11 w-full rounded-xl bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-900"
+          >
+            Nog {completeness.missingProductIds.length}{' '}
+            {completeness.missingProductIds.length === 1 ? 'product' : 'producten'} te tellen →
+          </button>
+        )}
+
+        <Button
+          size="lg"
+          className="w-full"
+          onClick={handleComplete}
+          disabled={isSaving || !completeness.isComplete}
+        >
+          {isSaving ? 'Opslaan…' : 'Kiosk afronden ✓'}
+        </Button>
+
+        <div className="flex gap-2">
           <Button
             variant="outline"
             size="md"
-            className="w-full"
+            className="flex-1"
             onClick={() => setShowSkipDialog(true)}
+            disabled={isSaving}
           >
-            Kiosk overslaan
+            Overslaan
+          </Button>
+          <Button
+            variant="outline"
+            size="md"
+            className="flex-1"
+            onClick={() => void handlePause()}
+            disabled={isSaving}
+          >
+            Pauzeren
           </Button>
         </div>
       </div>
 
-      <ConfirmDialog
+      <SkipKioskDialog
         open={showSkipDialog}
+        kioskNumber={kiosk?.number}
         onClose={() => setShowSkipDialog(false)}
-        onConfirm={async () => {
-          setShowSkipDialog(false)
-          if (kioskCount) {
-            const skipped = { ...kioskCount, status: KioskCountStatus.SKIPPED }
-            await saveKioskCountLocally(skipped)
-            try { await repositories.count().upsertKioskCount(skipped) } catch { /* offline */ }
-          }
-          const nextId = session?.kioskRoute[routeIndex + 1]
-          if (nextId) {
-            router.push(`/events/${eventId}/count/${sessionId}/kiosk/${nextId}`)
-          } else {
-            router.push(`/events/${eventId}/count/review`)
-          }
-        }}
-        title="Kiosk overslaan"
-        message="Weet je zeker dat je deze kiosk wilt overslaan? Je kunt de telling later nog aanvullen."
-        confirmLabel="Overslaan"
-        cancelLabel="Annuleren"
+        onConfirm={(reason) => void handleSkip(reason)}
       />
     </>
   )

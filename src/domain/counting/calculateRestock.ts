@@ -63,11 +63,20 @@ export function calculateRestockQuantity(
     effectiveQU = countedQU + 1
     appliedFractionRule = FractionRule.THREE_QUARTER_UP
   } else {
-    // .50 → 80%-rule based on the whole-package count
-    const wholePackages = Math.floor(countedQuantity)
-    const threshold = (halfPackageThresholdPercentage / 100) * targetQuantity
+    // .50 → 80%-rule based on the whole-package count.
+    //
+    // De vergelijking `wholePackages <= (pct/100) * target` wordt hier zonder
+    // deling uitgevoerd, zodat er geen afrondingsverschil kan ontstaan precies
+    // op de grens (bijv. 12 tegenover 80% van 15):
+    //
+    //   wholePackages          <= (pct / 100) * targetPackages
+    //   wholePackages * 100    <= pct * targetPackages
+    //   wholePackages * 100 * 4 <= pct * targetQU          (targetQU = target * 4)
+    //
+    // Alle factoren zijn gehele getallen, dus de vergelijking is exact.
+    const wholePackages = Math.floor(countedQU / 4)
 
-    if (wholePackages <= threshold) {
+    if (wholePackages * 400 <= targetQU * halfPackageThresholdPercentage) {
       // Round down: the half does not count
       effectiveQU = countedQU - 2
       appliedFractionRule = FractionRule.HALF_DOWN

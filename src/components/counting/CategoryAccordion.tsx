@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { ProductCountRow } from './ProductCountRow'
 import type { Product, KioskProductStandard } from '@/types'
@@ -9,9 +9,13 @@ interface CategoryAccordionProps {
   categoryName: string
   products: Product[]
   standards: Map<string, KioskProductStandard>
-  counts: Map<string, number> // productId → quarter units
+  /** productId → kwarteenheden. Ontbrekende sleutel = nog niet geteld. */
+  counts: Map<string, number>
   onCountChange: (productId: string, quarters: number) => void
+  onCountClear: (productId: string) => void
   defaultOpen?: boolean
+  /** Wanneer gezet, klapt de categorie open en springt de focus naar dit product. */
+  focusProductId?: string | null
 }
 
 export function CategoryAccordion({
@@ -20,15 +24,22 @@ export function CategoryAccordion({
   standards,
   counts,
   onCountChange,
+  onCountClear,
   defaultOpen = true,
+  focusProductId = null,
 }: CategoryAccordionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
 
-  const filledCount = products.filter((p) => {
-    const counted = counts.get(p.id)
-    return counted !== undefined && counted > 0
-  }).length
+  const containsFocus =
+    focusProductId !== null && products.some((p) => p.id === focusProductId)
 
+  useEffect(() => {
+    if (containsFocus) setIsOpen(true)
+  }, [containsFocus])
+
+  // Een expliciete 0 is ingevuld. Daarom telt de aanwezigheid van de sleutel,
+  // niet de waarde.
+  const filledCount = products.filter((p) => counts.get(p.id) !== undefined).length
   const isComplete = filledCount === products.length
 
   return (
@@ -37,21 +48,21 @@ export function CategoryAccordion({
         type="button"
         onClick={() => setIsOpen((o) => !o)}
         aria-expanded={isOpen}
-        className="flex w-full items-center justify-between bg-gray-50 px-4 py-3"
+        className="flex min-h-14 w-full items-center justify-between bg-gray-50 px-4 py-3"
       >
         <div className="flex items-center gap-2">
           <span className="font-semibold text-gray-900">{categoryName}</span>
           <span
             className={cn(
-              'rounded-full px-2 py-0.5 text-xs font-medium',
-              isComplete ? 'bg-green-100 text-green-700' : 'bg-gray-200 text-gray-600'
+              'rounded-full px-2 py-0.5 text-xs font-semibold',
+              isComplete ? 'bg-green-100 text-green-800' : 'bg-gray-200 text-gray-700'
             )}
-            aria-label={`${filledCount} van ${products.length} ingevuld`}
           >
+            {isComplete ? '✓ ' : ''}
             {filledCount}/{products.length}
           </span>
         </div>
-        <span aria-hidden="true" className="text-gray-400">
+        <span aria-hidden="true" className="text-gray-500">
           {isOpen ? '▲' : '▼'}
         </span>
       </button>
@@ -60,16 +71,21 @@ export function CategoryAccordion({
         <div className="divide-y divide-gray-100 bg-white">
           {products.map((product) => {
             const std = standards.get(product.id)
-            const targetQuarters = std?.targetQuantityQuarters ?? 0
-            const countedQuarters = counts.get(product.id) ?? 0
-
             return (
-              <div key={product.id} className="p-3">
+              <div
+                key={product.id}
+                id={`product-${product.id}`}
+                className={cn(
+                  'p-3',
+                  focusProductId === product.id && 'ring-2 ring-inset ring-arena-red'
+                )}
+              >
                 <ProductCountRow
                   product={product}
-                  targetQuantityQuarters={targetQuarters}
-                  countedQuantityQuarters={countedQuarters}
+                  targetQuantityQuarters={std?.targetQuantityQuarters ?? 0}
+                  countedQuantityQuarters={counts.get(product.id)}
                   onCountChange={onCountChange}
+                  onCountClear={onCountClear}
                   halfPackageThresholdPercentage={std?.halfPackageThresholdPercentage ?? 80}
                 />
               </div>

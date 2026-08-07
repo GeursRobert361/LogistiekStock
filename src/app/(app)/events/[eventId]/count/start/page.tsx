@@ -2,7 +2,6 @@
 
 import { use, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { v4 as uuidv4 } from 'uuid'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -10,8 +9,8 @@ import { Select } from '@/components/ui/Select'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import { generateCircularKioskRoute } from '@/domain/routing/kioskRoute'
-import { RouteDirection, CountSessionStatus, SyncStatus } from '@/types'
-import { saveCountSessionLocally } from '@/lib/db/offlineDb'
+import { createSession } from '@/services/countingService'
+import { RouteDirection } from '@/types'
 import type { Ring, Kiosk } from '@/types'
 
 export default function CountStartPage({
@@ -30,6 +29,7 @@ export default function CountStartPage({
   const [direction, setDirection] = useState<RouteDirection>(RouteDirection.ASCENDING)
   const [isLoading, setIsLoading] = useState(true)
   const [isStarting, setIsStarting] = useState(false)
+  const [startError, setStartError] = useState<string | null>(null)
   const [previewRoute, setPreviewRoute] = useState<number[]>([])
 
   useEffect(() => {
@@ -84,42 +84,36 @@ export default function CountStartPage({
     e.preventDefault()
     if (!profile || !startKioskId) return
     setIsStarting(true)
+    setStartError(null)
 
-    const route = generateCircularKioskRoute({
-      kiosks: ringKiosks,
-      startKioskId,
-      direction,
-    })
-
-    const sessionId = uuidv4()
-    const session = {
-      id: sessionId,
-      userId: profile.id,
-      eventId,
-      ringId: selectedRingId,
-      startKioskId,
-      direction,
-      kioskRoute: route.map((k) => k.id),
-      startedAt: new Date().toISOString(),
-      status: CountSessionStatus.IN_PROGRESS,
-      syncStatus: SyncStatus.LOCAL,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-
-    // Sla lokaal op — werkt ook offline
-    await saveCountSessionLocally(session)
-
-    // Probeer ook op server op te slaan
     try {
-      await repositories.count().createSession(session)
-    } catch {
-      // Offline — outbox synchroniseert later
-    }
+      const route = generateCircularKioskRoute({ kiosks: ringKiosks, startKioskId, direction })
+      if (route.length === 0) {
+        setStartError('Deze ring heeft geen open kiosken voor dit evenement.')
+        return
+      }
 
-    const firstKioskId = route[0]?.id
-    if (firstKioskId) {
-      router.push(`/events/${eventId}/count/${sessionId}/kiosk/${firstKioskId}`)
+      // De telronde staat direct lokaal; de server volgt via de outbox, zodat
+      // starten ook zonder verbinding werkt.
+      const session = await createSession({
+        userId: profile.id,
+        eventId,
+        ringId: selectedRingId,
+        startKioskId,
+        direction,
+        kioskRoute: route.map((k) => k.id),
+        startedAt: new Date().toISOString(),
+      })
+
+      const firstKioskId = route[0]?.id
+      if (firstKioskId) {
+        router.push(`/events/${eventId}/count/${session.id}/kiosk/${firstKioskId}`)
+      }
+    } catch (error) {
+      console.error('[telling] Telronde starten mislukt.', error)
+      setStartError('De telronde kon niet worden gestart. Probeer het opnieuw.')
+    } finally {
+      setIsStarting(false)
     }
   }
 
@@ -204,6 +198,12 @@ export default function CountStartPage({
                 </p>
               </CardContent>
             </Card>
+          )}
+
+          {startError && (
+            <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+              {startError}
+            </p>
           )}
 
           <Button type="submit" size="lg" className="w-full" disabled={isStarting || !startKioskId}>

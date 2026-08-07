@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback, useId } from 'react'
+import { useCallback, useId, useState } from 'react'
 import { cn } from '@/lib/utils'
 import {
   toQuarterUnits,
@@ -11,15 +11,18 @@ import {
 } from '@/lib/quarterUnits'
 
 interface QuarterQuantityInputProps {
-  /** Current value in packages (e.g. 4.5) */
-  value: number
-  /** Called with new value in packages */
+  /**
+   * Huidige waarde in verpakkingen, of `undefined` wanneer er nog niet geteld is.
+   * `undefined` en 0 zijn nadrukkelijk niet hetzelfde.
+   */
+  value: number | undefined
+  /** Nieuwe waarde in verpakkingen. */
   onChange: (value: number) => void
-  /** Step size: 1 | 0.5 | 0.25 */
+  /** Zet het product terug op "nog niet geteld". */
+  onClear?: () => void
   step?: 1 | 0.5 | 0.25
-  /** Target quantity for the "Vol" button */
+  /** Norm, gebruikt voor de "Vol"-knop. */
   targetQuantity: number
-  /** Minimum allowed value (default 0) */
   min?: number
   label?: string
   disabled?: boolean
@@ -29,6 +32,7 @@ interface QuarterQuantityInputProps {
 export function QuarterQuantityInput({
   value,
   onChange,
+  onClear,
   step = 1,
   targetQuantity,
   min = 0,
@@ -40,16 +44,14 @@ export function QuarterQuantityInput({
   const [inputText, setInputText] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
-  const displayValue = inputText !== null ? inputText : formatQuantity(value)
-
-  function clamp(v: number): number {
-    return Math.max(min, v)
-  }
+  const isCounted = value !== undefined
+  const displayValue = inputText !== null ? inputText : isCounted ? formatQuantity(value) : ''
 
   const adjust = useCallback(
     (delta: number) => {
       const deltaQU = Math.round(delta * 4)
-      const currentQU = toQuarterUnits(value)
+      // Nog niet geteld: "+" begint bij de stapgrootte zelf.
+      const currentQU = value === undefined ? 0 : toQuarterUnits(value)
       const newQU = Math.max(Math.round(min * 4), currentQU + deltaQU)
       onChange(fromQuarterUnits(newQU))
       setInputText(null)
@@ -58,47 +60,34 @@ export function QuarterQuantityInput({
     [value, min, onChange]
   )
 
-  function handleInputChange(e: React.ChangeEvent<HTMLInputElement>) {
-    setInputText(e.target.value)
-    setError(null)
-  }
-
-  function handleInputBlur() {
+  function commitText() {
     if (inputText === null) return
+    const trimmed = inputText.trim()
+
+    if (trimmed === '') {
+      // Leeggemaakt veld betekent "nog niet geteld", niet "nul".
+      onClear?.()
+      setInputText(null)
+      setError(null)
+      return
+    }
+
     try {
-      const parsed = parseQuantity(inputText)
+      const parsed = parseQuantity(trimmed)
       if (!isValidQuantity(parsed)) {
         setError('Gebruik stappen van 0,25 (bijv. 4 of 4,5)')
         return
       }
-      onChange(clamp(parsed))
+      onChange(Math.max(min, parsed))
       setInputText(null)
       setError(null)
     } catch {
-      setError('Ongeldige waarde')
+      setError('Ongeldige waarde — gebruik bijvoorbeeld 4 of 4,5')
     }
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter') {
-      handleInputBlur()
-    }
-  }
-
-  function setZero() {
-    onChange(0)
-    setInputText(null)
-    setError(null)
-  }
-
-  function setFull() {
-    onChange(targetQuantity)
-    setInputText(null)
-    setError(null)
   }
 
   return (
-    <div className={cn('flex flex-col gap-1', className)}>
+    <div className={cn('flex flex-col gap-2', className)}>
       {label && (
         <label htmlFor={inputId} className="text-sm font-medium text-gray-700">
           {label}
@@ -106,55 +95,64 @@ export function QuarterQuantityInput({
       )}
 
       <div className="flex items-center gap-2">
-        {/* Minus */}
         <button
           type="button"
           onClick={() => adjust(-step)}
-          disabled={disabled || value <= min}
+          disabled={disabled || !isCounted || value <= min}
           aria-label={`Verminder met ${formatQuantity(step)}`}
           className={cn(
-            'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-xl font-bold transition-colors',
+            'flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl text-2xl font-bold',
             'border border-gray-300 bg-white text-gray-700',
-            'hover:bg-gray-100 active:bg-gray-200',
-            'disabled:opacity-40'
+            'active:bg-gray-200 disabled:opacity-40'
           )}
         >
           −
         </button>
 
-        {/* Numeric input */}
         <div className="flex-1">
           <input
             id={inputId}
             type="text"
             inputMode="decimal"
             value={displayValue}
-            onChange={handleInputChange}
-            onBlur={handleInputBlur}
-            onKeyDown={handleKeyDown}
+            placeholder="—"
+            onChange={(e) => {
+              setInputText(e.target.value)
+              setError(null)
+            }}
+            onBlur={commitText}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') {
+                e.preventDefault()
+                commitText()
+              }
+            }}
             disabled={disabled}
             aria-invalid={error != null}
             aria-describedby={error ? `${inputId}-error` : undefined}
             className={cn(
-              'h-12 w-full rounded-xl border text-center text-xl font-bold transition-colors',
-              'focus:outline-none focus:ring-2 focus:ring-arena-red/30 focus:border-arena-red',
-              error ? 'border-red-400 bg-red-50' : 'border-gray-300 bg-white',
+              'h-14 w-full rounded-xl border text-center text-2xl font-bold text-gray-900',
+              'placeholder:font-normal placeholder:text-gray-400',
+              'focus:border-arena-red focus:outline-none focus:ring-2 focus:ring-arena-red/30',
+              error
+                ? 'border-red-400 bg-red-50'
+                : isCounted
+                  ? 'border-gray-300 bg-white'
+                  : 'border-dashed border-gray-300 bg-gray-50',
               'disabled:opacity-50'
             )}
           />
         </div>
 
-        {/* Plus */}
         <button
           type="button"
           onClick={() => adjust(step)}
           disabled={disabled}
           aria-label={`Verhoog met ${formatQuantity(step)}`}
           className={cn(
-            'flex h-12 w-12 flex-shrink-0 items-center justify-center rounded-xl text-xl font-bold transition-colors',
+            'flex h-14 w-14 flex-shrink-0 items-center justify-center rounded-xl text-2xl font-bold',
             'border border-gray-300 bg-white text-gray-700',
-            'hover:bg-gray-100 active:bg-gray-200',
-            'disabled:opacity-40'
+            'active:bg-gray-200 disabled:opacity-40'
           )}
         >
           +
@@ -162,29 +160,50 @@ export function QuarterQuantityInput({
       </div>
 
       {error && (
-        <p id={`${inputId}-error`} role="alert" className="text-xs text-red-600">
+        <p id={`${inputId}-error`} role="alert" className="text-xs font-medium text-red-600">
           {error}
         </p>
       )}
 
-      {/* Snelknoppen */}
       <div className="flex gap-2">
         <button
           type="button"
-          onClick={setZero}
+          onClick={() => {
+            onChange(0)
+            setInputText(null)
+            setError(null)
+          }}
           disabled={disabled}
-          className="flex-1 rounded-lg border border-gray-300 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 active:bg-gray-100 disabled:opacity-40"
+          className="min-h-11 flex-1 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-700 active:bg-gray-100 disabled:opacity-40"
         >
           0
         </button>
         <button
           type="button"
-          onClick={setFull}
+          onClick={() => {
+            onChange(targetQuantity)
+            setInputText(null)
+            setError(null)
+          }}
           disabled={disabled}
-          className="flex-1 rounded-lg border border-green-300 bg-green-50 py-2 text-sm font-medium text-green-700 hover:bg-green-100 active:bg-green-200 disabled:opacity-40"
+          className="min-h-11 flex-1 rounded-lg border border-green-300 bg-green-50 text-sm font-semibold text-green-800 active:bg-green-100 disabled:opacity-40"
         >
           Vol ({formatQuantity(targetQuantity)})
         </button>
+        {onClear && isCounted && (
+          <button
+            type="button"
+            onClick={() => {
+              onClear()
+              setInputText(null)
+              setError(null)
+            }}
+            disabled={disabled}
+            className="min-h-11 rounded-lg border border-gray-300 bg-white px-3 text-sm font-medium text-gray-600 active:bg-gray-100 disabled:opacity-40"
+          >
+            Wissen
+          </button>
+        )}
       </div>
     </div>
   )

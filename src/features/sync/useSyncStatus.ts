@@ -1,38 +1,36 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
-import { SyncStatus } from '@/types'
-import { getPendingOutboxEntries } from '@/lib/db/offlineDb'
+import { useEffect, useState } from 'react'
+import { syncService, type SyncSnapshot } from '@/services/syncService'
 
-interface SyncState {
-  status: SyncStatus
-  pendingCount: number
-  lastSyncedAt: string | null
-  error: string | null
+export interface SyncStatusView extends SyncSnapshot {
+  /** Wat de browser denkt. Zegt niets over of de server echt bereikbaar is. */
+  isBrowserOnline: boolean
+  /** Alles is weggeschreven én er staat niets meer klaar. */
+  isEverythingSaved: boolean
 }
 
-export function useSyncStatus() {
-  const [state, setState] = useState<SyncState>({
-    status: SyncStatus.SYNCED,
-    pendingCount: 0,
-    lastSyncedAt: null,
-    error: null,
-  })
+export function useSyncStatus(): SyncStatusView {
+  const [snapshot, setSnapshot] = useState<SyncSnapshot>(() => syncService.getSnapshot())
+  const [isBrowserOnline, setIsBrowserOnline] = useState(true)
 
-  const checkPending = useCallback(async () => {
-    const entries = await getPendingOutboxEntries()
-    setState((prev) => ({
-      ...prev,
-      pendingCount: entries.length,
-      status: entries.length > 0 ? SyncStatus.LOCAL : SyncStatus.SYNCED,
-    }))
-  }, [])
+  useEffect(() => syncService.subscribe(setSnapshot), [])
 
   useEffect(() => {
-    checkPending()
-    const interval = setInterval(checkPending, 10_000)
-    return () => clearInterval(interval)
-  }, [checkPending])
+    setIsBrowserOnline(navigator.onLine)
+    const onOnline = () => setIsBrowserOnline(true)
+    const onOffline = () => setIsBrowserOnline(false)
+    window.addEventListener('online', onOnline)
+    window.addEventListener('offline', onOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', onOffline)
+    }
+  }, [])
 
-  return { ...state, refresh: checkPending }
+  return {
+    ...snapshot,
+    isBrowserOnline,
+    isEverythingSaved: snapshot.pendingCount === 0 && snapshot.failedCount === 0,
+  }
 }

@@ -31,10 +31,7 @@ export function BottomNavigation() {
   })
 
   return (
-    <nav
-      aria-label="Hoofdnavigatie"
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white pb-safe"
-    >
+    <nav aria-label="Hoofdnavigatie" className="border-t border-gray-100 bg-white pb-safe">
       <ul className="flex">
         {visibleItems.map((item) => {
           const isActive = pathname.startsWith(item.href)

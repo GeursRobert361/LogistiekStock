@@ -64,6 +64,17 @@ export function getFractionQuarters(quarterUnits: number): 0 | 1 | 2 | 3 {
 }
 
 /**
+ * Returns true when `quarterUnits` represents whole packages.
+ *
+ * Voorraadnormen horen in deze workflow hele verpakkingen te zijn: de
+ * bijvulregels ronden een telling altijd af naar hele verpakkingen, dus een
+ * norm van 4,5 zou nooit exact bereikbaar zijn.
+ */
+export function isWholePackages(quarterUnits: number): boolean {
+  return Number.isInteger(quarterUnits) && quarterUnits % QUARTERS_PER_PACKAGE === 0
+}
+
+/**
  * Returns true when `value` is a valid package quantity (multiple of 0.25, non-negative).
  */
 export function isValidQuantity(value: number): boolean {
