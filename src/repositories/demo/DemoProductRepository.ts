@@ -4,8 +4,10 @@ import { demoTables } from './demoTables'
 import { newId } from '@/lib/ids'
 
 export class DemoProductRepository implements IProductRepository {
-  async getCategories(): Promise<ProductCategory[]> {
-    return demoTables.categories.filter((c) => c.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
+  async getCategories(options?: { includeInactive?: boolean }): Promise<ProductCategory[]> {
+    return demoTables.categories
+      .filter((c) => options?.includeInactive === true || c.isActive)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
   async getProducts(options?: { categoryId?: string; activeOnly?: boolean }): Promise<Product[]> {

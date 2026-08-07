@@ -1,7 +1,7 @@
 import type { Product, ProductCategory, KioskProductStandard } from '@/types'
 
 export interface IProductRepository {
-  getCategories(): Promise<ProductCategory[]>
+  getCategories(options?: { includeInactive?: boolean }): Promise<ProductCategory[]>
   createCategory(data: Omit<ProductCategory, 'id'>): Promise<ProductCategory>
   updateCategory(id: string, data: Partial<ProductCategory>): Promise<ProductCategory>
   getProducts(options?: { categoryId?: string; activeOnly?: boolean }): Promise<Product[]>

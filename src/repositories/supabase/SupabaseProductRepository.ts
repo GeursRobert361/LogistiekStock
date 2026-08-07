@@ -18,10 +18,10 @@ export class SupabaseProductRepository implements IProductRepository {
     return getSupabaseClient()
   }
 
-  async getCategories(): Promise<ProductCategory[]> {
-    const rows = unwrapList<Row>(
-      await this.db.from('product_categories').select('*').eq('is_active', true).order('sort_order')
-    )
+  async getCategories(options?: { includeInactive?: boolean }): Promise<ProductCategory[]> {
+    let query = this.db.from('product_categories').select('*')
+    if (options?.includeInactive !== true) query = query.eq('is_active', true)
+    const rows = unwrapList<Row>(await query.order('sort_order'))
     return rows.map(mapCategory)
   }
 

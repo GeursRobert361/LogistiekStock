@@ -6,6 +6,7 @@ import {
   getFailedOutboxEntries,
   markOutboxEntrySuccess,
   markOutboxEntryFailed,
+  countUnresolvedConflicts,
 } from '@/lib/db/offlineDb'
 
 /**
@@ -33,6 +34,8 @@ export interface SyncSnapshot {
   pendingCount: number
   /** Mutaties die na herhaalde pogingen blijven falen. */
   failedCount: number
+  /** Onopgeloste conflicten tussen de lokale en de servertelling. */
+  conflictCount: number
   /** Of de server bij de laatste poging bereikbaar bleek. */
   isServerReachable: boolean
   lastSyncedAt: string | null
@@ -57,6 +60,7 @@ export class SyncService {
     status: SyncStatus.SYNCED,
     pendingCount: 0,
     failedCount: 0,
+    conflictCount: 0,
     isServerReachable: true,
     lastSyncedAt: null,
     lastError: null,
@@ -176,13 +180,15 @@ export class SyncService {
   }
 
   private async refreshCounts(): Promise<void> {
-    const [pending, failed] = await Promise.all([
+    const [pending, failed, conflicts] = await Promise.all([
       getPendingOutboxEntries(),
       getFailedOutboxEntries(),
+      countUnresolvedConflicts(),
     ])
     this.update({
       pendingCount: pending.length,
       failedCount: failed.length,
+      conflictCount: conflicts,
       status: this.deriveStatus(pending, failed.length),
     })
     if (pending.length === 0 && this.retryTimer) {

@@ -187,3 +187,17 @@ export async function getUnresolvedConflicts(): Promise<SyncConflict[]> {
   const all = await getOfflineDb().conflicts.toArray()
   return all.filter((c) => !c.resolvedAt)
 }
+
+export async function countUnresolvedConflicts(): Promise<number> {
+  return (await getUnresolvedConflicts()).length
+}
+
+export async function markConflictResolved(id: string, resolvedBy: string): Promise<void> {
+  const conflict = await getOfflineDb().conflicts.get(id)
+  if (!conflict) return
+  await getOfflineDb().conflicts.put({
+    ...conflict,
+    resolvedAt: new Date().toISOString(),
+    resolvedBy,
+  })
+}

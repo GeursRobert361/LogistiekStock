@@ -1,7 +1,7 @@
 import type { IKioskRepository } from '../interfaces/IKioskRepository'
 import type { Kiosk, Ring } from '@/types'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import { mapKiosk, mapRing, kioskToRow } from './mappers'
+import { mapKiosk, mapRing, kioskToRow, ringToRow } from './mappers'
 import { unwrap, unwrapList, unwrapMaybe } from './supabaseHelpers'
 
 type Row = Record<string, unknown>
@@ -11,10 +11,10 @@ export class SupabaseKioskRepository implements IKioskRepository {
     return getSupabaseClient()
   }
 
-  async getRings(): Promise<Ring[]> {
-    const rows = unwrapList<Row>(
-      await this.db.from('rings').select('*').eq('is_active', true).order('sort_order')
-    )
+  async getRings(options?: { includeInactive?: boolean }): Promise<Ring[]> {
+    let query = this.db.from('rings').select('*')
+    if (options?.includeInactive !== true) query = query.eq('is_active', true)
+    const rows = unwrapList<Row>(await query.order('sort_order'))
     return rows.map(mapRing)
   }
 
@@ -23,8 +23,21 @@ export class SupabaseKioskRepository implements IKioskRepository {
     return row ? mapRing(row) : null
   }
 
-  async getKiosks(ringId?: string): Promise<Kiosk[]> {
-    let query = this.db.from('kiosks').select('*').eq('is_active', true)
+  async createRing(data: Omit<Ring, 'id' | 'createdAt' | 'updatedAt'>): Promise<Ring> {
+    const row = unwrap<Row>(await this.db.from('rings').insert(ringToRow(data)).select().single())
+    return mapRing(row)
+  }
+
+  async updateRing(id: string, data: Partial<Ring>): Promise<Ring> {
+    const row = unwrap<Row>(
+      await this.db.from('rings').update(ringToRow(data)).eq('id', id).select().single()
+    )
+    return mapRing(row)
+  }
+
+  async getKiosks(ringId?: string, options?: { includeInactive?: boolean }): Promise<Kiosk[]> {
+    let query = this.db.from('kiosks').select('*')
+    if (options?.includeInactive !== true) query = query.eq('is_active', true)
     if (ringId) query = query.eq('ring_id', ringId)
     const rows = unwrapList<Row>(await query.order('sort_order'))
     return rows.map(mapKiosk)

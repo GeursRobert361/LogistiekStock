@@ -4,17 +4,34 @@ import { demoTables } from './demoTables'
 import { newId } from '@/lib/ids'
 
 export class DemoKioskRepository implements IKioskRepository {
-  async getRings(): Promise<Ring[]> {
-    return demoTables.rings.filter((r) => r.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
+  async getRings(options?: { includeInactive?: boolean }): Promise<Ring[]> {
+    return demoTables.rings
+      .filter((r) => options?.includeInactive === true || r.isActive)
+      .sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
   async getRingById(id: string): Promise<Ring | null> {
     return demoTables.rings.getById(id)
   }
 
-  async getKiosks(ringId?: string): Promise<Kiosk[]> {
+  async createRing(data: Omit<Ring, 'id' | 'createdAt' | 'updatedAt'>): Promise<Ring> {
+    const now = new Date().toISOString()
+    const ring: Ring = { ...data, id: `ring-${newId()}`, createdAt: now, updatedAt: now }
+    demoTables.rings.insert(ring)
+    return ring
+  }
+
+  async updateRing(id: string, data: Partial<Ring>): Promise<Ring> {
+    return demoTables.rings.update(id, { ...data, updatedAt: new Date().toISOString() })
+  }
+
+  async getKiosks(ringId?: string, options?: { includeInactive?: boolean }): Promise<Kiosk[]> {
     return demoTables.kiosks
-      .filter((k) => k.isActive && (ringId == null || k.ringId === ringId))
+      .filter(
+        (k) =>
+          (options?.includeInactive === true || k.isActive) &&
+          (ringId == null || k.ringId === ringId)
+      )
       .sort((a, b) => a.sortOrder - b.sortOrder)
   }
 

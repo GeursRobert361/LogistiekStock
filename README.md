@@ -120,8 +120,31 @@ begintoestand.
    psql $DATABASE_URL < supabase/migrations/003_restock_round_type.sql
    psql $DATABASE_URL < supabase/migrations/004_restock_stop_items.sql
    ```
-3. Zet `NEXT_PUBLIC_APP_MODE=production` in `.env.local`
-4. Vul de Supabase-omgevingsvariabelen in
+3. Vul de Supabase-gegevens in `.env.local` (dat bestand staat in
+   `.gitignore` en wordt nooit meegecommit):
+   ```
+   NEXT_PUBLIC_APP_MODE=production
+   NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
+   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
+   SUPABASE_SERVICE_ROLE_KEY=<service role key>
+   ```
+   De anon key is bedoeld om in de browser te staan. De **service role key
+   omzeilt Row Level Security** — die hoort alleen in `.env.local` en in de
+   serveromgeving, nooit in een `NEXT_PUBLIC_`-variabele en niet in een chat
+   of ticket.
+4. Vul de database met stamdata:
+   ```bash
+   npm run seed              # ringen, kiosken, categorieën, producten, normen
+   npm run seed -- --users   # plus de demo-accounts (alleen voor test/acceptatie)
+   ```
+   Het script is idempotent: opnieuw draaien werkt bestaande rijen bij in
+   plaats van dubbele aan te maken.
+
+De Supabase-laag wordt gecontroleerd door
+`src/repositories/supabase/__tests__/schema.test.ts`: die leest de migraties en
+controleert of elke tabel, kolom en `onConflict` die de repositories en het
+seed-script gebruiken ook echt bestaat. Een typefout in een kolomnaam valt
+daarmee op zonder draaiende database.
 
 ---
 

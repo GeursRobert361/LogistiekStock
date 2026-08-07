@@ -1,10 +1,13 @@
 'use client'
 
 import { useEffect } from 'react'
+import Link from 'next/link'
 import { cn } from '@/lib/utils'
+import { useAuth } from '@/context/AuthContext'
 import { useSyncStatus } from '@/features/sync/useSyncStatus'
 import { registerSyncHandlers } from '@/services/syncHandlers'
 import { syncService } from '@/services/syncService'
+import { PERMISSIONS } from '@/lib/permissions'
 
 /**
  * Permanente synchronisatiestatus.
@@ -15,20 +18,32 @@ import { syncService } from '@/services/syncService'
  */
 export function SyncStatusBar() {
   const status = useSyncStatus()
+  const { hasAnyRole } = useAuth()
+  const canResolveConflicts = hasAnyRole([...PERMISSIONS.REVIEW_COUNTS])
 
   useEffect(() => {
     registerSyncHandlers()
     void syncService.flush()
   }, [])
 
-  const { pendingCount, failedCount, isServerReachable, isBrowserOnline, isEverythingSaved } =
-    status
+  const {
+    pendingCount,
+    failedCount,
+    conflictCount,
+    isServerReachable,
+    isBrowserOnline,
+    isEverythingSaved,
+  } = status
 
   let tone: 'ok' | 'busy' | 'offline' | 'error'
   let icon: string
   let text: string
 
-  if (failedCount > 0) {
+  if (conflictCount > 0) {
+    tone = 'error'
+    icon = '⚠'
+    text = `${conflictCount} telling${conflictCount === 1 ? '' : 'en'} wijkt af van de server`
+  } else if (failedCount > 0) {
     tone = 'error'
     icon = '⚠'
     text = `Synchronisatiefout — ${failedCount} wijziging${failedCount === 1 ? '' : 'en'} niet opgeslagen`
@@ -64,7 +79,12 @@ export function SyncStatusBar() {
     >
       <span aria-hidden="true">{icon}</span>
       <span>{text}</span>
-      {(tone === 'error' || (tone === 'offline' && pendingCount > 0)) && (
+      {conflictCount > 0 && canResolveConflicts && (
+        <Link href="/conflicts" className="ml-2 underline underline-offset-2">
+          Oplossen
+        </Link>
+      )}
+      {conflictCount === 0 && (tone === 'error' || (tone === 'offline' && pendingCount > 0)) && (
         <button
           type="button"
           onClick={() => void syncService.flush()}
