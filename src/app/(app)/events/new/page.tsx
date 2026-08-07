@@ -13,6 +13,7 @@ import { useAuth } from '@/context/AuthContext'
 import { PERMISSIONS } from '@/lib/permissions'
 import { EVENT_TYPE_LABEL } from '@/lib/eventLabels'
 import { formatDate, todayIso } from '@/lib/utils'
+import { findPreviousEventId } from '@/services/consumptionService'
 import { EventStatus, EventType } from '@/types'
 import type { AgendaEntry, Kiosk, Ring } from '@/types'
 
@@ -106,11 +107,16 @@ export default function NewEventPage() {
     setIsSaving(true)
     setError(null)
     try {
+      // De voorganger vastleggen: zonder die ketting is later niet te zien
+      // hoeveel er tijdens het vorige evenement doorheen is gegaan.
+      const existingEvents = await repositories.event().getEvents()
+
       const event = await repositories.event().createEvent({
         name: name.trim(),
         date,
         eventType,
         status: EventStatus.READY_FOR_COUNTING,
+        previousEventId: findPreviousEventId(existingEvents, date),
         notes: notes.trim() || undefined,
         activeRingIds: [...selectedRingIds],
         activeKioskIds: openKiosks.map((kiosk) => kiosk.id),

@@ -69,6 +69,7 @@ export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
   'count.getKioskCountsForSession': 'AUTHENTICATED',
   'count.upsertKioskCount': 'COUNT',
   'count.getEntriesForKioskCount': 'AUTHENTICATED',
+  'count.getEntriesForSession': 'AUTHENTICATED',
   'count.upsertCountEntry': 'COUNT',
   'count.bulkUpsertCountEntries': 'COUNT',
   'count.deleteCountEntry': 'COUNT',

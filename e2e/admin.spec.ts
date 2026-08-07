@@ -138,6 +138,30 @@ test.describe('Startkiosk per ring', () => {
     await expect(page.getByLabel(/bezoekers/i)).toHaveCount(0)
   })
 
+  test('een evenement verwijderen, met alles wat eraan hangt', async ({ page }) => {
+    await page.goto('/events/event-demo-ajax')
+    await page.getByRole('button', { name: 'Evenement verwijderen' }).click()
+    await expect(page.getByText(/telrondes met hun telregels/)).toBeVisible()
+    await page.getByRole('button', { name: 'Verwijderen', exact: true }).click()
+
+    await page.waitForURL(/\/events$/)
+    await expect(page.getByText('Ajax – Demo FC')).toHaveCount(0)
+  })
+
+  test('een nieuw evenement legt zijn voorganger vast', async ({ page }) => {
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+
+    await page.goto('/events/new')
+    await page.getByLabel('Naam').fill('Ajax – Vitesse')
+    await page.getByLabel('Datum').fill(tomorrow)
+    await page.getByRole('button', { name: 'Evenement aanmaken' }).click()
+    await page.waitForURL(/\/events\/[^/]+$/)
+
+    // Het demo-evenement staat op een latere datum, dus dat telt niet als
+    // voorganger; er is er hier geen.
+    await expect(page.getByText(/Vorig evenement/)).toHaveCount(0)
+  })
+
   test('ringbeheer is te vinden via het beheeroverzicht', async ({ page }) => {
     await page.goto('/dashboard')
     await page.getByRole('link', { name: /Alle instellingen/ }).click()

@@ -291,6 +291,7 @@ export function mapEvent(
     date: dateStr(row.date),
     eventType: str(row.event_type) as EventType,
     status: str(row.status) as EventStatus,
+    previousEventId: optStr(row.previous_event_id),
     notes: optStr(row.notes),
     activeRingIds: relations.ringIds,
     activeKioskIds: relations.kioskIds,
@@ -307,6 +308,7 @@ export function eventToRow(data: Partial<Event>): Row {
   if (data.date !== undefined) row.date = data.date
   if (data.eventType !== undefined) row.event_type = data.eventType
   if (data.status !== undefined) row.status = data.status
+  if (data.previousEventId !== undefined) row.previous_event_id = data.previousEventId || null
   if (data.notes !== undefined) row.notes = data.notes
   if (data.createdById !== undefined) row.created_by_id = data.createdById
   return row

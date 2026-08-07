@@ -60,6 +60,16 @@ export const countRepository: ICountRepository = {
     return rows.map(mapCountEntry)
   },
 
+  async getEntriesForSession(sessionId) {
+    const rows = await query(
+      `select e.* from count_entries e
+       join kiosk_counts k on k.id = e.kiosk_count_id
+       where k.count_session_id = $1`,
+      [sessionId]
+    )
+    return rows.map(mapCountEntry)
+  },
+
   async upsertCountEntry(data) {
     const { text, params } = buildUpsert('count_entries', countEntryToRow(data), [
       'kiosk_count_id',

@@ -11,6 +11,13 @@ export interface ICountRepository {
   upsertKioskCount(data: Omit<KioskCount, 'createdAt' | 'updatedAt'>): Promise<KioskCount>
 
   getEntriesForKioskCount(kioskCountId: string): Promise<CountEntry[]>
+  /**
+   * Alle telregels van een hele telronde in één keer.
+   *
+   * Voor het verbruiksoverzicht: per kiosk apart ophalen zou tientallen
+   * verzoeken kosten voor één scherm.
+   */
+  getEntriesForSession(sessionId: string): Promise<CountEntry[]>
   upsertCountEntry(data: Omit<CountEntry, 'lastModifiedAt'>): Promise<CountEntry>
   bulkUpsertCountEntries(entries: Array<Omit<CountEntry, 'lastModifiedAt'>>): Promise<void>
   /** Verwijdert een telregel — gebruikt wanneer een telling wordt teruggezet naar "nog niet geteld". */

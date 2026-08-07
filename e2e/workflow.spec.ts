@@ -190,6 +190,10 @@ test.describe('Volledige workflow', () => {
     // En het werk staat weer klaar voor een volgende pallet.
     await page.goto('/restock-rounds/new')
     await expect(page.getByRole('button', { name: new RegExp(roundProductName!) })).toBeVisible()
+
+    // ── 16. Verbruik wacht op de telling van het volgende evenement ────────
+    await page.goto('/events/event-demo-ajax/data')
+    await expect(page.getByText(/volgende evenement/)).toBeVisible()
   })
 })
 

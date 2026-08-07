@@ -65,6 +65,13 @@ export class DemoCountRepository implements ICountRepository {
     return demoTables.countEntries.filter((e) => e.kioskCountId === id)
   }
 
+  async getEntriesForSession(sessionId: string): Promise<CountEntry[]> {
+    const kioskCountIds = new Set(
+      demoTables.kioskCounts.filter((c) => c.countSessionId === sessionId).map((c) => c.id)
+    )
+    return demoTables.countEntries.filter((e) => kioskCountIds.has(e.kioskCountId))
+  }
+
   async upsertCountEntry(data: Omit<CountEntry, 'lastModifiedAt'>): Promise<CountEntry> {
     const entry: CountEntry = {
       ...data,

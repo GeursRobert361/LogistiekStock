@@ -82,6 +82,14 @@ export class FakeCountRepository implements ICountRepository {
     return this.entries.filter((e) => e.kioskCountId === kioskCountId)
   }
 
+  async getEntriesForSession(sessionId: string): Promise<CountEntry[]> {
+    this.guard()
+    const kioskCountIds = new Set(
+      this.kioskCounts.filter((c) => c.countSessionId === sessionId).map((c) => c.id)
+    )
+    return this.entries.filter((e) => kioskCountIds.has(e.kioskCountId))
+  }
+
   async upsertCountEntry(data: Omit<CountEntry, 'lastModifiedAt'>): Promise<CountEntry> {
     this.guard()
     const entry: CountEntry = {

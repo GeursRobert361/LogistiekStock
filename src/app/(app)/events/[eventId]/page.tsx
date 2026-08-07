@@ -3,9 +3,11 @@
 import { use, useCallback, useEffect, useState } from 'react'
 import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
+import { ConfirmDialog } from '@/components/ui/Dialog'
 import { EventStatusBadge } from '@/components/shared/EventStatusBadge'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { repositories } from '@/repositories'
@@ -28,22 +30,33 @@ export default function EventDetailPage({
 }) {
   const { eventId } = use(params)
   const { hasRole } = useAuth()
+  const router = useRouter()
   const [event, setEvent] = useState<Event | null>(null)
   const [resumable, setResumable] = useState<SessionOverview[]>([])
   const [kiosks, setKiosks] = useState<Map<string, Kiosk>>(new Map())
+  const [previousEvent, setPreviousEvent] = useState<Event | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const canCount = hasRole(UserRole.TELLER) || hasRole(UserRole.PLANNER) || hasRole(UserRole.ADMIN)
   const canReview = hasRole(UserRole.PLANNER) || hasRole(UserRole.ADMIN)
+  const canManage = canReview
 
   const load = useCallback(async () => {
-    const [eventData, sessions, kioskList] = await Promise.all([
+    const [eventData, sessions, kioskList, events] = await Promise.all([
       repositories.event().getEventById(eventId),
       loadSessionsForEvent(eventId),
       repositories.kiosk().getKiosks(),
+      repositories.event().getEvents(),
     ])
     setEvent(eventData)
     setKiosks(new Map(kioskList.map((k) => [k.id, k])))
+    setPreviousEvent(
+      eventData?.previousEventId
+        ? (events.find((candidate) => candidate.id === eventData.previousEventId) ?? null)
+        : null
+    )
 
     const overviews = await Promise.all(sessions.filter(isResumable).map(getSessionOverview))
     setResumable(overviews.filter((o) => !o.isFullyHandled))
@@ -51,11 +64,22 @@ export default function EventDetailPage({
   }, [eventId])
 
   useEffect(() => {
-    load().catch((error: unknown) => {
-      console.error('[evenement] Laden mislukt.', error)
+    load().catch((loadError: unknown) => {
+      console.error('[evenement] Laden mislukt.', loadError)
       setIsLoading(false)
     })
   }, [load])
+
+  async function handleDelete() {
+    setShowDeleteDialog(false)
+    try {
+      await repositories.event().deleteEvent(eventId)
+      router.push('/events')
+    } catch (deleteError) {
+      console.error('[evenement] Verwijderen mislukt.', deleteError)
+      setError('Het evenement kon niet worden verwijderd.')
+    }
+  }
 
   if (isLoading) {
     return (
@@ -82,12 +106,26 @@ export default function EventDetailPage({
       <AppHeader title={event.name} backHref="/events" />
       <div className="space-y-4 p-4">
         <Card>
-          <CardContent className="flex items-center justify-between py-3">
-            <div>
-              <p className="text-sm text-gray-600">Datum</p>
-              <p className="font-semibold text-gray-900">{formatDate(event.date)}</p>
+          <CardContent className="py-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm text-gray-600">Datum</p>
+                <p className="font-semibold text-gray-900">{formatDate(event.date)}</p>
+              </div>
+              <EventStatusBadge status={event.status} />
             </div>
-            <EventStatusBadge status={event.status} />
+            {previousEvent && (
+              <p className="mt-2 border-t border-gray-100 pt-2 text-sm text-gray-600">
+                Vorig evenement:{' '}
+                <Link
+                  href={`/events/${previousEvent.id}`}
+                  className="font-medium text-arena-red underline"
+                >
+                  {previousEvent.name}
+                </Link>{' '}
+                ({formatDate(previousEvent.date)})
+              </p>
+            )}
           </CardContent>
         </Card>
 
@@ -140,6 +178,12 @@ export default function EventDetailPage({
                   Vulplanning
                 </Button>
               </Link>
+
+              <Link href={`/events/${eventId}/data`} className="block">
+                <Button variant="secondary" className="w-full" size="lg">
+                  Verbruik
+                </Button>
+              </Link>
             </>
           )}
         </div>
@@ -154,7 +198,40 @@ export default function EventDetailPage({
             </CardContent>
           </Card>
         )}
+
+        {error && (
+          <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
+            {error}
+          </p>
+        )}
+
+        {canManage && (
+          <div className="border-t border-gray-200 pt-3">
+            <Button
+              variant="outline"
+              size="md"
+              className="w-full border-red-300 text-red-700"
+              onClick={() => setShowDeleteDialog(true)}
+            >
+              Evenement verwijderen
+            </Button>
+          </div>
+        )}
       </div>
+
+      <ConfirmDialog
+        open={showDeleteDialog}
+        onClose={() => setShowDeleteDialog(false)}
+        onConfirm={() => void handleDelete()}
+        isDestructive
+        title={`${event.name} verwijderen`}
+        message={
+          'Alles wat aan dit evenement hangt gaat mee: de telrondes met hun telregels, de ' +
+          'bijvullijst en de vulrondes. Dit kan niet ongedaan worden gemaakt.'
+        }
+        confirmLabel="Verwijderen"
+        cancelLabel="Terug"
+      />
     </>
   )
 }

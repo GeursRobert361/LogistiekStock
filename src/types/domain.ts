@@ -154,6 +154,14 @@ export interface Event {
   date: string
   eventType: EventType
   status: EventStatus
+  /**
+   * Het evenement dat hiervoor kwam.
+   *
+   * Wat er tijdens een evenement verbruikt is, blijkt pas uit de telling vóór
+   * het volgende: wat er stond, plus wat erbij is gevuld, min wat er daarna nog
+   * ligt. Zonder die ketting is verbruik niet te berekenen.
+   */
+  previousEventId?: string
   notes?: string
   activeRingIds: string[]
   activeKioskIds: string[]
