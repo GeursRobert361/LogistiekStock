@@ -87,14 +87,11 @@ test.describe('Volledige workflow', () => {
 
     await page.getByRole('button', { name: 'Productronde maken' }).first().click()
     await page.waitForURL(/\/restock-rounds\//)
-    await expect(page.getByRole('heading', { name: 'Pallet laden' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Op de pallet zetten' })).toBeVisible()
 
-    // ── 9. Werkelijk geladen aantal invullen ───────────────────────────────
-    const loadedInput = page.locator('input[inputmode="numeric"]').first()
-    const needed = Number(await loadedInput.inputValue())
-    expect(needed).toBeGreaterThan(0)
-    await loadedInput.fill(String(needed))
-
+    // ── 9. Stapellijst bevestigen ──────────────────────────────────────────
+    // Wat er op de pallet moet staat er al; er valt niets in te vullen.
+    await expect(page.locator('input[inputmode="numeric"]')).toHaveCount(0)
     await page.getByRole('button', { name: /Route maken/ }).click()
     const routeHeading = page.getByRole('heading', { name: /Route \(/ })
     await expect(routeHeading).toBeVisible()

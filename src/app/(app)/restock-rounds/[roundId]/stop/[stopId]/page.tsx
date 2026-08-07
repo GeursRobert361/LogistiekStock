@@ -155,6 +155,41 @@ export default function RestockStopPage({
           />
         ))}
 
+        {/* Wat er hierna nog volgt. Staat er straks niets meer op de pallet,
+            dan is dit precies de lijst voor het magazijn. */}
+        {stopPlan.stillNeededAfter.length > 0 && (
+          <section
+            aria-labelledby="still-needed-heading"
+            className="rounded-xl border border-gray-200 bg-white p-3"
+          >
+            <h3 id="still-needed-heading" className="mb-2 text-sm font-semibold text-gray-900">
+              Na deze kiosk nog nodig
+            </h3>
+            <ul className="divide-y divide-gray-100">
+              {stopPlan.stillNeededAfter.map((entry) => {
+                const product = products.get(entry.productId)
+                return (
+                  <li
+                    key={entry.productId}
+                    className="flex items-baseline justify-between gap-2 py-1.5"
+                  >
+                    <span className="min-w-0 truncate text-sm text-gray-800">
+                      {product?.name ?? entry.productId}
+                    </span>
+                    <span className="whitespace-nowrap text-sm">
+                      <span className="font-bold text-gray-900">{entry.packages}</span>{' '}
+                      <span className="text-gray-600">
+                        {product?.packagingUnit ?? ''} · {entry.kioskCount}{' '}
+                        {entry.kioskCount === 1 ? 'kiosk' : 'kiosken'}
+                      </span>
+                    </span>
+                  </li>
+                )
+              })}
+            </ul>
+          </section>
+        )}
+
         <div className="rounded-xl border border-gray-200 bg-white p-3">
           <label htmlFor="stop-notes" className="mb-1 block text-sm font-medium text-gray-700">
             Notitie bij deze kiosk

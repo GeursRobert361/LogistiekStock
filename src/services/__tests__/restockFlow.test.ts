@@ -408,6 +408,51 @@ describe('vulronde uitvoeren', () => {
     ])
   })
 
+  it('toont bij een halte wat er daarna nog nodig is', async () => {
+    await seedRequirements('servetten', [0, 3])
+    const round = await readyRound()
+    const plan = await getRoundPlan(round.id)
+
+    // Bij de eerste halte staan de 4 water van kiosk 102 nog open.
+    const first = await getStopPlan(round.id, plan.stops[0]!.id)
+    expect(first.stillNeededAfter).toEqual([
+      { productId: 'water', packages: 4, kioskCount: 1 },
+    ])
+
+    // Bij de laatste halte, met de eerste afgerond, volgt er niets meer.
+    await completeStop(plan.stops[0]!.id)
+    const last = await getStopPlan(round.id, plan.stops[1]!.id)
+    expect(last.stillNeededAfter).toEqual([])
+  })
+
+  it('telt een afgeronde halte niet meer mee in wat er nog nodig is', async () => {
+    const round = await readyRound()
+    const plan = await getRoundPlan(round.id)
+
+    expect(plan.stillNeededByProduct.get('water')).toEqual({
+      productId: 'water',
+      packages: 10,
+      kioskCount: 2,
+    })
+
+    await registerDelivery({
+      roundId: round.id,
+      stopId: plan.stops[0]!.id,
+      productId: 'water',
+      plannedPackages: 6,
+      deliveredPackages: 6,
+      userId: VULLER,
+    })
+    await completeStop(plan.stops[0]!.id)
+
+    const after = await getRoundPlan(round.id)
+    expect(after.stillNeededByProduct.get('water')).toEqual({
+      productId: 'water',
+      packages: 4,
+      kioskCount: 1,
+    })
+  })
+
   it('sluit een behoefte bij volledige levering', async () => {
     const round = await readyRound()
     const plan = await getRoundPlan(round.id)
@@ -483,7 +528,7 @@ describe('vulronde uitvoeren', () => {
     ).rejects.toThrow('toe')
   })
 
-  it('levert nooit meer dan er op de pallet ligt', async () => {
+  it('boekt nooit meer af dan er voor de ronde gepland staat', async () => {
     const round = await readyRound()
     const plan = await getRoundPlan(round.id)
 
@@ -506,7 +551,7 @@ describe('vulronde uitvoeren', () => {
         reason: DeliveryReason.VERKEERDE_TELLING,
         userId: VULLER,
       })
-    ).rejects.toThrow('op de pallet')
+    ).rejects.toThrow(/nog maar 4 van dit product gepland/)
   })
 
   it('markeert een ronde met een tekort niet als volledig afgerond', async () => {

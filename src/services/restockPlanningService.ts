@@ -187,6 +187,19 @@ export async function createMixedPalletRound(params: {
   })
 }
 
+/**
+ * Bouwt de route voor alles wat er voor deze ronde gereserveerd staat.
+ *
+ * De vuller stapelt wat er nodig is; hoeveel er op dat moment werkelijk op de
+ * pallet past is geen planningsvraag. Raakt de pallet onderweg leeg, dan haalt
+ * hij bij — de route blijft compleet.
+ */
+export async function planRouteForRound(roundId: string): Promise<PlannedStop[]> {
+  const items = await repositories.restock().getRoundItems(roundId)
+  if (items.length === 0) throw new Error('Deze ronde heeft geen producten.')
+  return setLoadedQuantities(roundId, roundItemsToLoadMap(items))
+}
+
 export interface PalletRoundResult {
   round: RestockRound
   /** Eerste halte, of null als er met deze lading nergens heen te rijden valt. */
@@ -228,14 +241,11 @@ export async function startPalletRound(params: {
     roundType: single ? RestockRoundType.PRODUCT_ROUND : RestockRoundType.MIXED_PALLET,
   })
 
-  const restock = repositories.restock()
-  const items = await restock.getRoundItems(round.id)
-  await setLoadedQuantities(round.id, roundItemsToLoadMap(items))
-
+  await planRouteForRound(round.id)
   await claimRound(round.id, userId)
   const started = await startRound(round.id)
 
-  const stops = [...(await restock.getRoundStops(round.id))].sort(
+  const stops = [...(await repositories.restock().getRoundStops(round.id))].sort(
     (a, b) => a.sortOrder - b.sortOrder
   )
   return { round: started, firstStopId: stops[0]?.id ?? null }

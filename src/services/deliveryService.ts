@@ -16,9 +16,9 @@ import type {
 /**
  * Uitvoeren van een vulronde: kiosk voor kiosk afleveren.
  *
- * Kern van de regels: er wordt nooit meer geleverd dan er geladen is, en een
- * gedeeltelijke levering sluit een behoefte niet af — het restant hoort weer
- * in de vulplanning terug te komen.
+ * Kern van de regels: er wordt nooit meer afgeboekt dan er voor de ronde
+ * gepland staat, en een gedeeltelijke levering sluit een behoefte niet af —
+ * het restant hoort weer in de vulplanning terug te komen.
  */
 
 const writeQueue = new KeyedQueue()
@@ -31,9 +31,14 @@ export interface StopProductPlan {
   productId: string
   plannedPackages: number
   deliveredPackages: number
-  /** Wat er nog op de pallet ligt voor dit product, over de hele ronde. */
-  remainingOnPallet: number
   isDelivered: boolean
+}
+
+/** Wat er voor de rest van de route nog nodig is, per product. */
+export interface StillNeeded {
+  productId: string
+  packages: number
+  kioskCount: number
 }
 
 export interface StopPlan {
@@ -42,6 +47,11 @@ export interface StopPlan {
   stopNumber: number
   totalStops: number
   products: StopProductPlan[]
+  /**
+   * Wat er na deze kiosk nog de pallet af moet. Raakt de pallet onderweg leeg,
+   * dan staat hier precies wat er uit het magazijn bij moet.
+   */
+  stillNeededAfter: StillNeeded[]
   isCompleted: boolean
 }
 
@@ -51,8 +61,15 @@ export interface RoundPlan {
   stops: RestockRoundStop[]
   stopItems: RestockStopItem[]
   deliveries: RestockDelivery[]
-  /** Nog op de pallet: geladen min geleverd, per product. */
-  remainingByProduct: Map<string, number>
+  /**
+   * Wat er nog naar de kiosken moet, per product: alles wat gepland staat bij
+   * haltes die nog niet zijn afgerond.
+   *
+   * Bewust niet "wat er nog op de pallet ligt" — dat hoeft niemand bij te
+   * houden. Dit getal beantwoordt de vraag die de vuller wél heeft: hoeveel
+   * moet ik meenemen, of ophalen als de pallet leeg is.
+   */
+  stillNeededByProduct: Map<string, StillNeeded>
   completedStops: number
 }
 
@@ -76,22 +93,48 @@ export async function getRoundPlan(roundId: string): Promise<RoundPlan> {
     )
   }
 
-  const remainingByProduct = new Map(
-    items.map((item) => [
-      item.productId,
-      Math.max(0, item.loadedPackages - (deliveredByProduct.get(item.productId) ?? 0)),
-    ])
-  )
-
   return {
     round,
     items,
     stops,
     stopItems,
     deliveries,
-    remainingByProduct,
+    stillNeededByProduct: sumStillNeeded(stops, stopItems),
     completedStops: stops.filter((stop) => stop.completedAt).length,
   }
+}
+
+/**
+ * Telt op wat er bij de nog openstaande haltes gepland staat.
+ *
+ * `skipStopId` laat één halte extra buiten beschouwing: op het afleverscherm
+ * wil de vuller weten wat er ná deze kiosk nog volgt, terwijl die halte zelf
+ * pas als afgerond wordt weggeschreven als hij doorklikt.
+ */
+function sumStillNeeded(
+  stops: RestockRoundStop[],
+  stopItems: RestockStopItem[],
+  skipStopId?: string
+): Map<string, StillNeeded> {
+  const openStopIds = new Set(
+    stops.filter((stop) => !stop.completedAt && stop.id !== skipStopId).map((stop) => stop.id)
+  )
+
+  const perProduct = new Map<string, StillNeeded>()
+  for (const item of stopItems) {
+    if (!openStopIds.has(item.restockRoundStopId)) continue
+    if (item.plannedPackages <= 0) continue
+
+    const current = perProduct.get(item.productId) ?? {
+      productId: item.productId,
+      packages: 0,
+      kioskCount: 0,
+    }
+    current.packages += item.plannedPackages
+    current.kioskCount += 1
+    perProduct.set(item.productId, current)
+  }
+  return perProduct
 }
 
 export async function getStopPlan(roundId: string, stopId: string): Promise<StopPlan> {
@@ -114,7 +157,6 @@ export async function getStopPlan(roundId: string, stopId: string): Promise<Stop
       productId: item.productId,
       plannedPackages: item.plannedPackages,
       deliveredPackages: deliveredByProduct.get(item.productId) ?? 0,
-      remainingOnPallet: plan.remainingByProduct.get(item.productId) ?? 0,
       isDelivered: deliveredByProduct.has(item.productId),
     }))
 
@@ -124,6 +166,9 @@ export async function getStopPlan(roundId: string, stopId: string): Promise<Stop
     stopNumber: plan.stops.findIndex((s) => s.id === stopId) + 1,
     totalStops: plan.stops.length,
     products,
+    stillNeededAfter: [...sumStillNeeded(plan.stops, plan.stopItems, stopId).values()].sort(
+      (a, b) => b.packages - a.packages
+    ),
     isCompleted: Boolean(stop.completedAt),
   }
 }
@@ -175,9 +220,11 @@ export async function registerDelivery(params: RegisterDeliveryParams): Promise<
     .reduce((sum, d) => sum + d.deliveredPackages, 0)
   const loaded = plan.items.find((i) => i.productId === productId)?.loadedPackages ?? 0
 
+  // Meer afboeken dan er voor deze hele ronde gepland staat kan niet kloppen;
+  // dat is een typefout, geen levering.
   if (alreadyDelivered + deliveredPackages > loaded) {
     throw new Error(
-      `Er ligt maar ${loaded - alreadyDelivered} van dit product op de pallet.`
+      `Voor deze ronde staat nog maar ${loaded - alreadyDelivered} van dit product gepland.`
     )
   }
 

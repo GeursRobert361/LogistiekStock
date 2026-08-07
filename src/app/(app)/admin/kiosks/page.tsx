@@ -208,6 +208,17 @@ export default function AdminKiosksPage() {
           onChange={(e) => setDraft({ ...draft, ringId: e.target.value })}
           options={rings.map((ring) => ({ value: ring.id, label: ring.name }))}
         />
+        <Input
+          label="Opschrift"
+          placeholder={draft.number || 'Bijv. 120 Cubes'}
+          value={draft.label}
+          onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+        />
+        <p className="-mt-2 text-xs text-gray-600">
+          Hoe dit telpunt heet op de vloer. Dit staat op het bord en in alle lijsten. Leeg laten
+          toont het nummer.
+        </p>
+
         <div className="grid grid-cols-2 gap-3">
           <Input
             label="Nummer"
@@ -222,14 +233,9 @@ export default function AdminKiosksPage() {
             onChange={(e) => setDraft({ ...draft, sortOrder: e.target.value })}
           />
         </div>
-        <Input
-          label="Opschrift (optioneel)"
-          placeholder={draft.number || 'Bijv. 120 Cubes'}
-          value={draft.label}
-          onChange={(e) => setDraft({ ...draft, label: e.target.value })}
-        />
         <p className="-mt-2 text-xs text-gray-600">
-          Wat er groot op het bord komt te staan. Leeg laten toont het kiosknummer.
+          Het nummer is intern: het koppelt tellijsten en importbestanden en moet uniek zijn binnen
+          de ring. Wie een opschrift heeft, ziet dit nummer verder nergens terug.
         </p>
         <Input
           label="Naam"

@@ -5,14 +5,13 @@ import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
-import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { ConfirmDialog } from '@/components/ui/Dialog'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
-import { claimRound, setLoadedQuantities, startRound, cancelRound } from '@/services/restockPlanningService'
+import { claimRound, planRouteForRound, startRound, cancelRound } from '@/services/restockPlanningService'
 import { completeRound, getRoundPlan, getNextStop, type RoundPlan } from '@/services/deliveryService'
 import { ROUND_STATUS_LABEL } from '@/lib/roundStatus'
 import { RestockRoundStatus, UserRole } from '@/types'
@@ -30,7 +29,6 @@ export default function RestockRoundDetailPage({
   const [plan, setPlan] = useState<RoundPlan | null>(null)
   const [products, setProducts] = useState<Map<string, Product>>(new Map())
   const [kiosks, setKiosks] = useState<Map<string, Kiosk>>(new Map())
-  const [loadedInput, setLoadedInput] = useState<Map<string, string>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [isWorking, setIsWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -48,9 +46,6 @@ export default function RestockRoundDetailPage({
     setPlan(roundPlan)
     setProducts(new Map(productList.map((p) => [p.id, p])))
     setKiosks(new Map(kioskList.map((k) => [k.id, k])))
-    setLoadedInput(
-      new Map(roundPlan.items.map((item) => [item.productId, String(item.loadedPackages)]))
-    )
     setIsLoading(false)
   }, [roundId])
 
@@ -67,24 +62,11 @@ export default function RestockRoundDetailPage({
     setIsWorking(true)
     setError(null)
     try {
-      const loaded = new Map<string, number>()
-      for (const item of plan.items) {
-        const raw = (loadedInput.get(item.productId) ?? '').replace(',', '.').trim()
-        const value = raw === '' ? 0 : Number(raw)
-        if (!Number.isFinite(value) || value < 0 || !Number.isInteger(value)) {
-          throw new Error('Vul per product een heel aantal verpakkingen in.')
-        }
-        loaded.set(item.productId, value)
-      }
-      if ([...loaded.values()].every((value) => value === 0)) {
-        throw new Error('Er is niets geladen — vul minstens één aantal in.')
-      }
-
-      await setLoadedQuantities(roundId, loaded)
+      await planRouteForRound(roundId)
       await load()
-    } catch (loadError) {
-      console.error('[vulronde] Laden vastleggen mislukt.', loadError)
-      setError(loadError instanceof Error ? loadError.message : 'Opslaan is mislukt.')
+    } catch (routeError) {
+      console.error('[vulronde] Route maken mislukt.', routeError)
+      setError(routeError instanceof Error ? routeError.message : 'Route maken is mislukt.')
     } finally {
       setIsWorking(false)
     }
@@ -163,6 +145,9 @@ export default function RestockRoundDetailPage({
   const isRunning =
     round.status === RestockRoundStatus.CLAIMED || round.status === RestockRoundStatus.IN_PROGRESS
   const nextStop = getNextStop(plan)
+  const stillNeeded = [...plan.stillNeededByProduct.values()].sort(
+    (a, b) => b.packages - a.packages
+  )
 
   return (
     <>
@@ -185,48 +170,34 @@ export default function RestockRoundDetailPage({
           </p>
         )}
 
-        {/* ── Pallet laden ─────────────────────────────────────────────── */}
+        {/* ── Stapellijst ──────────────────────────────────────────────── */}
         {isPicking && (
           <section aria-labelledby="load-heading">
             <h2 id="load-heading" className="mb-1 text-lg font-bold text-gray-900">
-              Pallet laden
+              Op de pallet zetten
             </h2>
             <p className="mb-3 text-sm text-gray-600">
-              Vul in wat er werkelijk op de pallet gaat. Dat aantal is leidend voor de route.
+              Dit gaat er in totaal naar de kiosken. Past het niet in één keer, haal dan onderweg
+              bij — de route blijft hetzelfde.
             </p>
 
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
               {plan.items.map((item) => {
                 const product = products.get(item.productId)
                 return (
-                  <Card key={item.id}>
-                    <CardContent className="py-3">
-                      <p className="font-semibold text-gray-900">
-                        {product?.name ?? item.productId}
-                      </p>
-                      <p className="mb-2 text-sm text-gray-600">
-                        Nodig: {item.proposedPackages} {product?.packagingUnit ?? ''}
-                      </p>
-                      <label
-                        htmlFor={`loaded-${item.productId}`}
-                        className="mb-1 block text-sm font-medium text-gray-700"
-                      >
-                        Geladen
-                      </label>
-                      <input
-                        id={`loaded-${item.productId}`}
-                        type="text"
-                        inputMode="numeric"
-                        value={loadedInput.get(item.productId) ?? ''}
-                        onChange={(e) =>
-                          setLoadedInput((previous) =>
-                            new Map(previous).set(item.productId, e.target.value)
-                          )
-                        }
-                        className="h-14 w-full rounded-xl border border-gray-300 text-center text-2xl font-bold text-gray-900 focus:border-arena-red focus:outline-none focus:ring-2 focus:ring-arena-red/30"
-                      />
-                    </CardContent>
-                  </Card>
+                  <div key={item.id} className="flex items-center justify-between px-3 py-3">
+                    <p className="min-w-0 truncate font-medium text-gray-900">
+                      {product?.name ?? item.productId}
+                    </p>
+                    <p className="ml-3 whitespace-nowrap text-right">
+                      <span className="text-2xl font-bold text-gray-900">
+                        {item.proposedPackages}
+                      </span>{' '}
+                      <span className="text-sm text-gray-600">
+                        {product?.packagingUnit ?? ''}
+                      </span>
+                    </p>
+                  </div>
                 )
               })}
             </div>
@@ -242,31 +213,36 @@ export default function RestockRoundDetailPage({
           </section>
         )}
 
-        {/* ── Lading ───────────────────────────────────────────────────── */}
-        {!isPicking && (
+        {/* ── Nog nodig ────────────────────────────────────────────────── */}
+        {!isPicking && stillNeeded.length > 0 && (
           <section aria-labelledby="cargo-heading">
             <h3
               id="cargo-heading"
               className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500"
             >
-              Op de pallet
+              Nog nodig
             </h3>
             <div className="divide-y divide-gray-100 overflow-hidden rounded-xl border border-gray-200 bg-white">
-              {plan.items.map((item) => {
-                const product = products.get(item.productId)
-                const remaining = plan.remainingByProduct.get(item.productId) ?? 0
+              {stillNeeded.map((entry) => {
+                const product = products.get(entry.productId)
                 return (
-                  <div key={item.id} className="flex items-center justify-between px-3 py-2.5">
+                  <div
+                    key={entry.productId}
+                    className="flex items-center justify-between px-3 py-2.5"
+                  >
                     <div className="min-w-0">
                       <p className="truncate font-medium text-gray-900">
-                        {product?.name ?? item.productId}
+                        {product?.name ?? entry.productId}
                       </p>
                       <p className="text-xs text-gray-600">
-                        Geladen {item.loadedPackages} · geleverd {item.deliveredPackages}
+                        {entry.kioskCount} {entry.kioskCount === 1 ? 'kiosk' : 'kiosken'} te gaan
                       </p>
                     </div>
-                    <p className="ml-2 whitespace-nowrap text-sm font-bold text-gray-900">
-                      nog {remaining}
+                    <p className="ml-2 whitespace-nowrap text-right">
+                      <span className="text-lg font-bold text-gray-900">{entry.packages}</span>{' '}
+                      <span className="text-xs text-gray-600">
+                        {product?.packagingUnit ?? ''}
+                      </span>
                     </p>
                   </div>
                 )
