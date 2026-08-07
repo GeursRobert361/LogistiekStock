@@ -8,6 +8,7 @@ import { KioskCountStatus, CountSessionStatus, SyncStatus } from '@/types'
 import type { CountSession, KioskCount, CountEntry, KioskProductStandard } from '@/types'
 import {
   getLocalSession,
+  getLocalSessionsForEvent,
   saveCountSessionLocally,
   getLocalKioskCount,
   getLocalKioskCounts,
@@ -60,6 +61,35 @@ export async function loadSession(sessionId: string): Promise<CountSession | nul
     console.warn('[counting] Telronde niet van de server te laden.', error)
   }
   return null
+}
+
+/**
+ * Alle telrondes van een evenement: lokaal en server samengevoegd.
+ * Lokale rondes die de server nog niet kent (offline gestart) blijven zichtbaar.
+ */
+export async function loadSessionsForEvent(eventId: string): Promise<CountSession[]> {
+  const local = await getLocalSessionsForEvent(eventId)
+  const byId = new Map(local.map((s) => [s.id, s]))
+
+  try {
+    const remote = await repositories.count().getSessions(eventId)
+    for (const remoteSession of remote) {
+      const localSession = byId.get(remoteSession.id)
+      if (!localSession || remoteSession.updatedAt > localSession.updatedAt) {
+        byId.set(remoteSession.id, remoteSession)
+        await saveCountSessionLocally(remoteSession)
+      }
+    }
+  } catch {
+    // Offline: alleen de lokaal bekende telrondes.
+  }
+
+  return [...byId.values()].sort((a, b) => b.startedAt.localeCompare(a.startedAt))
+}
+
+/** Telregels van een kiosktelling zoals ze nu bekend zijn (lokaal + server). */
+export async function loadEntryList(kioskCountId: string): Promise<CountEntry[]> {
+  return [...(await loadEntries(kioskCountId)).values()]
 }
 
 async function refreshSessionFromServer(sessionId: string, local: CountSession): Promise<void> {
