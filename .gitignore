@@ -40,3 +40,8 @@ next-env.d.ts
 # IDE
 .idea/
 *.iml
+
+# Playwright
+/test-results/
+/playwright-report/
+/playwright/.cache/

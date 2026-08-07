@@ -90,14 +90,18 @@ async function cacheFirst(request, cacheName) {
 
 /**
  * Pagina's: eerst het netwerk, zodat een nieuwe versie meteen zichtbaar is.
- * Zonder verbinding valt de app terug op de gecachete shell — de telronde
- * zelf komt daarna uit IndexedDB.
+ *
+ * Een geslaagde navigatie wordt onder zijn eigen URL bewaard, zodat een
+ * refresh zonder verbinding dezelfde pagina teruggeeft en niet de homepage.
+ * Deze HTML is een lege app-shell: de telgegevens komen uit IndexedDB, dus er
+ * belandt geen voorraad- of gebruikersinformatie in de cache.
  */
 async function navigationHandler(request) {
   try {
     const response = await fetch(request)
     if (response.ok) {
       const cache = await caches.open(SHELL_CACHE)
+      await cache.put(request, response.clone())
       await cache.put('/', response.clone())
     }
     return response

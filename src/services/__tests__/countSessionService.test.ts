@@ -205,17 +205,37 @@ describe('goedkeuren', () => {
     await expect(approveSession(session)).rejects.toThrow()
   })
 
-  it('blokkeert goedkeuren bij niet-gesynchroniseerde wijzigingen', async () => {
+  it('blokkeert goedkeuren wanneer wijzigingen de server niet bereiken', async () => {
     const session = makeSession({ kioskRoute: shortRoute })
     await saveCountSessionLocally(session)
+
+    // Tellen met een onbereikbare server: alles staat lokaal, niets op de server.
+    fakeCountRepo.offline = true
     await countKiosk(shortRoute[0]!)
     await countKiosk(shortRoute[1]!)
-    // Bewust niet synchroniseren: de outbox is nog gevuld.
+    await flushPendingCountWrites()
 
     const overview = await getSessionOverview(session)
     const blockers = await getApprovalBlockers(overview)
 
     expect(blockers.map((b) => b.code)).toContain('UNSYNCED_CHANGES')
+    await expect(approveSession(session)).rejects.toThrow()
+  })
+
+  it('keurt wel goed zodra de wijzigingen alsnog zijn weggeschreven', async () => {
+    const session = makeSession({ kioskRoute: shortRoute })
+    await saveCountSessionLocally(session)
+
+    fakeCountRepo.offline = true
+    await countKiosk(shortRoute[0]!)
+    await countKiosk(shortRoute[1]!)
+    await flushPendingCountWrites()
+
+    // Verbinding terug: goedkeuren synchroniseert eerst en gaat dan door.
+    fakeCountRepo.offline = false
+    const result = await approveSession(session)
+
+    expect(result.requirementCount).toBe(2)
   })
 
   it('genereert bijvulbehoeften bij goedkeuren', async () => {

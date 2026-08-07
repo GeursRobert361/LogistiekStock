@@ -2,6 +2,7 @@ import { repositories } from '@/repositories'
 import { CountSessionStatus, KioskCountStatus, EventStatus } from '@/types'
 import type { CountSession, KioskCount, CountEntry } from '@/types'
 import { loadKioskCounts, saveSession, flushPendingCountWrites } from './countingService'
+import { syncService } from './syncService'
 import { buildRestockRequirements } from '@/domain/restocking/buildRequirements'
 import { getLocalEntries } from '@/lib/db/offlineDb'
 import { getPendingOutboxEntries } from '@/lib/db/offlineDb'
@@ -151,6 +152,8 @@ export async function getApprovalBlockers(
 
   const isOnline = typeof navigator === 'undefined' || navigator.onLine
   if (isOnline) {
+    // Eerst proberen weg te schrijven; pas wat dan nog blijft staan is een blokkade.
+    await syncService.flush()
     const pending = await getPendingOutboxEntries()
     if (pending.length > 0) {
       blockers.push({
