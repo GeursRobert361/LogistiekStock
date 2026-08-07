@@ -19,10 +19,15 @@ src/
     counting/       # Restockberekening (kwartregels, 80%-regel)
     routing/        # Circulaire kioskroutes
     restocking/     # Vulplanning
-  repositories/     # Data-laag (demo | supabase)
+  repositories/     # Data-laag in de browser (demo | http)
     interfaces/     # Repository-interfaces
     demo/           # Demo-implementatie (localStorage, geen database nodig)
-    supabase/       # Supabase-implementatie (productie)
+    http/           # Productie: praat met /api/rpc, nooit rechtstreeks met de db
+  server/           # Alles wat alleen op de server draait
+    api/            # Welke methode bij welke rol hoort (default deny)
+    auth/           # Wachtwoorden (bcrypt) en sessies
+    db/             # Postgres-pool en rij ↔ object-vertalingen
+    repositories/   # De echte queries
   services/         # Toepassingslogica boven de repositories
     countingService.ts        # Tellen: lokaal schrijven, server via de outbox
     countSessionService.ts    # Telronde: status, review, goedkeuren
@@ -72,7 +77,8 @@ cp .env.example .env.local
 npm run dev
 ```
 
-Open `http://localhost:3000`. De app start automatisch in **demo-modus** (geen Supabase nodig).
+Open `http://localhost:3000`. De app start automatisch in **demo-modus**: geen
+database nodig.
 
 ---
 
@@ -81,10 +87,14 @@ Open `http://localhost:3000`. De app start automatisch in **demo-modus** (geen S
 | Variabele | Beschrijving | Standaard |
 |-----------|-------------|-----------|
 | `NEXT_PUBLIC_APP_MODE` | `demo` of `production` | `demo` |
-| `NEXT_PUBLIC_SUPABASE_URL` | Supabase project URL | — |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase anon key | — |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server-side) | — |
 | `NEXT_PUBLIC_APP_URL` | Publieke URL van de app | `http://localhost:3000` |
+| `DATABASE_URL` | Postgres-verbinding (alleen `production`) | — |
+| `SESSION_SECRET` | Ondertekent de sessies (alleen `production`) | — |
+
+`DATABASE_URL` en `SESSION_SECRET` zijn geheim en hebben bewust **geen**
+`NEXT_PUBLIC_`-prefix: alles met dat voorvoegsel wordt in de browserbundle
+ingebakken en is daarmee openbaar. Wie een `NEXT_PUBLIC_`-waarde wijzigt moet
+opnieuw bouwen — herstarten is niet genoeg.
 
 ---
 
@@ -108,43 +118,42 @@ begintoestand.
 
 ---
 
-## Supabase instellen (productie)
+## Productie: Postgres op de eigen server
 
-1. Maak een Supabase-project aan
-2. Voer de migraties uit:
-   ```bash
-   supabase db push
-   # of handmatig:
-   psql $DATABASE_URL < supabase/migrations/001_initial_schema.sql
-   psql $DATABASE_URL < supabase/migrations/002_rls_policies.sql
-   psql $DATABASE_URL < supabase/migrations/003_restock_round_type.sql
-   psql $DATABASE_URL < supabase/migrations/004_restock_stop_items.sql
-   ```
-3. Vul de Supabase-gegevens in `.env.local` (dat bestand staat in
-   `.gitignore` en wordt nooit meegecommit):
+De productiemodus praat niet vanuit de browser met de database. De browser kent
+alleen `/api/rpc`; die endpoint kijkt de rol van de ingelogde gebruiker na tegen
+een expliciete lijst van toegestane methoden (`src/server/api/methodPermissions.ts`)
+en weigert al het overige. Daardoor zijn er geen databasegegevens in de browser
+nodig — en staan ze er dus ook niet.
+
+1. Zet `.env.local` (staat in `.gitignore` en wordt nooit meegecommit):
    ```
    NEXT_PUBLIC_APP_MODE=production
-   NEXT_PUBLIC_SUPABASE_URL=https://<project>.supabase.co
-   NEXT_PUBLIC_SUPABASE_ANON_KEY=<anon key>
-   SUPABASE_SERVICE_ROLE_KEY=<service role key>
+   DATABASE_URL=postgres://logistiek:<wachtwoord>@localhost:5432/logistiek
+   SESSION_SECRET=<openssl rand -base64 32>
    ```
-   De anon key is bedoeld om in de browser te staan. De **service role key
-   omzeilt Row Level Security** — die hoort alleen in `.env.local` en in de
-   serveromgeving, nooit in een `NEXT_PUBLIC_`-variabele en niet in een chat
-   of ticket.
-4. Vul de database met stamdata:
+2. Voer de migraties uit:
+   ```bash
+   npm run db:migrate
+   ```
+   Het script houdt in `schema_migrations` bij wat er al gedraaid is en zet elke
+   migratie in een transactie; opnieuw draaien is veilig.
+3. Vul de database met stamdata:
    ```bash
    npm run seed              # ringen, kiosken, categorieën, producten, normen
    npm run seed -- --users   # plus de demo-accounts (alleen voor test/acceptatie)
    ```
-   Het script is idempotent: opnieuw draaien werkt bestaande rijen bij in
+   Ook dit script is idempotent: opnieuw draaien werkt bestaande rijen bij in
    plaats van dubbele aan te maken.
+4. Optioneel, om de vullijst te kunnen bekijken zonder echt te tellen:
+   ```bash
+   npm run seed:testcount            # fictieve telling over de eerste ring
+   npm run seed:testcount -- --remove
+   ```
 
-De Supabase-laag wordt gecontroleerd door
-`src/repositories/supabase/__tests__/schema.test.ts`: die leest de migraties en
-controleert of elke tabel, kolom en `onConflict` die de repositories en het
-seed-script gebruiken ook echt bestaat. Een typefout in een kolomnaam valt
-daarmee op zonder draaiende database.
+Wachtwoorden staan als bcrypt-hash in de database en sessies in de tabel
+`sessions` — daarvan wordt alleen de SHA-256 van het token bewaard, in een
+httpOnly-cookie. Een gestolen databasedump levert dus geen bruikbare sessies op.
 
 ---
 
@@ -179,39 +188,61 @@ npm run typecheck
 
 De app draait op `root@5.181.134.106` op poort **3003**, reverse proxied via Nginx naar `https://stock.niettegeloven.com`.
 
+De app en de database draaien als twee containers uit `docker-compose.yml`. De
+database heeft bewust géén poort naar buiten: alleen de app komt erbij, over het
+interne Docker-netwerk.
+
 ### Eerste deployment
 
 ```bash
-# SSH naar server
 ssh root@5.181.134.106
+git clone <repo> /opt/logistiek-stock
+cd /opt/logistiek-stock
 
-# Repository klonen
-cd /var/www
-git clone <repo> LogistiekStock
-cd LogistiekStock
+# Geheimen: genereer ze op de server, lees ze niet voor en plak ze nergens.
+umask 077
+{
+  echo "NEXT_PUBLIC_APP_MODE=production"
+  echo "NEXT_PUBLIC_APP_URL=https://stock.niettegeloven.com"
+  echo "POSTGRES_USER=logistiek"
+  echo "POSTGRES_DB=logistiek"
+  echo "POSTGRES_PASSWORD=$(openssl rand -base64 32)"
+  echo "SESSION_SECRET=$(openssl rand -base64 32)"
+} > .env
 
-# Environment instellen
-cp .env.example .env
-nano .env  # vul waarden in
-
-# Nginx config plaatsen
 cp nginx/stock.niettegeloven.com.conf /etc/nginx/sites-available/stock.niettegeloven.com
 ln -s /etc/nginx/sites-available/stock.niettegeloven.com /etc/nginx/sites-enabled/
 nginx -t && systemctl reload nginx
-
-# SSL certificaat
 certbot --nginx -d stock.niettegeloven.com
 
-# Docker starten
 docker compose up -d --build
 ```
 
 ### Updates deployen
 
 ```bash
-git push origin main
-ssh root@5.181.134.106 "cd /var/www/LogistiekStock && git pull && docker compose up -d --build"
+git push
+ssh root@5.181.134.106 "cd /opt/logistiek-stock && git pull && docker compose up -d --build"
 ```
+
+### Migraties en seeds op de server
+
+Op de server staat geen `node_modules` — die zit in het image. Draai
+scripts daarom in een wegwerp-container op het netwerk van de compose-stack,
+zodat `db` bereikbaar is:
+
+```bash
+cd /opt/logistiek-stock
+docker run --rm -v /opt/logistiek-stock:/app -w /app \
+  --network logistiek-stock_default --env-file /opt/logistiek-stock/.env \
+  node:22-alpine sh -c '
+    export DATABASE_URL="postgres://$POSTGRES_USER:$POSTGRES_PASSWORD@db:5432/$POSTGRES_DB"
+    npm ci --no-audit --no-fund && npx tsx scripts/migrate.ts
+  '
+```
+
+Vervang het laatste script door `scripts/seedDb.ts` of `scripts/seedTestCount.ts`
+voor de stamdata en de testtelling.
 
 ---
 

@@ -54,8 +54,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (!cancelled) setIsLoading(false)
       })
 
-    // In productie stuurt Supabase hier ook token-refreshes en verlopen
-    // sessies doorheen, zodat de app niet blijft hangen op oude gegevens.
+    // Hier komt ook een verlopen sessie binnen, zodat de app niet blijft
+    // hangen op gegevens van iemand die allang is uitgelogd.
     const unsubscribe = authRepo.current.onAuthStateChange?.((nextProfile) => {
       if (cancelled) return
       if (nextProfile === null && wasAuthenticated.current) {
