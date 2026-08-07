@@ -186,20 +186,8 @@ export const demoProducts: Product[] = [
   product('sixpacks', CAT_VERPAKKINGEN_ID, 'Sixpacks', 'Sixpacks', 'pak', 'pakken', 75, SMALL),
   product('arena-blaadjes', CAT_VERPAKKINGEN_ID, 'Arena Blaadjes', 'Arena Blaadjes', 'pak', 'pakken', 76, SMALL),
   product('kassa-bonnen', CAT_VERPAKKINGEN_ID, 'Kassa Bonnen', 'Kassabonnen', 'rol', 'rollen', 77, SMALL),
-  product('hotdog-broodjes', CAT_VERPAKKINGEN_ID, 'Hotdog Broodjes', 'Hotdogbroodjes', 'zak', 'zakken', 78, SMALL),
-  product('hotdog-worsten', CAT_VERPAKKINGEN_ID, 'Hotdog Worsten', 'Hotdogworsten', 'pak', 'pakken', 79, {
-    ...SMALL,
-    refrigerated: true,
-  }),
-  product('kroketten', CAT_VERPAKKINGEN_ID, 'Kroketten', 'Kroketten', 'zak', 'dozen', 80, {
-    ...SMALL,
-    refrigerated: true,
-  }),
-  product('kipburgers', CAT_VERPAKKINGEN_ID, 'Kipburgers', 'Kipburgers', 'zak', 'dozen', 81, {
-    ...SMALL,
-    refrigerated: true,
-  }),
-  product('broodjes', CAT_VERPAKKINGEN_ID, 'Broodjes', 'Broodjes', 'zak', 'zakken', 82, SMALL),
+  // Het eten zelf — broodjes, worsten, kroketten, kipburgers — telt logistiek
+  // niet; dat loopt via de keuken.
 
   // ── Sauzen ─────────────────────────────────────────────────────────────
   product('mayo-emmers', CAT_SAUZEN_ID, 'Mayo Emmers', 'Mayo emmer', 'emmer', 'emmers', 80, SMALL),

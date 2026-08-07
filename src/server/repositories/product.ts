@@ -74,8 +74,18 @@ export const productRepository: IProductRepository = {
     return mapProduct(await queryRequired(statement.text, statement.params))
   },
 
+  /**
+   * Verwijdert een product uit alle lijsten, maar laat de rij staan: er hangen
+   * tellingen en leveringen aan die anders onleesbaar worden. Ook de normen bij
+   * de kiosken gaan uit, zodat het product niet via een telronde terugkomt.
+   */
   async deleteProduct(id) {
-    await this.updateProduct(id, { isActive: false })
+    await query(
+      `update products set deleted_at = now(), is_active = false
+       where id = $1 and deleted_at is null`,
+      [id]
+    )
+    await query('update kiosk_product_standards set is_active = false where product_id = $1', [id])
   },
 
   async getStandards(kioskId) {

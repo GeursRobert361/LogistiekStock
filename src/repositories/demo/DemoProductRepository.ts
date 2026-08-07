@@ -13,6 +13,7 @@ export class DemoProductRepository implements IProductRepository {
   async getProducts(options?: { categoryId?: string; activeOnly?: boolean }): Promise<Product[]> {
     return demoTables.products
       .filter((p) => {
+        if (p.deletedAt) return false
         if (options?.activeOnly !== false && !p.isActive) return false
         if (options?.categoryId && p.categoryId !== options.categoryId) return false
         return true
@@ -35,8 +36,15 @@ export class DemoProductRepository implements IProductRepository {
     return demoTables.products.update(id, { ...data, updatedAt: new Date().toISOString() })
   }
 
+  /** Zie de productierepository: verwijderen is uit beeld halen, niet wissen. */
   async deleteProduct(id: string): Promise<void> {
-    await this.updateProduct(id, { isActive: false })
+    await this.updateProduct(id, {
+      deletedAt: new Date().toISOString(),
+      isActive: false,
+    })
+    for (const standard of demoTables.standards.filter((s) => s.productId === id)) {
+      demoTables.standards.update(standard.id, { isActive: false })
+    }
   }
 
   async getStandards(kioskId: string): Promise<KioskProductStandard[]> {

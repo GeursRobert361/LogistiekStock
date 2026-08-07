@@ -98,6 +98,11 @@ export interface Product {
   storageLocation?: string
   refrigerated: boolean
   notes?: string
+  /**
+   * Verwijderd: het product verdwijnt uit alle lijsten, maar de rij blijft
+   * bestaan zodat eerdere tellingen en leveringen leesbaar blijven.
+   */
+  deletedAt?: string
   createdAt: string
   updatedAt: string
 }

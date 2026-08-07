@@ -13,7 +13,10 @@ interface ProductFormProps {
   categories: ProductCategory[]
   initial?: Product
   onSubmit: (values: ProductFormValues) => Promise<void>
+  /** Tijdelijk uit de tellijst halen; het product blijft in het beheer staan. */
   onDeactivate?: () => Promise<void>
+  /** Definitief uit alle lijsten halen. */
+  onDelete?: () => void
 }
 
 const ROUND_TYPE_LABEL: Record<RoundType, string> = {
@@ -34,7 +37,13 @@ const STEP_LABEL: Record<string, string> = {
   '0.25': 'Kwart verpakkingen (0,25)',
 }
 
-export function ProductForm({ categories, initial, onSubmit, onDeactivate }: ProductFormProps) {
+export function ProductForm({
+  categories,
+  initial,
+  onSubmit,
+  onDeactivate,
+  onDelete,
+}: ProductFormProps) {
   const [values, setValues] = useState<ProductFormValues>({
     categoryId: initial?.categoryId ?? categories[0]?.id ?? '',
     name: initial?.name ?? '',
@@ -229,6 +238,24 @@ export function ProductForm({ categories, initial, onSubmit, onDeactivate }: Pro
         >
           Product uitschakelen
         </Button>
+      )}
+
+      {onDelete && (
+        <div className="border-t border-gray-200 pt-3">
+          <Button
+            type="button"
+            variant="outline"
+            size="md"
+            className="w-full border-red-300 text-red-700"
+            onClick={onDelete}
+          >
+            Product verwijderen
+          </Button>
+          <p className="mt-1 text-xs text-gray-600">
+            Uitschakelen haalt het product uit de tellijsten maar laat het hier staan.
+            Verwijderen haalt het overal weg.
+          </p>
+        </div>
       )}
     </form>
   )

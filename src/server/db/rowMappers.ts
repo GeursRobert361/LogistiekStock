@@ -199,6 +199,7 @@ export function mapProduct(row: Row): Product {
     storageLocation: optStr(row.storage_location),
     refrigerated: bool(row.refrigerated),
     notes: optStr(row.notes),
+    deletedAt: optStr(row.deleted_at),
     createdAt: str(row.created_at),
     updatedAt: str(row.updated_at),
   }

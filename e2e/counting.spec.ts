@@ -51,10 +51,12 @@ test.describe('Telflow', () => {
     // Het bord toont het opschrift van de vloer, niet het interne nummer 1201.
     await expect(page.getByRole('heading', { level: 2 })).toHaveText('120 Cubes')
 
-    // Daar staan hotdogs en kroketten, en geen tap.
-    await expect(page.locator('#product-hotdog-broodjes')).toBeVisible()
-    await expect(page.locator('#product-kroketten')).toBeVisible()
+    // Verpakking, saus en schoonmaak — het eten zelf loopt via de keuken en
+    // staat dus niet op de logistieke lijst. Een tap staat er ook niet.
+    await expect(page.locator('#product-square-bakjes')).toBeVisible()
+    await expect(page.locator('#product-mayo-flessen')).toBeVisible()
     await expect(page.locator('#product-bierbeker-05')).toHaveCount(0)
+    await expect(page.locator('#product-kroketten')).toHaveCount(0)
   })
 
   test('een niet-geteld product is niet hetzelfde als nul', async ({ page }) => {

@@ -27,9 +27,10 @@ export const KIOSKS_WITH_DRINKS_FRIDGE = new Set([
 export const KIOSKS_WITH_FRIES = new Set([116, 120, 126, 407, 419])
 
 /**
- * De cubes: drie hokjes tegenover kiosk 120 met hotdogs, kroketten en
- * kipburgers. Een eigen telpunt met een eigen, korte lijst — geen drank, geen
- * koffie, geen chips.
+ * De cubes: drie hokjes tegenover kiosk 120 met warme snacks. Een eigen
+ * telpunt met een eigen, korte lijst — geen drank, geen koffie, geen chips.
+ * Het eten zelf loopt via de keuken en staat dus niet op de lijst; wat
+ * logistiek aanvult is de verpakking, de saus en de schoonmaak.
  */
 export const CUBE_KIOSK_NUMBERS = new Set([1201])
 
@@ -86,12 +87,6 @@ export function assortmentForKiosk(kioskNumber: number): AssortmentItem[] {
   // Warme snacks en wat erbij hoort. Geen drank, geen koffie, geen chips —
   // dat staat allemaal in de kiosk ertegenover.
   if (CUBE_KIOSK_NUMBERS.has(kioskNumber)) {
-    add('hotdog-broodjes', 8)
-    add('hotdog-worsten', 8)
-    add('kroketten', 6)
-    add('kipburgers', 6)
-    add('broodjes', 5)
-
     add('rectangular-bakjes', 2)
     add('square-bakjes', 3)
     add('servetten', 3)
