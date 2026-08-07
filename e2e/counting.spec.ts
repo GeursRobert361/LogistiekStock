@@ -1,12 +1,25 @@
 import { test, expect, type Page } from '@playwright/test'
 import { login, resetAppData, fillAllCounts } from './helpers'
 
-/** Start een telronde in de eerste ring, oplopend vanaf kiosk 123. */
-async function startCountAtKiosk123(page: Page) {
+/**
+ * Kiosk 116 heeft een drankkoeling, en daar staat Chaudfontaine Blauw op
+ * norm 15 — handig om de afrondingsregels doorheen te halen. Kiosken zonder
+ * koeling voeren die producten helemaal niet.
+ */
+const KIOSK = 116
+const WATER = '#product-chaudfontaine-blauw'
+
+/** Start een telronde in de eerste ring, oplopend vanaf de gegeven kiosk. */
+async function startCountAt(page: Page, kioskNumber: number) {
   await page.goto('/events/event-demo-ajax/count/start')
-  await page.getByLabel('Startkiosk').selectOption({ label: 'Kiosk 123' })
+  await page.getByLabel('Startkiosk').selectOption({ label: `Kiosk ${kioskNumber}` })
   await page.getByRole('button', { name: /Telronde starten/ }).click()
   await page.waitForURL(/\/kiosk\//)
+}
+
+/** Het invoerveld van één product, op id in plaats van op volgorde. */
+function inputFor(page: Page, productSelector: string) {
+  return page.locator(productSelector).locator('input[inputmode="decimal"]')
 }
 
 test.describe('Telflow', () => {
@@ -15,50 +28,56 @@ test.describe('Telflow', () => {
     await login(page, 'teller1@demo.nl')
   })
 
-  test('start bij kiosk 123 en toont de route oplopend', async ({ page }) => {
-    await startCountAtKiosk123(page)
+  test('start standaard op de kiosk waar je de lift uitkomt', async ({ page }) => {
+    await page.goto('/events/event-demo-ajax/count/start')
 
-    await expect(page.getByRole('heading', { level: 2 })).toHaveText('123')
+    // 127 staat als startkiosk voor tellen op de eerste ring.
+    await expect(page.getByLabel('Startkiosk')).toHaveValue('kiosk-127')
+  })
+
+  test('start bij de gekozen kiosk en toont de route', async ({ page }) => {
+    await startCountAt(page, KIOSK)
+
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText(String(KIOSK))
     await expect(page.getByText(/Stop 1 van 28/)).toBeVisible()
   })
 
   test('een niet-geteld product is niet hetzelfde als nul', async ({ page }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
 
-    // Onaangeraakt: geen bijvuladvies, wel de status "Nog tellen".
-    await expect(page.getByText('Nog tellen').first()).toBeVisible()
-    const firstInput = page.locator('input[inputmode="decimal"]').first()
-    await expect(firstInput).toHaveValue('')
+    const water = page.locator(WATER)
+    await expect(water.getByText('Nog tellen')).toBeVisible()
+    await expect(inputFor(page, WATER)).toHaveValue('')
 
-    // Expliciet 0 levert wél een advies op.
-    await page.getByRole('button', { name: '0', exact: true }).first().click()
-    await expect(firstInput).toHaveValue('0')
-    await expect(page.getByText('+15').first()).toBeVisible()
+    // Expliciet 0 levert wél een advies op: de hele norm moet erbij.
+    await water.getByRole('button', { name: '0', exact: true }).click()
+    await expect(inputFor(page, WATER)).toHaveValue('0')
+    await expect(water.getByText('+15')).toBeVisible()
   })
 
   test('4,5 bij norm 15 geeft 11 bijvullen', async ({ page }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
 
-    const input = page.locator('input[inputmode="decimal"]').first()
+    const input = inputFor(page, WATER)
     await input.fill('4,5')
     await input.blur()
 
-    await expect(page.getByText('+11').first()).toBeVisible()
-    await expect(page.getByText(/Effectief 4 — bijvullen/).first()).toBeVisible()
+    await expect(page.locator(WATER).getByText('+11')).toBeVisible()
+    await expect(page.locator(WATER).getByText(/Effectief 4 — bijvullen/)).toBeVisible()
   })
 
   test('14,5 bij norm 15 geeft 0 bijvullen', async ({ page }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
 
-    const input = page.locator('input[inputmode="decimal"]').first()
+    const input = inputFor(page, WATER)
     await input.fill('14,5')
     await input.blur()
 
-    await expect(page.getByText('Vol', { exact: true }).first()).toBeVisible()
+    await expect(page.locator(WATER).getByText('Vol', { exact: true })).toBeVisible()
   })
 
   test('afronden kan niet zolang er producten ontbreken', async ({ page }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
 
     const completeButton = page.getByRole('button', { name: /Kiosk afronden/ })
     await expect(completeButton).toBeDisabled()
@@ -71,34 +90,33 @@ test.describe('Telflow', () => {
   })
 
   test('afronden gaat door naar de volgende kiosk in de route', async ({ page }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
     await fillAllCounts(page, '3')
 
     await page.getByRole('button', { name: /Kiosk afronden/ }).click()
-    await page.waitForURL(/\/kiosk\/kiosk-124/)
+    await page.waitForURL(/\/kiosk\/kiosk-117/)
 
-    await expect(page.getByRole('heading', { level: 2 })).toHaveText('124')
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText('117')
     await expect(page.getByText(/Stop 2 van 28/)).toBeVisible()
   })
 
   test('de laatst ingevoerde waarde gaat niet verloren bij direct afronden', async ({ page }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
     await fillAllCounts(page, '3')
 
     // Nog één wijziging en meteen doorklikken.
-    const input = page.locator('input[inputmode="decimal"]').first()
+    const input = inputFor(page, WATER)
     await input.fill('7')
     await page.getByRole('button', { name: /Kiosk afronden/ }).click()
-    await page.waitForURL(/\/kiosk\/kiosk-124/)
+    await page.waitForURL(/\/kiosk\/kiosk-117/)
 
-    // Terug naar 123: de 7 moet er nog staan.
     await page.goBack()
-    await page.waitForURL(/\/kiosk\/kiosk-123/)
-    await expect(page.locator('input[inputmode="decimal"]').first()).toHaveValue('7')
+    await page.waitForURL(new RegExp(`/kiosk/kiosk-${KIOSK}`))
+    await expect(inputFor(page, WATER)).toHaveValue('7')
   })
 
   test('overslaan vraagt om een reden', async ({ page }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
 
     await page.getByRole('button', { name: 'Overslaan' }).click()
     await page.getByRole('button', { name: 'Overslaan' }).last().click()
@@ -108,11 +126,11 @@ test.describe('Telflow', () => {
     await page.getByRole('radio', { name: 'Kiosk gesloten' }).check()
     await page.getByRole('button', { name: 'Overslaan' }).last().click()
 
-    await page.waitForURL(/\/kiosk\/kiosk-124/)
+    await page.waitForURL(/\/kiosk\/kiosk-117/)
   })
 
   test('een kiosknotitie blijft bewaard', async ({ page }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
 
     await page.getByRole('button', { name: /Notitie toevoegen/ }).click()
     const notes = page.getByLabel('Notitie bij deze kiosk')
@@ -124,6 +142,30 @@ test.describe('Telflow', () => {
   })
 })
 
+test.describe('Assortiment per kiosk', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetAppData(page)
+    await login(page, 'teller1@demo.nl')
+  })
+
+  test('een kiosk met koeling telt de gekoelde drank', async ({ page }) => {
+    await startCountAt(page, 116)
+
+    await expect(page.locator(WATER)).toBeVisible()
+    await expect(page.getByText('Fuze Tea')).toBeVisible()
+  })
+
+  test('een kiosk zonder koeling telt die drank helemaal niet', async ({ page }) => {
+    await startCountAt(page, 121)
+
+    await expect(page.locator(WATER)).toHaveCount(0)
+    await expect(page.getByText('Fuze Tea')).toHaveCount(0)
+    // De rest staat er wel gewoon.
+    await expect(page.getByText('Bierbekers 0,5')).toBeVisible()
+    await expect(page.getByText('Chips Blauw')).toBeVisible()
+  })
+})
+
 test.describe('Offline', () => {
   test.beforeEach(async ({ page }) => {
     await resetAppData(page)
@@ -131,34 +173,26 @@ test.describe('Offline', () => {
   })
 
   test('een herlaadactie zonder verbinding houdt de telling vast', async ({ page, context }) => {
-    await startCountAtKiosk123(page)
+    await startCountAt(page, KIOSK)
 
     // De service worker moet de pagina één keer online gezien hebben.
     await page.evaluate(() => navigator.serviceWorker.ready)
     await page.reload()
-    await page.locator('input[inputmode="decimal"]').first().waitFor()
+    await inputFor(page, WATER).waitFor()
 
-    const input = page.locator('input[inputmode="decimal"]').first()
+    const input = inputFor(page, WATER)
     await input.fill('4,5')
     await input.blur()
-    await expect(page.getByText('+11').first()).toBeVisible()
+    await expect(page.locator(WATER).getByText('+11')).toBeVisible()
 
-    // Verbinding eruit en de pagina opnieuw laden.
     await context.setOffline(true)
     await page.reload()
 
-    await expect(page.locator('input[inputmode="decimal"]').first()).toHaveValue('4,5')
-    await expect(page.getByText('+11').first()).toBeVisible()
-
-    // Offline verder tellen kan gewoon.
-    const second = page.locator('input[inputmode="decimal"]').nth(1)
-    await second.fill('2')
-    await second.blur()
+    await expect(inputFor(page, WATER)).toHaveValue('4,5')
+    await expect(page.locator(WATER).getByText('+11')).toBeVisible()
 
     await context.setOffline(false)
     await page.reload()
-
-    await expect(page.locator('input[inputmode="decimal"]').first()).toHaveValue('4,5')
-    await expect(page.locator('input[inputmode="decimal"]').nth(1)).toHaveValue('2')
+    await expect(inputFor(page, WATER)).toHaveValue('4,5')
   })
 })

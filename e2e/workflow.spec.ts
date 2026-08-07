@@ -7,7 +7,9 @@ import { login, resetAppData, fillAllCounts } from './helpers'
  * planning.
  */
 test.describe('Volledige workflow', () => {
-  test.slow()
+  // Deze test loopt de hele keten door en vult per kiosk het volledige
+  // assortiment in; dat kost meer dan de standaardlimiet.
+  test.setTimeout(240_000)
 
   test.beforeEach(async ({ page }) => {
     await resetAppData(page)
@@ -20,31 +22,32 @@ test.describe('Volledige workflow', () => {
     await page.getByRole('button', { name: /telronde starten/i }).click()
     await page.waitForURL(/\/count\/start/)
 
-    await page.getByLabel('Startkiosk').selectOption({ label: 'Kiosk 123' })
+    await page.getByLabel('Startkiosk').selectOption({ label: 'Kiosk 116' })
     await page.getByRole('button', { name: /Telronde starten/ }).click()
-    await page.waitForURL(/\/kiosk\/kiosk-123/)
+    await page.waitForURL(/\/kiosk\/kiosk-116/)
 
-    await expect(page.getByRole('heading', { level: 2 })).toHaveText('123')
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText('116')
     await expect(page.getByText(/Stop 1 van 28/)).toBeVisible()
 
-    // ── 2. Kiosk 123 tellen: expliciet 0 en een kwartwaarde ────────────────
+    // ── 2. Kiosk 116 tellen: expliciet 0 en een kwartwaarde ────────────────
     await fillAllCounts(page, '1')
 
-    await page.getByRole('button', { name: '0', exact: true }).first().click()
-    await expect(page.getByText('+15').first()).toBeVisible()
+    const water = page.locator('#product-chaudfontaine-blauw')
+    await water.getByRole('button', { name: '0', exact: true }).click()
+    await expect(water.getByText('+15')).toBeVisible()
 
-    const firstInput = page.locator('input[inputmode="decimal"]').first()
-    await firstInput.fill('4,5')
-    await firstInput.blur()
-    await expect(page.getByText('+11').first()).toBeVisible()
+    const waterInput = water.locator('input[inputmode="decimal"]')
+    await waterInput.fill('4,5')
+    await waterInput.blur()
+    await expect(water.getByText('+11')).toBeVisible()
 
     await page.getByRole('button', { name: /Kiosk afronden/ }).click()
-    await page.waitForURL(/\/kiosk\/kiosk-124/)
+    await page.waitForURL(/\/kiosk\/kiosk-117/)
 
-    // ── 3. Kiosk 124 tellen ────────────────────────────────────────────────
+    // ── 3. Kiosk 117 tellen ────────────────────────────────────────────────
     await fillAllCounts(page, '2')
     await page.getByRole('button', { name: /Kiosk afronden/ }).click()
-    await page.waitForURL(/\/kiosk\/kiosk-125/)
+    await page.waitForURL(/\/kiosk\/kiosk-118/)
 
     // ── 4. De rest van de ring bewust overslaan ────────────────────────────
     for (let index = 0; index < 26; index++) {

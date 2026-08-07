@@ -191,6 +191,17 @@ async function seedProducts(): Promise<void> {
     const id = idByName.get(product.name)
     if (id) productIds.set(product.id, id)
   }
+
+  // Producten die niet meer in de catalogus staan gaan uit, niet weg: er
+  // kunnen tellingen aan hangen die je wilt kunnen terugzien.
+  const deactivated = await client.query(
+    'update products set is_active = false where is_active = true and name <> all($1::text[])',
+    [demoProducts.map((product) => product.name)]
+  )
+  if ((deactivated.rowCount ?? 0) > 0) {
+    console.log(`  · ${deactivated.rowCount} product(en) uit de oude catalogus uitgeschakeld`)
+  }
+
   console.log(`✓ ${demoProducts.length} producten`)
 }
 
@@ -219,6 +230,38 @@ async function seedStandards(): Promise<void> {
     )
     count++
   }
+
+  // Normen voor producten die een kiosk niet meer voert gaan uit, zodat ze
+  // niet meer geteld hoeven te worden.
+  const active = new Set(demoStandards.map((s) => `${s.kioskId}|${s.productId}`))
+  const stale = await client.query<{ id: string }>(
+    `select s.id from kiosk_product_standards s where s.is_active = true`
+  )
+  let deactivated = 0
+  for (const row of stale.rows) {
+    const { rows: detail } = await client.query<{ kiosk_id: string; product_id: string }>(
+      'select kiosk_id, product_id from kiosk_product_standards where id = $1',
+      [row.id]
+    )
+    const found = detail[0]
+    if (!found) continue
+
+    const stillWanted = [...active].some((key) => {
+      const [demoKioskId, demoProductId] = key.split('|')
+      return (
+        kioskIds.get(demoKioskId!) === found.kiosk_id &&
+        productIds.get(demoProductId!) === found.product_id
+      )
+    })
+    if (!stillWanted) {
+      await client.query('update kiosk_product_standards set is_active = false where id = $1', [
+        row.id,
+      ])
+      deactivated++
+    }
+  }
+  if (deactivated > 0) console.log(`  · ${deactivated} verouderde normen uitgeschakeld`)
+
   console.log(`✓ ${count} voorraadnormen`)
 }
 
