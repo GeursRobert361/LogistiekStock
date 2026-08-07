@@ -52,6 +52,7 @@ export default function DashboardPage() {
   const canPlanRestock = hasAnyRole([...PERMISSIONS.PLAN_RESTOCK])
   const canExecuteRestock = hasAnyRole([...PERMISSIONS.EXECUTE_RESTOCK])
   const canManageMasterData = hasAnyRole([...PERMISSIONS.MANAGE_MASTER_DATA])
+  const canManageEvents = hasAnyRole([...PERMISSIONS.MANAGE_EVENTS])
 
   const load = useCallback(async () => {
     const events = await repositories.event().getEvents()
@@ -150,8 +151,19 @@ export default function DashboardPage() {
         {!event ? (
           <EmptyState
             title="Geen evenementen"
-            description="Er staat op dit moment geen evenement gepland."
+            description={
+              canManageEvents
+                ? 'Maak een evenement aan om te kunnen tellen.'
+                : 'Er staat op dit moment geen evenement gepland.'
+            }
             icon="📅"
+            action={
+              canManageEvents ? (
+                <Link href="/events/new">
+                  <Button>Evenement aanmaken</Button>
+                </Link>
+              ) : undefined
+            }
           />
         ) : (
           <>
