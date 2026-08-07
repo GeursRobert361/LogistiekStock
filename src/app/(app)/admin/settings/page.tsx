@@ -9,7 +9,7 @@ import { ConfirmDialog } from '@/components/ui/Dialog'
 import { clearDemoStorage } from '@/lib/demo/demoStore'
 import { getOfflineDb } from '@/lib/db/offlineDb'
 import { clearServiceWorkerCaches } from '@/components/layout/ServiceWorkerRegistrar'
-import { getAppMode, isDemoMode } from '@/lib/appMode'
+import { isDemoMode } from '@/lib/appMode'
 
 export default function AdminSettingsPage() {
   const router = useRouter()
@@ -58,13 +58,13 @@ export default function AdminSettingsPage() {
           </CardHeader>
           <CardContent className="space-y-1">
             <p className="text-sm text-gray-800">
-              Modus: <strong>{demoMode ? 'Demo' : 'Productie (Supabase)'}</strong>
+              Modus: <strong>{demoMode ? 'Demo' : 'Productie (eigen server)'}</strong>
             </p>
             <p className="text-xs text-gray-600">
               {demoMode
                 ? 'Gegevens staan op dit apparaat, niet op een server. Ingesteld via ' +
                   'NEXT_PUBLIC_APP_MODE.'
-                : `Verbonden met Supabase (${getAppMode()}).`}
+                : 'Gegevens staan in de database op onze eigen server.'}
             </p>
           </CardContent>
         </Card>

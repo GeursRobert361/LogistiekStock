@@ -14,23 +14,19 @@ import { DemoCountRepository } from './demo/DemoCountRepository'
 import { DemoRestockRepository } from './demo/DemoRestockRepository'
 import { DemoIncidentRepository } from './demo/DemoIncidentRepository'
 
-import { SupabaseAuthRepository } from './supabase/SupabaseAuthRepository'
-import { SupabaseKioskRepository } from './supabase/SupabaseKioskRepository'
-import { SupabaseProductRepository } from './supabase/SupabaseProductRepository'
-import { SupabaseEventRepository } from './supabase/SupabaseEventRepository'
-import { SupabaseCountRepository } from './supabase/SupabaseCountRepository'
-import { SupabaseRestockRepository } from './supabase/SupabaseRestockRepository'
-import { SupabaseIncidentRepository } from './supabase/SupabaseIncidentRepository'
+import { HttpAuthRepository } from './http/HttpAuthRepository'
+import { createRpcRepository } from './http/rpcClient'
 
 import { isDemoMode } from '@/lib/appMode'
 
 /**
  * Centrale plek waar demo- en productie-implementaties worden gekozen.
- * Pages en componenten praten alleen met de interfaces — nooit rechtstreeks
- * met Supabase of met de demo-store.
+ *
+ * Pages en componenten praten alleen met de interfaces. In demo-modus draait
+ * alles in de browser; in productie gaat elke aanroep via /api/rpc naar de
+ * Postgres op onze eigen server, waar de rechten worden gecontroleerd.
  */
 
-// Singletons — dezelfde instantie gedurende de hele app-levensduur
 let authRepo: IAuthRepository | null = null
 let kioskRepo: IKioskRepository | null = null
 let productRepo: IProductRepository | null = null
@@ -41,49 +37,61 @@ let incidentRepo: IIncidentRepository | null = null
 
 function getAuthRepository(): IAuthRepository {
   if (!authRepo) {
-    authRepo = isDemoMode() ? new DemoAuthRepository() : new SupabaseAuthRepository()
+    authRepo = isDemoMode() ? new DemoAuthRepository() : new HttpAuthRepository()
   }
   return authRepo
 }
 
 function getKioskRepository(): IKioskRepository {
   if (!kioskRepo) {
-    kioskRepo = isDemoMode() ? new DemoKioskRepository() : new SupabaseKioskRepository()
+    kioskRepo = isDemoMode()
+      ? new DemoKioskRepository()
+      : createRpcRepository<IKioskRepository>('kiosk')
   }
   return kioskRepo
 }
 
 function getProductRepository(): IProductRepository {
   if (!productRepo) {
-    productRepo = isDemoMode() ? new DemoProductRepository() : new SupabaseProductRepository()
+    productRepo = isDemoMode()
+      ? new DemoProductRepository()
+      : createRpcRepository<IProductRepository>('product')
   }
   return productRepo
 }
 
 function getEventRepository(): IEventRepository {
   if (!eventRepo) {
-    eventRepo = isDemoMode() ? new DemoEventRepository() : new SupabaseEventRepository()
+    eventRepo = isDemoMode()
+      ? new DemoEventRepository()
+      : createRpcRepository<IEventRepository>('event')
   }
   return eventRepo
 }
 
 function getCountRepository(): ICountRepository {
   if (!countRepo) {
-    countRepo = isDemoMode() ? new DemoCountRepository() : new SupabaseCountRepository()
+    countRepo = isDemoMode()
+      ? new DemoCountRepository()
+      : createRpcRepository<ICountRepository>('count')
   }
   return countRepo
 }
 
 function getRestockRepository(): IRestockRepository {
   if (!restockRepo) {
-    restockRepo = isDemoMode() ? new DemoRestockRepository() : new SupabaseRestockRepository()
+    restockRepo = isDemoMode()
+      ? new DemoRestockRepository()
+      : createRpcRepository<IRestockRepository>('restock')
   }
   return restockRepo
 }
 
 function getIncidentRepository(): IIncidentRepository {
   if (!incidentRepo) {
-    incidentRepo = isDemoMode() ? new DemoIncidentRepository() : new SupabaseIncidentRepository()
+    incidentRepo = isDemoMode()
+      ? new DemoIncidentRepository()
+      : createRpcRepository<IIncidentRepository>('incident')
   }
   return incidentRepo
 }

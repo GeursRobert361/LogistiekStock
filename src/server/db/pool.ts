@@ -83,6 +83,27 @@ export async function transaction<T>(fn: (client: PoolClient) => Promise<T>): Pr
 }
 
 /**
+ * Bouwt een `update ... where id = ...`-statement uit de gezette velden.
+ * Een lege `row` levert null op: dan valt er niets bij te werken.
+ */
+export function buildUpdate(
+  table: string,
+  row: Row,
+  id: string
+): { text: string; params: unknown[] } | null {
+  const columns = Object.keys(row)
+  if (columns.length === 0) return null
+
+  const assignments = columns.map((column, index) => `${column} = $${index + 1}`)
+  const params = [...Object.values(row), id]
+
+  return {
+    text: `update ${table} set ${assignments.join(', ')} where id = $${columns.length + 1} returning *`,
+    params,
+  }
+}
+
+/**
  * Bouwt een `insert ... on conflict do update`-statement.
  * Scheelt in elke repository dezelfde string-plakkerij.
  */
