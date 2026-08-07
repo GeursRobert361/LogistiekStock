@@ -40,7 +40,12 @@ export interface IRestockRepository {
   createStopItems(items: Array<Omit<RestockStopItem, 'id' | 'createdAt'>>): Promise<RestockStopItem[]>
 
   // ─── Leveringen ────────────────────────────────────────────────────────────
-  createDelivery(data: Omit<RestockDelivery, 'id' | 'createdAt'>): Promise<RestockDelivery>
+  /**
+   * Legt een levering vast. Het id komt van de client en de aanroep is
+   * idempotent: dezelfde levering twee keer wegschrijven — rechtstreeks én
+   * later nog eens vanuit de outbox — levert één regel op.
+   */
+  createDelivery(data: RestockDelivery): Promise<RestockDelivery>
   getDeliveriesForStop(stopId: string): Promise<RestockDelivery[]>
   getDeliveriesForRound(roundId: string): Promise<RestockDelivery[]>
 

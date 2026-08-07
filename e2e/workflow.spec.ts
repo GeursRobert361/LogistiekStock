@@ -132,7 +132,9 @@ test.describe('Volledige workflow', () => {
         ).toBeVisible()
       } else {
         await page.getByRole('button', { name: 'Alles geleverd' }).first().click()
-        await expect(page.getByText(/van \d+ geleverd/).first()).toBeVisible()
+        // Hetzelfde getal aan beide kanten: "16 van 8" betekent dat de levering
+        // dubbel is weggeschreven.
+        await expect(page.getByText(/✓ (\d+) van \1 geleverd/).first()).toBeVisible()
       }
 
       await page.getByRole('button', { name: /Kiosk klaar/ }).click()

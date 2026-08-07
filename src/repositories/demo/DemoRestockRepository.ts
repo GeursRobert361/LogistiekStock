@@ -157,11 +157,15 @@ export class DemoRestockRepository implements IRestockRepository {
 
   // ─── Leveringen ────────────────────────────────────────────────────────────
 
-  async createDelivery(data: Omit<RestockDelivery, 'id' | 'createdAt'>): Promise<RestockDelivery> {
+  async createDelivery(data: RestockDelivery): Promise<RestockDelivery> {
+    // Zie de interface: dezelfde levering twee keer aanbieden mag maar één
+    // regel opleveren.
+    const existing = demoTables.restockDeliveries.getById(data.id)
+    if (existing) return existing
+
     const delivery: RestockDelivery = {
       ...data,
-      id: newId(),
-      createdAt: new Date().toISOString(),
+      createdAt: data.createdAt || new Date().toISOString(),
     }
     demoTables.restockDeliveries.insert(delivery)
     return delivery

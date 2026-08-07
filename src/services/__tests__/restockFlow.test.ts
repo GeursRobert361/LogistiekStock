@@ -582,6 +582,30 @@ describe('vulronde uitvoeren', () => {
     ).rejects.toThrow(/nog maar 4 van dit product gepland/)
   })
 
+  it('telt een levering niet dubbel als hij twee keer wordt weggeschreven', async () => {
+    // De app schrijft de levering rechtstreeks weg én zet hem in de outbox.
+    // Kwam die tweede poging als losse regel binnen, dan stond er "16 van 8
+    // geleverd" op het scherm.
+    const round = await readyRound()
+    const plan = await getRoundPlan(round.id)
+
+    await registerDelivery({
+      roundId: round.id,
+      stopId: plan.stops[0]!.id,
+      productId: 'water',
+      plannedPackages: 6,
+      deliveredPackages: 6,
+      userId: VULLER,
+    })
+
+    const delivery = (await fakeRestockRepo.getDeliveriesForStop(plan.stops[0]!.id))[0]!
+    await fakeRestockRepo.createDelivery(delivery)
+
+    const stopPlan = await getStopPlan(round.id, plan.stops[0]!.id)
+    expect(stopPlan.products[0]!.deliveredPackages).toBe(6)
+    expect(await fakeRestockRepo.getDeliveriesForStop(plan.stops[0]!.id)).toHaveLength(1)
+  })
+
   it('stopt een ronde halverwege en geeft de rest terug aan de vulplanning', async () => {
     const round = await readyRound()
     const plan = await getRoundPlan(round.id)

@@ -171,11 +171,15 @@ export class FakeRestockRepository implements IRestockRepository {
     return created
   }
 
-  async createDelivery(data: Omit<RestockDelivery, 'id' | 'createdAt'>): Promise<RestockDelivery> {
+  async createDelivery(data: RestockDelivery): Promise<RestockDelivery> {
+    // Idempotent, net als de echte repositories: de levering wordt zowel
+    // rechtstreeks als via de outbox aangeboden.
+    const existing = this.deliveries.find((d) => d.id === data.id)
+    if (existing) return existing
+
     const delivery: RestockDelivery = {
       ...data,
-      id: newId(),
-      createdAt: new Date().toISOString(),
+      createdAt: data.createdAt || new Date().toISOString(),
     }
     this.deliveries.push(delivery)
     return delivery

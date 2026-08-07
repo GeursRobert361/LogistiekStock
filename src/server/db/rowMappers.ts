@@ -536,8 +536,10 @@ export function mapDelivery(row: Row): RestockDelivery {
   }
 }
 
-export function deliveryToRow(data: Omit<RestockDelivery, 'id' | 'createdAt'>): Row {
+export function deliveryToRow(data: RestockDelivery): Row {
   return {
+    // Het id komt mee zodat een herhaalde verzending dezelfde rij raakt.
+    id: data.id,
     restock_round_stop_id: data.restockRoundStopId,
     product_id: data.productId,
     planned_packages: data.plannedPackages,

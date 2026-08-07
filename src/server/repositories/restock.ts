@@ -189,13 +189,22 @@ export const restockRepository: IRestockRepository = {
   async createDelivery(data) {
     const row = deliveryToRow(data)
     const columns = Object.keys(row)
+
+    // De levering wordt rechtstreeks weggeschreven én belandt in de outbox;
+    // zonder deze conflictregel staat er daarna twee keer hetzelfde ("16 van 8
+    // geleverd"). Het id van de client maakt de tweede poging een no-op.
+    const inserted = await queryOne(
+      `insert into restock_deliveries (${columns.join(', ')}) values (${columns
+        .map((_, i) => `$${i + 1}`)
+        .join(', ')})
+       on conflict (id) do nothing
+       returning *`,
+      Object.values(row)
+    )
+    if (inserted) return mapDelivery(inserted)
+
     return mapDelivery(
-      await queryRequired(
-        `insert into restock_deliveries (${columns.join(', ')}) values (${columns
-          .map((_, i) => `$${i + 1}`)
-          .join(', ')}) returning *`,
-        Object.values(row)
-      )
+      await queryRequired('select * from restock_deliveries where id = $1', [data.id])
     )
   },
 
