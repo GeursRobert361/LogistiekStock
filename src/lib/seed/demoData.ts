@@ -80,10 +80,28 @@ const cubes120: Kiosk = {
   updatedAt: '2026-01-01T00:00:00Z',
 }
 
+/**
+ * De extra bar bij kiosk 420: een eigen tappunt met een post-mixinstallatie,
+ * dat los van de kiosk zelf geteld en gevuld wordt.
+ */
+const bar420: Kiosk = {
+  id: 'kiosk-420-bar',
+  ringId: RING2_ID,
+  number: 4201,
+  label: '420 Bar',
+  name: 'Bar naast kiosk 420',
+  location: 'Naast kiosk 420',
+  sortOrder: 205, // direct na 420 (200), vóór 421 (210)
+  isActive: true,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+}
+
 export const demoKiosks: Kiosk[] = [
   ...makeKiosks(RING1_ID, 101, 28), // 101–128
   cubes120,
   ...makeKiosks(RING2_ID, 401, 29), // 401–429, daarna wrapt de ring naar 401
+  bar420,
 ].sort((a, b) => a.sortOrder - b.sortOrder)
 
 // ─── Users / Profiles ────────────────────────────────────────────────────

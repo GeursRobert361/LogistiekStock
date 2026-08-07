@@ -168,6 +168,21 @@ test.describe('Volledige workflow', () => {
     // Geen tussenschermen: van aanvinken direct naar de kiosk.
     await page.waitForURL(/\/stop\//)
     await expect(page.getByText(/Stop 1 van/)).toBeVisible()
+
+    // ── 15. Ronde stoppen zonder hem af te maken ───────────────────────────
+    const roundUrl = /\/restock-rounds\/[^/]+$/
+    await page.getByRole('link', { name: 'Terug' }).click()
+    await page.waitForURL(roundUrl)
+
+    await page.getByRole('button', { name: 'Ronde stoppen' }).click()
+    await expect(page.getByText(/staat nog open|staan nog open/)).toBeVisible()
+    await page.getByRole('button', { name: 'Stoppen', exact: true }).click()
+
+    await expect(page.getByText('Deels geleverd')).toBeVisible()
+
+    // En het werk staat weer klaar voor een volgende pallet.
+    await page.goto('/restock-rounds/new')
+    await expect(page.getByRole('button', { name: new RegExp(roundProductName!) })).toBeVisible()
   })
 })
 

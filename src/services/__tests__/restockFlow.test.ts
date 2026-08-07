@@ -582,6 +582,33 @@ describe('vulronde uitvoeren', () => {
     ).rejects.toThrow(/nog maar 4 van dit product gepland/)
   })
 
+  it('stopt een ronde halverwege en geeft de rest terug aan de vulplanning', async () => {
+    const round = await readyRound()
+    const plan = await getRoundPlan(round.id)
+
+    // Eerste kiosk gevuld, tweede niet meer aan toegekomen.
+    await registerDelivery({
+      roundId: round.id,
+      stopId: plan.stops[0]!.id,
+      productId: 'water',
+      plannedPackages: 6,
+      deliveredPackages: 6,
+      userId: VULLER,
+    })
+    await completeStop(plan.stops[0]!.id)
+
+    const stopped = await completeRound(round.id)
+    expect(stopped.status).toBe(RestockRoundStatus.PARTIALLY_COMPLETED)
+
+    const requirements = await fakeRestockRepo.getRequirements(EVENT_ID)
+    const first = requirements.find((r) => r.kioskId === 'kiosk-101')!
+    const second = requirements.find((r) => r.kioskId === 'kiosk-102')!
+
+    // Wat geleverd is blijft staan; de niet-bezochte kiosk staat weer open.
+    expect(openPackages(first)).toBe(0)
+    expect(unplannedPackages(second)).toBe(4)
+  })
+
   it('markeert een ronde met een tekort niet als volledig afgerond', async () => {
     const round = await readyRound()
     const plan = await getRoundPlan(round.id)

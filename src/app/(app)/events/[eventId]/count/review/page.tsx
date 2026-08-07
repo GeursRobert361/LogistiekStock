@@ -14,6 +14,7 @@ import { KioskReviewDetail } from '@/components/counting/KioskReviewDetail'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import { loadEntryList, loadSessionsForEvent, reopenKiosk } from '@/services/countingService'
+import { syncService } from '@/services/syncService'
 import {
   approveSession,
   getApprovalBlockers,
@@ -73,6 +74,14 @@ export default function CountReviewPage({
   const canApprove = hasRole(UserRole.PLANNER) || hasRole(UserRole.ADMIN)
 
   const load = useCallback(async () => {
+    // Wie hier direct vanaf de laatste kiosk binnenkomt, loopt vóór de sync
+    // uit: de server weet dan nog niet dat die kiosk klaar is. Eerst legen,
+    // dan pas tellen — anders staat er een kiosk op "bezig" die het allang niet
+    // meer is.
+    await syncService.flush().catch((flushError: unknown) => {
+      console.warn('[review] Wegschrijven vóór het overzicht mislukt.', flushError)
+    })
+
     const [sessions, productList, categoryList, kioskList, ringList] = await Promise.all([
       loadSessionsForEvent(eventId),
       repositories.product().getProducts({ activeOnly: false }),

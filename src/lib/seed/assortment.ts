@@ -33,6 +33,26 @@ export const KIOSKS_WITH_FRIES = new Set([116, 120, 126, 407, 419])
  */
 export const CUBE_KIOSK_NUMBERS = new Set([1201])
 
+/**
+ * Telpunten met een post-mixinstallatie. Alleen daar staan de BIB-pakken en
+ * de koolzuurcilinders; de rest schenkt uit blik en fles.
+ *
+ * Opgegeven door de vloer. Wijzigt dit, dan kan het ook zonder nieuwe seed:
+ * in Beheer → Voorraadnormen een norm op 0 zetten haalt het product bij die
+ * kiosk weg.
+ */
+export const KIOSKS_WITH_POSTMIX = new Set([
+  // Eerste ring
+  101, 103, 106, 110, 112, 116, 118, 120, 122, 126,
+  // Tweede ring
+  401, 404, 406, 407, 410, 416, 420, 426,
+  // De losse bar naast 420
+  4201,
+])
+
+/** De losse bar naast kiosk 420: tappen en post-mix, verder niets. */
+export const BAR_KIOSK_NUMBERS = new Set([4201])
+
 /** Kiosken die ook snoep en wijn voeren. */
 export const KIOSKS_WITH_SWEETS = new Set([110, 401])
 
@@ -86,6 +106,25 @@ export function assortmentForKiosk(kioskNumber: number): AssortmentItem[] {
     return items
   }
 
+  // ── Bar: alleen tappen en post-mix ───────────────────────────────────────
+  if (BAR_KIOSK_NUMBERS.has(kioskNumber)) {
+    add('bierbeker-05', 2)
+    add('bierbeker-04', 2)
+    add('bierbeker-03', 1)
+
+    add('cola', 2)
+    add('cola-zero', 3)
+    add('fanta', 1)
+    add('sprite', 2)
+    add('koolzuur', 2)
+
+    add('servetten', 2)
+    add('sixpacks', 1)
+    add('tork-rol', 2)
+    add('vuilniszakken', 2)
+    return items
+  }
+
   // ── Bierbekers — overal, en de grootste stroom van allemaal ──────────────
   add('bierbeker-05', 2)
   add('bierbeker-04', 2)
@@ -120,13 +159,15 @@ export function assortmentForKiosk(kioskNumber: number): AssortmentItem[] {
   add('chips-rood', vary(3, kioskNumber, 1))
   add('chips-oranje', vary(2, kioskNumber, 1))
 
-  // ── Post-mix — overal ────────────────────────────────────────────────────
+  // ── Post-mix — alleen waar een installatie staat ─────────────────────────
   // Eén pak gaat lang mee; er staan er nooit meer dan een paar achter de tap.
-  add('cola', vary(2, kioskNumber, 1))
-  add('cola-zero', vary(3, kioskNumber, 1))
-  add('fanta', 1)
-  add('sprite', vary(2, kioskNumber, 1))
-  add('koolzuur', vary(2, kioskNumber, 1))
+  if (KIOSKS_WITH_POSTMIX.has(kioskNumber)) {
+    add('cola', vary(2, kioskNumber, 1))
+    add('cola-zero', vary(3, kioskNumber, 1))
+    add('fanta', 1)
+    add('sprite', vary(2, kioskNumber, 1))
+    add('koolzuur', vary(2, kioskNumber, 1))
+  }
 
   // ── Koffie en thee ───────────────────────────────────────────────────────
   if (!KIOSKS_WITHOUT_COFFEE.has(kioskNumber)) {

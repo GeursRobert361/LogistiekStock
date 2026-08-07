@@ -141,20 +141,14 @@ export async function getApprovalBlockers(
   overview: SessionOverview
 ): Promise<ApprovalBlocker[]> {
   const blockers: ApprovalBlocker[] = []
-
-  const open = overview.notStartedCount + overview.inProgressCount
-  if (open > 0) {
-    blockers.push({
-      code: 'OPEN_KIOSKS',
-      message: `${open} ${open === 1 ? 'kiosk is' : 'kiosken zijn'} nog niet afgerond of overgeslagen.`,
-    })
-  }
+  let current = overview
 
   const isOnline = typeof navigator === 'undefined' || navigator.onLine
   if (isOnline) {
     // Eerst proberen weg te schrijven; pas wat dan nog blijft staan is een blokkade.
     await syncService.flush()
     const pending = await getPendingOutboxEntries()
+
     if (pending.length > 0) {
       blockers.push({
         code: 'UNSYNCED_CHANGES',
@@ -162,7 +156,20 @@ export async function getApprovalBlockers(
           pending.length === 1 ? 'is' : 'zijn'
         } nog niet gesynchroniseerd.`,
       })
+    } else {
+      // Het overzicht komt van vóór dat wegschrijven. Een kiosk die net is
+      // overgeslagen staat op de server dan nog op "bezig" en zou de
+      // goedkeuring blokkeren terwijl er niets aan de hand is.
+      current = await getSessionOverview(overview.session)
     }
+  }
+
+  const open = current.notStartedCount + current.inProgressCount
+  if (open > 0) {
+    blockers.push({
+      code: 'OPEN_KIOSKS',
+      message: `${open} ${open === 1 ? 'kiosk is' : 'kiosken zijn'} nog niet afgerond of overgeslagen.`,
+    })
   }
 
   return blockers

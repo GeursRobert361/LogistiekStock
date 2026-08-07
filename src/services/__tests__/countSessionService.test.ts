@@ -222,6 +222,26 @@ describe('goedkeuren', () => {
     await expect(approveSession(session)).rejects.toThrow()
   })
 
+  it('blokkeert niet op een kiosk die nog in de outbox stond', async () => {
+    // De reviewpagina haalt zijn overzicht op terwijl de laatste kiosk nog
+    // onderweg is naar de server. Zou de controle op dat verouderde overzicht
+    // afgaan, dan meldt de app "1 kiosk staat nog open" terwijl die kiosk
+    // allang geteld is — en kun je niet goedkeuren tot je ververst.
+    const session = makeSession({ kioskRoute: shortRoute })
+    await saveCountSessionLocally(session)
+
+    await countKiosk(shortRoute[0]!)
+    await syncService.flush()
+    const staleOverview = await getSessionOverview(session)
+    expect(staleOverview.notStartedCount + staleOverview.inProgressCount).toBe(1)
+
+    // Tweede kiosk erbij, nog niet gesynchroniseerd.
+    await countKiosk(shortRoute[1]!)
+
+    const blockers = await getApprovalBlockers(staleOverview)
+    expect(blockers).toEqual([])
+  })
+
   it('keurt wel goed zodra de wijzigingen alsnog zijn weggeschreven', async () => {
     const session = makeSession({ kioskRoute: shortRoute })
     await saveCountSessionLocally(session)

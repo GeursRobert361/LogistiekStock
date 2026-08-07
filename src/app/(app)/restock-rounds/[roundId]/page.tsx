@@ -145,6 +145,11 @@ export default function RestockRoundDetailPage({
   const isRunning =
     round.status === RestockRoundStatus.CLAIMED || round.status === RestockRoundStatus.IN_PROGRESS
   const nextStop = getNextStop(plan)
+  const openStops = plan.stops.length - plan.completedStops
+  // Wie de pallet zelf heeft gepakt mag hem ook zelf weer weggooien.
+  const isMine =
+    profile !== null &&
+    (round.assignedUserId === profile.id || round.createdById === profile.id)
   const stillNeeded = [...plan.stillNeededByProduct.values()].sort(
     (a, b) => b.packages - a.packages
   )
@@ -309,11 +314,25 @@ export default function RestockRoundDetailPage({
           )}
 
           {isRunning && nextStop && (
-            <Link href={`/restock-rounds/${roundId}/stop/${nextStop.id}`} className="block">
-              <Button size="lg" className="w-full">
-                Verder — {kioskTitle(kiosks.get(nextStop.kioskId))}
+            <>
+              <Link href={`/restock-rounds/${roundId}/stop/${nextStop.id}`} className="block">
+                <Button size="lg" className="w-full">
+                  Verder — {kioskTitle(kiosks.get(nextStop.kioskId))}
+                </Button>
+              </Link>
+              {/* Stoppen kan altijd: een lege pallet, een dienst die erop zit,
+                  een ronde die niet meer klopt. Wat er nog stond, komt terug
+                  in de vulplanning. */}
+              <Button
+                variant="outline"
+                size="lg"
+                className="w-full"
+                disabled={isWorking}
+                onClick={() => setShowCompleteDialog(true)}
+              >
+                Ronde stoppen
               </Button>
-            </Link>
+            </>
           )}
 
           {isRunning && !nextStop && (
@@ -322,7 +341,7 @@ export default function RestockRoundDetailPage({
             </Button>
           )}
 
-          {canPlan && (isPicking || isReady) && (
+          {(canPlan || isMine) && (isPicking || isReady) && (
             <Button
               variant="outline"
               size="md"
@@ -350,9 +369,16 @@ export default function RestockRoundDetailPage({
         open={showCompleteDialog}
         onClose={() => setShowCompleteDialog(false)}
         onConfirm={() => void handleComplete()}
-        title="Vulronde afronden"
-        message="Wat niet geleverd is, komt terug in de vulplanning. Doorgaan?"
-        confirmLabel="Afronden"
+        title={openStops > 0 ? 'Ronde stoppen' : 'Vulronde afronden'}
+        message={
+          openStops > 0
+            ? `${openStops} ${openStops === 1 ? 'kiosk staat' : 'kiosken staan'} nog open. ` +
+              'Wat daar nog heen moest, komt terug in de vulplanning en kan op een volgende ' +
+              'pallet mee. Wat je al geleverd hebt blijft staan.'
+            : 'Wat niet geleverd is, komt terug in de vulplanning. Doorgaan?'
+        }
+        confirmLabel={openStops > 0 ? 'Stoppen' : 'Afronden'}
+        cancelLabel="Terug"
       />
     </>
   )
