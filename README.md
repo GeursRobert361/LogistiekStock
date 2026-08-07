@@ -21,14 +21,31 @@ src/
     restocking/     # Vulplanning
   repositories/     # Data-laag (demo | supabase)
     interfaces/     # Repository-interfaces
-    demo/           # In-memory implementatie (geen database nodig)
+    demo/           # Demo-implementatie (localStorage, geen database nodig)
     supabase/       # Supabase-implementatie (productie)
+  services/         # Toepassingslogica boven de repositories
+    countingService.ts        # Tellen: lokaal schrijven, server via de outbox
+    countSessionService.ts    # Telronde: status, review, goedkeuren
+    restockPlanningService.ts # Vulrondes samenstellen en reserveren
+    deliveryService.ts        # Afleveren per kiosk
+    syncService.ts            # Outbox richting server
   lib/
     quarterUnits.ts # Quarter-unit hulpfuncties
+    permissions.ts  # Rechten per rol en per pad
     db/offlineDb.ts # IndexedDB via Dexie
     seed/           # Demodata
   types/            # TypeScript-typen en enums
 ```
+
+### Lokaal eerst, server erachteraan
+
+Tijdens het tellen is IndexedDB de bron van waarheid: iedere wijziging gaat er
+zonder vertraging in. De server volgt via een outbox, die bij verbindingsverlies
+blijft staan en later opnieuw probeert. Daardoor kan een telling niet verloren
+gaan doordat iemand direct doorloopt naar de volgende kiosk of de app sluit.
+
+De demo-modus heeft geen server: de Demo-repositories schrijven naar
+localStorage en gedragen zich verder als een echte backend.
 
 ### Rekenprincipe: kwart-eenheden
 
@@ -73,8 +90,12 @@ Open `http://localhost:3000`. De app start automatisch in **demo-modus** (geen S
 
 ## Demo-modus
 
-In demo-modus draait de app volledig lokaal zonder database.  
-Alle data zit in geheugen (demo-repositories) en IndexedDB (offline opslag).
+In demo-modus draait de app volledig lokaal zonder database. De
+demo-repositories schrijven naar localStorage (de gesimuleerde server) en de
+offline-opslag zit in IndexedDB. Een refresh raakt dus niets kwijt.
+
+Via **Beheer → Instellingen → Demo terugzetten** zet je alles terug naar de
+begintoestand.
 
 **Demo-accounts** (wachtwoord: `demo1234`):
 
@@ -96,6 +117,8 @@ Alle data zit in geheugen (demo-repositories) en IndexedDB (offline opslag).
    # of handmatig:
    psql $DATABASE_URL < supabase/migrations/001_initial_schema.sql
    psql $DATABASE_URL < supabase/migrations/002_rls_policies.sql
+   psql $DATABASE_URL < supabase/migrations/003_restock_round_type.sql
+   psql $DATABASE_URL < supabase/migrations/004_restock_stop_items.sql
    ```
 3. Zet `NEXT_PUBLIC_APP_MODE=production` in `.env.local`
 4. Vul de Supabase-omgevingsvariabelen in
@@ -111,7 +134,8 @@ npm run test:run
 # Unit tests met watch
 npm run test
 
-# E2E tests (Playwright) — dev server moet draaien
+# E2E tests (Playwright) — bouwt en start zelf een productieserver, want de
+# service worker draait niet in development
 npm run test:e2e
 
 # TypeScript typecheck
