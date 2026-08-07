@@ -83,6 +83,8 @@ export function mapRing(row: Row): Ring {
     description: optStr(row.description),
     isActive: bool(row.is_active),
     sortOrder: num(row.sort_order),
+    countStartKioskId: optStr(row.count_start_kiosk_id),
+    restockStartKioskId: optStr(row.restock_start_kiosk_id),
     createdAt: str(row.created_at),
     updatedAt: str(row.updated_at),
   }
@@ -94,6 +96,13 @@ export function ringToRow(data: Partial<Ring>): Row {
   if (data.description !== undefined) row.description = data.description
   if (data.isActive !== undefined) row.is_active = data.isActive
   if (data.sortOrder !== undefined) row.sort_order = data.sortOrder
+  // Leegmaken moet kunnen: dan valt de app terug op de standaardkeuze.
+  if (data.countStartKioskId !== undefined) {
+    row.count_start_kiosk_id = data.countStartKioskId || null
+  }
+  if (data.restockStartKioskId !== undefined) {
+    row.restock_start_kiosk_id = data.restockStartKioskId || null
+  }
   return row
 }
 

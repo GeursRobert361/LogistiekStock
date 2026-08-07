@@ -25,12 +25,7 @@ import { PERMISSIONS } from '@/lib/permissions'
 import { RestockRoundStatus } from '@/types'
 import type { Event, Incident, Kiosk, Product, RestockRound } from '@/types'
 import { formatDate } from '@/lib/utils'
-import {
-  IconCount,
-  IconDashboard,
-  IconRestock,
-  IconUsers,
-} from '@/components/layout/NavIcons'
+import { IconAdmin, IconCount } from '@/components/layout/NavIcons'
 
 interface DashboardData {
   event: Event | null
@@ -327,7 +322,7 @@ export default function DashboardPage() {
             </section>
 
             {/* ── Beheer alleen voor wie er iets mag ───────────────────── */}
-            {canManageMasterData && (
+            {(canManageMasterData || canPlanRestock) && (
               <section aria-labelledby="admin-heading">
                 <h3
                   id="admin-heading"
@@ -336,24 +331,8 @@ export default function DashboardPage() {
                   Beheer
                 </h3>
                 <div className="grid grid-cols-2 gap-2">
-                  <ShortcutCard href="/admin/products" Icon={IconRestock} label="Producten" />
                   <ShortcutCard href="/admin/standards" Icon={IconCount} label="Normen" />
-                  <ShortcutCard href="/admin/kiosks" Icon={IconDashboard} label="Kiosken" />
-                  <ShortcutCard href="/admin/users" Icon={IconUsers} label="Gebruikers" />
-                </div>
-              </section>
-            )}
-
-            {!canManageMasterData && canPlanRestock && (
-              <section aria-labelledby="planner-admin-heading">
-                <h3
-                  id="planner-admin-heading"
-                  className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500"
-                >
-                  Beheer
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <ShortcutCard href="/admin/standards" Icon={IconCount} label="Normen" />
+                  <ShortcutCard href="/admin" Icon={IconAdmin} label="Alle instellingen" />
                 </div>
               </section>
             )}

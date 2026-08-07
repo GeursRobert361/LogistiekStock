@@ -110,3 +110,47 @@ test.describe('Beheer', () => {
     await expect(page.getByRole('heading', { name: 'Geen conflicten' })).toBeVisible()
   })
 })
+
+test.describe('Startkiosk per ring', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetAppData(page)
+    await login(page, 'admin@demo.nl')
+  })
+
+  test('ringbeheer is te vinden via het beheeroverzicht', async ({ page }) => {
+    await page.goto('/dashboard')
+    await page.getByRole('link', { name: /Alle instellingen/ }).click()
+    await page.waitForURL(/\/admin$/)
+
+    await page.getByRole('link', { name: /Ringen/ }).click()
+    await page.waitForURL(/\/admin\/rings/)
+    await expect(page.getByText('Eerste ring')).toBeVisible()
+  })
+
+  test('de ingestelde startkiosk staat in het formulier', async ({ page }) => {
+    await page.goto('/admin/rings')
+    await page.getByRole('button', { name: /Eerste ring/ }).click()
+
+    // Wat in de gegevens staat, moet ook voorgeselecteerd zijn.
+    await expect(page.getByLabel('Startkiosk tellen')).toHaveValue('kiosk-127')
+    await expect(page.getByLabel('Startkiosk vullen')).toHaveValue('kiosk-122')
+  })
+
+  test('een telronde begint op de ingestelde kiosk', async ({ page }) => {
+    await page.goto('/events/event-demo-ajax/count/start')
+
+    // 127 is ingesteld als startkiosk voor tellen; niet 101.
+    await expect(page.getByLabel('Startkiosk')).toHaveValue('kiosk-127')
+    await expect(page.getByText(/^127 → /)).toBeVisible()
+  })
+
+  test('een gewijzigde startkiosk werkt door in de telronde', async ({ page }) => {
+    await page.goto('/admin/rings')
+    await page.getByRole('button', { name: /Eerste ring/ }).click()
+    await page.getByLabel('Startkiosk tellen').selectOption('kiosk-110')
+    await page.getByRole('button', { name: 'Opslaan' }).click()
+
+    await page.goto('/events/event-demo-ajax/count/start')
+    await expect(page.getByLabel('Startkiosk')).toHaveValue('kiosk-110')
+  })
+})

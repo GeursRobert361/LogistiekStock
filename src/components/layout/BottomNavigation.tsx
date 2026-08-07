@@ -26,7 +26,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/events', label: 'Tellen', Icon: IconCount, permission: 'COUNT' },
   { href: '/restock-rounds', label: 'Vullen', Icon: IconRestock, permission: 'EXECUTE_RESTOCK' },
   { href: '/incidents', label: 'Storingen', Icon: IconIncident, permission: 'INCIDENTS' },
-  { href: '/admin/products', label: 'Beheer', Icon: IconAdmin, permission: 'MANAGE_MASTER_DATA' },
+  { href: '/admin', label: 'Beheer', Icon: IconAdmin, permission: 'MANAGE_STANDARDS' },
 ]
 
 export function BottomNavigation() {

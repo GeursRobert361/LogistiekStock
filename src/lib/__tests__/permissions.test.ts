@@ -77,3 +77,22 @@ describe('rolrechten', () => {
     }
   })
 })
+
+describe('beheeroverzicht', () => {
+  it('is bereikbaar voor een planner, de onderdelen erbinnen niet allemaal', () => {
+    expect(getRequiredPermission('/admin')).toBe('MANAGE_STANDARDS')
+    expect(hasPermission(PLANNER, getRequiredPermission('/admin')!)).toBe(true)
+
+    // Binnen het overzicht blijft stamdata voor de admin.
+    expect(getRequiredPermission('/admin/products')).toBe('MANAGE_MASTER_DATA')
+    expect(hasPermission(PLANNER, 'MANAGE_MASTER_DATA')).toBe(false)
+  })
+
+  it('houdt een teller er helemaal buiten', () => {
+    expect(hasPermission(TELLER, getRequiredPermission('/admin')!)).toBe(false)
+  })
+
+  it('laat ringen alleen voor de admin', () => {
+    expect(getRequiredPermission('/admin/rings')).toBe('MANAGE_MASTER_DATA')
+  })
+})

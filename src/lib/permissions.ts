@@ -36,7 +36,10 @@ export function hasPermission(roles: UserRole[], permission: Permission): boolea
  * Beveiligde paden, meest specifieke eerst. Een pad zonder regel is voor
  * iedere ingelogde gebruiker toegankelijk.
  */
-const ROUTE_RULES: Array<{ prefix: string; permission: Permission }> = [
+const ROUTE_RULES: Array<{ prefix: string; permission: Permission; exact?: boolean }> = [
+  // Het beheeroverzicht zelf mag ruimer: het toont alleen de onderdelen waar
+  // je rechten voor hebt, en een planner beheert de voorraadnormen.
+  { prefix: '/admin', permission: 'MANAGE_STANDARDS', exact: true },
   { prefix: '/admin/standards', permission: 'MANAGE_STANDARDS' },
   { prefix: '/admin/import', permission: 'MANAGE_STANDARDS' },
   { prefix: '/admin', permission: 'MANAGE_MASTER_DATA' },
@@ -46,8 +49,10 @@ const ROUTE_RULES: Array<{ prefix: string; permission: Permission }> = [
 
 /** Rechten die nodig zijn voor een pad, of `null` wanneer er geen regel geldt. */
 export function getRequiredPermission(pathname: string): Permission | null {
-  const rule = ROUTE_RULES.find(
-    (candidate) => pathname === candidate.prefix || pathname.startsWith(`${candidate.prefix}/`)
+  const rule = ROUTE_RULES.find((candidate) =>
+    candidate.exact
+      ? pathname === candidate.prefix
+      : pathname === candidate.prefix || pathname.startsWith(`${candidate.prefix}/`)
   )
   if (rule) return rule.permission
 
