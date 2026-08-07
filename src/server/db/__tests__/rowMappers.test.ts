@@ -8,6 +8,7 @@ import {
   productToRow,
   mapCountSession,
   countSessionToRow,
+  mapAgendaEntry,
 } from '../rowMappers'
 import { InputStep, RoundType, ProductSize } from '@/types'
 
@@ -142,6 +143,47 @@ describe('mapKiosk', () => {
 
   it('wist een opschrift als het leeg wordt gemaakt', () => {
     expect(kioskToRow({ label: '   ' }).label).toBeNull()
+  })
+})
+
+describe('datums uit de database', () => {
+  /**
+   * node-postgres geeft een `date`-kolom terug als Date-object. Werd dat met
+   * String() omgezet, dan stond er "Sat Sep 05 2026 00:00:00 GMT+0000" in het
+   * domeinobject. Daarop sorteren is alfabetisch: "Sat" vóór "Sun" vóór "Thu",
+   * en elke vergelijking met "2026-08-08" gaat mis omdat een letter altijd
+   * groter is dan een cijfer. De agenda wees daardoor een wedstrijd maanden
+   * later aan als eerstvolgende.
+   */
+  const row = (date: unknown) => ({
+    id: 'agenda-1',
+    name: 'Ajax – PSV',
+    date,
+    event_type: 'VOETBAL',
+    created_at: new Date('2026-08-01T09:00:00.000Z'),
+    updated_at: '2026-08-01T09:00:00.000Z',
+  })
+
+  it('maakt van een Date-object een kale datum', () => {
+    expect(mapAgendaEntry(row(new Date(2026, 8, 5))).date).toBe('2026-09-05')
+  })
+
+  it('laat een datum die al tekst is met rust', () => {
+    expect(mapAgendaEntry(row('2026-09-05')).date).toBe('2026-09-05')
+  })
+
+  it('geeft datums die op volgorde te zetten zijn', () => {
+    const dates = [new Date(2026, 7, 16), new Date(2026, 8, 5), new Date(2026, 7, 6)]
+      .map((date) => mapAgendaEntry(row(date)).date)
+      .sort((a, b) => a.localeCompare(b))
+
+    expect(dates).toEqual(['2026-08-06', '2026-08-16', '2026-09-05'])
+    expect(dates[0]! >= '2026-08-08').toBe(false)
+    expect(dates[1]! >= '2026-08-08').toBe(true)
+  })
+
+  it('maakt van een tijdstempel ISO-tekst', () => {
+    expect(mapAgendaEntry(row('2026-09-05')).createdAt).toBe('2026-08-01T09:00:00.000Z')
   })
 })
 

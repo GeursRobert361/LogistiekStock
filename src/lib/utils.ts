@@ -5,6 +5,20 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 
+/**
+ * Vandaag als yyyy-mm-dd, in de tijdzone van de gebruiker.
+ *
+ * Niet via toISOString(): dat rekent in UTC en zet 's avonds na tienen de
+ * datum al een dag vooruit — dan geldt de wedstrijd van vanavond ineens als
+ * geweest.
+ */
+export function todayIso(): string {
+  const now = new Date()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${now.getFullYear()}-${month}-${day}`
+}
+
 export function formatDate(dateStr: string): string {
   return new Intl.DateTimeFormat('nl-NL', {
     day: 'numeric',

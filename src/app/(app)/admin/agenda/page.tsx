@@ -13,7 +13,7 @@ import { EditSheet } from '@/components/admin/EditSheet'
 import { ConfirmDialog } from '@/components/ui/Dialog'
 import { repositories } from '@/repositories'
 import { EVENT_TYPE_LABEL } from '@/lib/eventLabels'
-import { formatDate } from '@/lib/utils'
+import { formatDate, todayIso } from '@/lib/utils'
 import { EventType } from '@/types'
 import type { AgendaEntry } from '@/types'
 
@@ -31,11 +31,6 @@ function toDraft(entry?: AgendaEntry): AgendaDraft {
     eventType: entry?.eventType ?? EventType.VOETBAL,
     notes: entry?.notes ?? '',
   }
-}
-
-/** Vandaag als yyyy-mm-dd, zodat verleden en toekomst te scheiden zijn. */
-function today(): string {
-  return new Date().toISOString().slice(0, 10)
 }
 
 export default function AdminAgendaPage() {
@@ -93,7 +88,7 @@ export default function AdminAgendaPage() {
     }
   }
 
-  const now = today()
+  const now = todayIso()
   const upcoming = entries.filter((entry) => entry.date >= now)
   const past = entries.filter((entry) => entry.date < now).reverse()
 

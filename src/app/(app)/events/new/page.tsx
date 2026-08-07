@@ -12,7 +12,7 @@ import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import { PERMISSIONS } from '@/lib/permissions'
 import { EVENT_TYPE_LABEL } from '@/lib/eventLabels'
-import { formatDate } from '@/lib/utils'
+import { formatDate, todayIso } from '@/lib/utils'
 import { EventStatus, EventType } from '@/types'
 import type { AgendaEntry, Kiosk, Ring } from '@/types'
 
@@ -26,7 +26,7 @@ function pickAround(entries: AgendaEntry[]): {
   previous?: AgendaEntry
   next?: AgendaEntry
 } {
-  const today = new Date().toISOString().slice(0, 10)
+  const today = todayIso()
   const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
   return {
     previous: [...sorted].reverse().find((entry) => entry.date < today),

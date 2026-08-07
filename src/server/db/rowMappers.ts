@@ -45,7 +45,34 @@ import {
 
 type Row = Record<string, unknown>
 
-const str = (value: unknown): string => (typeof value === 'string' ? value : String(value ?? ''))
+/**
+ * Tekstwaarde uit een rij.
+ *
+ * node-postgres geeft tijdstempels als Date terug. `String(date)` levert dan
+ * "Sat Sep 05 2026 00:00:00 GMT+0000" op — leesbaar, maar waardeloos om op te
+ * sorteren of te vergelijken. De domeintypes gaan uit van ISO-tekst, dus dat
+ * maken we er hier van.
+ */
+const str = (value: unknown): string => {
+  if (value instanceof Date) return value.toISOString()
+  return typeof value === 'string' ? value : String(value ?? '')
+}
+
+/**
+ * Een `date`-kolom als yyyy-mm-dd.
+ *
+ * Zonder tijd erbij: een wedstrijddatum is een dag, geen moment. Bewust de
+ * lokale onderdelen en niet toISOString(), want die schuift een datum die om
+ * middernacht staat een dag terug zodra de server niet op UTC staat.
+ */
+const dateStr = (value: unknown): string => {
+  if (value instanceof Date) {
+    const month = String(value.getMonth() + 1).padStart(2, '0')
+    const day = String(value.getDate()).padStart(2, '0')
+    return `${value.getFullYear()}-${month}-${day}`
+  }
+  return typeof value === 'string' ? value.slice(0, 10) : ''
+}
 const optStr = (value: unknown): string | undefined =>
   value === null || value === undefined ? undefined : String(value)
 const num = (value: unknown): number => (typeof value === 'number' ? value : Number(value ?? 0))
@@ -261,7 +288,7 @@ export function mapEvent(
   return {
     id: str(row.id),
     name: str(row.name),
-    date: str(row.date),
+    date: dateStr(row.date),
     eventType: str(row.event_type) as EventType,
     status: str(row.status) as EventStatus,
     notes: optStr(row.notes),
@@ -289,7 +316,7 @@ export function mapAgendaEntry(row: Row): AgendaEntry {
   return {
     id: str(row.id),
     name: str(row.name),
-    date: str(row.date),
+    date: dateStr(row.date),
     eventType: str(row.event_type) as EventType,
     notes: optStr(row.notes),
     createdAt: str(row.created_at),
