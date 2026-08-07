@@ -18,9 +18,15 @@ const KIOSKS: Kiosk[] = Array.from({ length: 6 }, (_, i) => ({
 /** Startkiosk voor vullen; per test aanpasbaar. */
 let restockStartKioskId: string | undefined
 
+/** Normen per kiosk, zodat het afleverscherm "moet er staan" kan tonen. */
+const STANDARDS = new Map<string, Array<{ productId: string; targetQuantityQuarters: number }>>()
+
 vi.mock('@/repositories', () => ({
   repositories: {
     restock: () => fakeRestockRepo,
+    product: () => ({
+      getStandards: async (kioskId: string) => STANDARDS.get(kioskId) ?? [],
+    }),
     kiosk: () => ({
       getKiosks: async (ringId?: string) =>
         KIOSKS.filter((k) => ringId === undefined || k.ringId === ringId),
@@ -106,6 +112,7 @@ async function seedRequirements(productId: string, perKiosk: number[]) {
 beforeEach(() => {
   fakeRestockRepo.reset()
   restockStartKioskId = undefined
+  STANDARDS.clear()
 })
 
 describe('planRestock', () => {
@@ -406,6 +413,27 @@ describe('vulronde uitvoeren', () => {
     expect(stopPlan.products).toEqual([
       expect.objectContaining({ productId: 'water', plannedPackages: 6, deliveredPackages: 0 }),
     ])
+  })
+
+  it('toont naast het te leveren aantal ook de norm van de kiosk', async () => {
+    STANDARDS.set('kiosk-101', [{ productId: 'water', targetQuantityQuarters: 60 }])
+    const round = await readyRound()
+    const plan = await getRoundPlan(round.id)
+    const stopPlan = await getStopPlan(round.id, plan.stops[0]!.id)
+
+    expect(stopPlan.products[0]).toMatchObject({
+      productId: 'water',
+      plannedPackages: 6,
+      targetPackages: 15,
+    })
+  })
+
+  it('laat de norm weg als die er voor deze kiosk niet is', async () => {
+    const round = await readyRound()
+    const plan = await getRoundPlan(round.id)
+    const stopPlan = await getStopPlan(round.id, plan.stops[0]!.id)
+
+    expect(stopPlan.products[0]!.targetPackages).toBeUndefined()
   })
 
   it('toont bij een halte wat er daarna nog nodig is', async () => {

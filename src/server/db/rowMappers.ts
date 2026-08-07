@@ -134,6 +134,7 @@ export function mapKiosk(row: Row): Kiosk {
     id: str(row.id),
     ringId: str(row.ring_id),
     number: num(row.number),
+    label: optStr(row.label),
     name: optStr(row.name),
     sortOrder: num(row.sort_order),
     isActive: bool(row.is_active),
@@ -148,6 +149,9 @@ export function kioskToRow(data: Partial<Kiosk>): Row {
   const row: Row = {}
   if (data.ringId !== undefined) row.ring_id = data.ringId
   if (data.number !== undefined) row.number = data.number
+  // Een leeggemaakt opschrift moet ook echt leeg worden opgeslagen, anders
+  // blijft het oude bord staan.
+  if (data.label !== undefined) row.label = data.label.trim() || null
   if (data.name !== undefined) row.name = data.name
   if (data.sortOrder !== undefined) row.sort_order = data.sortOrder
   if (data.isActive !== undefined) row.is_active = data.isActive

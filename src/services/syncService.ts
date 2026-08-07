@@ -187,11 +187,14 @@ export class SyncService {
 
       try {
         await handler(entry.payload, entry.operation)
-        await markOutboxEntrySuccess(entry.id)
+        await markOutboxEntrySuccess(entry.id, entry.revision ?? 0)
       } catch (error) {
         lastError = error instanceof Error ? error.message : String(error)
         const isPermanent = this.isPermanentFailure(error)
-        await markOutboxEntryFailed(entry.id, lastError, { isPermanent })
+        await markOutboxEntryFailed(entry.id, lastError, {
+          isPermanent,
+          revision: entry.revision ?? 0,
+        })
 
         if (isPermanent) {
           console.error(`[sync] Mutatie ${entry.id} geweigerd: ${lastError}`)

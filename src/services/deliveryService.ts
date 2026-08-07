@@ -2,6 +2,7 @@ import { repositories } from '@/repositories'
 import { syncService } from './syncService'
 import { KeyedQueue } from '@/lib/keyedQueue'
 import { newId } from '@/lib/ids'
+import { fromQuarterUnits } from '@/lib/quarterUnits'
 import { releaseReservations } from './restockPlanningService'
 import { RestockRoundStatus, DeliveryReason } from '@/types'
 import type {
@@ -31,6 +32,11 @@ export interface StopProductPlan {
   productId: string
   plannedPackages: number
   deliveredPackages: number
+  /**
+   * De norm van deze kiosk: hoeveel er ná het vullen moet staan. Puur ter
+   * controle — de vuller kan zo nakijken of het klopt met wat hij ziet.
+   */
+  targetPackages?: number
   isDelivered: boolean
 }
 
@@ -151,12 +157,21 @@ export async function getStopPlan(roundId: string, stopId: string): Promise<Stop
     )
   }
 
+  const standards = await repositories.product().getStandards(stop.kioskId)
+  const targetByProduct = new Map(
+    standards.map((standard) => [
+      standard.productId,
+      fromQuarterUnits(standard.targetQuantityQuarters),
+    ])
+  )
+
   const products: StopProductPlan[] = plan.stopItems
     .filter((item) => item.restockRoundStopId === stopId)
     .map((item) => ({
       productId: item.productId,
       plannedPackages: item.plannedPackages,
       deliveredPackages: deliveredByProduct.get(item.productId) ?? 0,
+      targetPackages: targetByProduct.get(item.productId),
       isDelivered: deliveredByProduct.has(item.productId),
     }))
 

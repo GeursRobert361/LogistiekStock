@@ -87,12 +87,26 @@ export function DeliveryProductRow({ product, plan, onSubmit }: DeliveryProductR
     <div className={cn('rounded-xl border p-3', 'border-gray-200 bg-white')}>
       <div className="mb-2">
         <p className="font-semibold text-gray-900">{product?.name ?? plan.productId}</p>
-        <p className="text-sm text-gray-700">
-          Te leveren:{' '}
-          <span className="font-bold">
-            {plan.plannedPackages} {product?.packagingUnit ?? ''}
-          </span>
-        </p>
+
+        {/* Het aantal dat eruit moet, op afstand leesbaar met een pallet in de
+            hand. De norm eronder is de controle achteraf: klopt wat er staat? */}
+        <div className="mt-1 flex items-end justify-between gap-3">
+          <p className="leading-none">
+            <span className="text-5xl font-black text-gray-900">{plan.plannedPackages}</span>{' '}
+            <span className="text-base text-gray-700">{product?.packagingUnit ?? ''}</span>
+            <span className="mt-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+              Te leveren
+            </span>
+          </p>
+          {plan.targetPackages !== undefined && (
+            <p className="whitespace-nowrap text-right leading-none">
+              <span className="text-2xl font-bold text-gray-700">{plan.targetPackages}</span>
+              <span className="mt-1 block text-xs font-semibold uppercase tracking-wide text-gray-500">
+                Moet er staan
+              </span>
+            </p>
+          )}
+        </div>
       </div>
 
       {!isEditing ? (

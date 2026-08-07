@@ -112,13 +112,16 @@ test.describe('Volledige workflow', () => {
       await expect(page.getByText(`Stop ${stopNumber} van ${stopCount}`)).toBeVisible()
 
       if (stopNumber === 1) {
-        const plannedText = await page.getByText(/Te leveren:/).first().textContent()
-        const planned = Number(/(\d+)/.exec(plannedText ?? '')?.[1] ?? '0')
+        // Het te leveren aantal staat groot in beeld en vult het invoerveld.
+        await expect(page.getByText('Te leveren').first()).toBeVisible()
+        await page.getByRole('button', { name: 'Anders' }).first().click()
+
+        const deliveredInput = page.getByLabel('Geleverd').first()
+        const planned = Number(await deliveredInput.inputValue())
         expect(planned).toBeGreaterThan(1)
         shortfall = 1
 
-        await page.getByRole('button', { name: 'Anders' }).first().click()
-        await page.getByLabel('Geleverd').first().fill(String(planned - shortfall))
+        await deliveredInput.fill(String(planned - shortfall))
         await page
           .getByLabel('Reden van afwijking')
           .selectOption('onvoldoende_magazijnvoorraad')
@@ -170,12 +173,20 @@ test.describe('Volledige workflow', () => {
 
 /** Slaat de kiosk waar we nu staan over, met een reden. */
 async function skipCurrentKiosk(page: Page): Promise<void> {
-  const before = page.url()
+  const plate = page.getByRole('heading', { level: 2 })
+  const before = await plate.textContent()
+
   await page.getByRole('button', { name: 'Overslaan', exact: true }).click()
   await page.getByRole('radio', { name: 'Kiosk gesloten' }).check()
   await page.getByRole('button', { name: 'Overslaan' }).last().click()
-  // De dialoog sluit voordat de navigatie rond is. Wachten tot de URL echt
-  // verspringt, anders belandt de volgende klik op dezelfde kiosk en slaan we
-  // er per saldo één over.
-  await page.waitForURL((url) => url.toString() !== before)
+
+  // Tijdens het doorklikken blijft de vorige kiosk nog even in beeld — mét
+  // werkende knoppen. Pas doorgaan als het bord echt een andere kiosk toont,
+  // anders belandt de volgende klik op dezelfde kiosk en blijft er één staan.
+  // Na de laatste kiosk is er geen bord meer: dan staan we op de review.
+  await expect
+    .poll(async () =>
+      page.url().includes('/count/review') ? 'review' : await plate.textContent()
+    )
+    .not.toBe(before)
 }

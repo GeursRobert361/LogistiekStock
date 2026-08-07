@@ -158,6 +158,7 @@ export async function addToOutbox(
     nextAttemptAt: undefined,
     isPermanent: undefined,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
+    revision: (existing?.revision ?? 0) + 1,
   })
 }
 
@@ -196,17 +197,37 @@ export async function countOutboxEntries(): Promise<number> {
   return getOfflineDb().outbox.count()
 }
 
-export async function markOutboxEntrySuccess(id: string): Promise<void> {
-  await getOfflineDb().outbox.delete(id)
+/**
+ * Ruimt een geslaagde mutatie op — maar alleen als hij intussen niet is
+ * ingehaald.
+ *
+ * Tijdens het verzenden kan de gebruiker dezelfde telregel opnieuw wijzigen.
+ * Die nieuwe waarde neemt dezelfde plek in de outbox in. Blind verwijderen op
+ * id gooit dan de nieuwste wijziging weg terwijl de oude net verstuurd is: de
+ * outbox is leeg, de app zegt "alles opgeslagen", en de server heeft de
+ * verkeerde waarde.
+ */
+export async function markOutboxEntrySuccess(id: string, revision = 0): Promise<void> {
+  const db = getOfflineDb()
+  await db.transaction('rw', db.outbox, async () => {
+    const current = await db.outbox.get(id)
+    if (!current) return
+    if ((current.revision ?? 0) !== revision) return
+    await db.outbox.delete(id)
+  })
 }
 
 export async function markOutboxEntryFailed(
   id: string,
   error: string,
-  options: { isPermanent?: boolean } = {}
+  options: { isPermanent?: boolean; revision?: number } = {}
 ): Promise<void> {
   const entry = await getOfflineDb().outbox.get(id)
   if (!entry) return
+
+  // Een nieuwere mutatie mag niet de wachttijd van een oudere mislukking
+  // erven; die moet gewoon zo snel mogelijk alsnog de deur uit.
+  if (options.revision !== undefined && (entry.revision ?? 0) !== options.revision) return
 
   const attempts = entry.attempts + 1
   await getOfflineDb().outbox.put({

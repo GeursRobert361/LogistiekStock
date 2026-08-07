@@ -358,6 +358,14 @@ export interface OutboxEntry {
    * proberen — bij netwerk- of serverfouten blijft hij het proberen.
    */
   isPermanent?: boolean
+  /**
+   * Loopt op bij elke nieuwe mutatie op dezelfde entiteit.
+   *
+   * Een mutatie die tijdens het verzenden wordt overschreven mag niet worden
+   * opgeruimd als de oude verzending slaagt: dan zou de nieuwste waarde de
+   * server nooit bereiken en toch uit de outbox verdwijnen.
+   */
+  revision?: number
 }
 
 // ─── Route Calculation ────────────────────────────────────────────────────────

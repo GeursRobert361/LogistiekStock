@@ -105,6 +105,44 @@ describe('mapKiosk', () => {
     expect(backToRow.location).toBe('Vak 12')
     expect(backToRow.notes).toBe('naast de lift')
   })
+
+  it('geeft het opschrift terug', () => {
+    // Zonder dit veld valt de hele app terug op het nummer: "120 Cubes" werd
+    // overal 1201.
+    const kiosk = mapKiosk({
+      id: 'kiosk-120-cubes',
+      ring_id: 'ring-1',
+      number: 1201,
+      label: '120 Cubes',
+      sort_order: 205,
+      is_active: true,
+      created_at: '',
+      updated_at: '',
+    })
+
+    expect(kiosk.label).toBe('120 Cubes')
+    expect(kioskToRow(kiosk).label).toBe('120 Cubes')
+  })
+
+  it('laat een kiosk zonder opschrift met rust', () => {
+    const kiosk = mapKiosk({
+      id: 'kiosk-101',
+      ring_id: 'ring-1',
+      number: 101,
+      label: null,
+      sort_order: 10,
+      is_active: true,
+      created_at: '',
+      updated_at: '',
+    })
+
+    expect(kiosk.label).toBeUndefined()
+    expect(kioskToRow(kiosk)).not.toHaveProperty('label')
+  })
+
+  it('wist een opschrift als het leeg wordt gemaakt', () => {
+    expect(kioskToRow({ label: '   ' }).label).toBeNull()
+  })
 })
 
 describe('mapProduct', () => {

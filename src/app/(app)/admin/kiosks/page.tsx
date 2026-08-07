@@ -114,7 +114,8 @@ export default function AdminKiosksPage() {
     const values = {
       ringId: draft.ringId,
       number,
-      label: draft.label.trim() || undefined,
+      // Leeg meesturen, niet weglaten: anders is een opschrift niet te wissen.
+      label: draft.label.trim(),
       name: draft.name.trim() || undefined,
       sortOrder: Number.parseInt(draft.sortOrder, 10) || 0,
       location: draft.location.trim() || undefined,
