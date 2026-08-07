@@ -36,6 +36,10 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV PORT=3000
+# Zonder dit neemt server.js de door Docker gezette HOSTNAME over en luistert
+# hij alleen op het container-IP. Verkeer van buiten werkt dan wel, maar
+# loopback niet — waardoor de healthcheck altijd faalt.
+ENV HOSTNAME=0.0.0.0
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
