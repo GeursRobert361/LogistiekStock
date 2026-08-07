@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -376,7 +377,7 @@ export default function CountReviewPage({
                       className="flex min-h-14 w-full items-center justify-between px-4 py-3 text-left"
                     >
                       <span className="text-base font-semibold text-gray-900">
-                        Kiosk {kiosk?.number ?? routeKiosk.kioskId}
+                        {kiosk ? kioskTitle(kiosk) : routeKiosk.kioskId}
                       </span>
                       <span
                         className={`text-sm font-medium ${STATUS_CLASS[routeKiosk.status]}`}

@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, type FormEvent } from 'react'
+import { kioskLabel } from '@/lib/kiosk'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
@@ -192,13 +193,15 @@ export default function NewEventPage() {
                 type="button"
                 onClick={() => toggleKiosk(kiosk.id)}
                 aria-pressed={closedKioskIds.has(kiosk.id)}
-                className={`min-h-11 rounded-lg border text-sm font-medium ${
+                className={`min-h-11 rounded-lg border px-1 font-medium leading-tight ${
+                  kioskLabel(kiosk).length > 4 ? 'text-xs' : 'text-sm'
+                } ${
                   closedKioskIds.has(kiosk.id)
                     ? 'border-gray-400 bg-gray-200 text-gray-500 line-through'
                     : 'border-gray-300 bg-white text-gray-800'
                 }`}
               >
-                {kiosk.number}
+                {kioskLabel(kiosk)}
               </button>
             ))}
           </div>

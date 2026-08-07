@@ -1,6 +1,7 @@
 'use client'
 
 import { Suspense, useEffect, useState, type FormEvent } from 'react'
+import { kioskLabel, kioskTitle } from '@/lib/kiosk'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
@@ -114,7 +115,7 @@ function NewIncidentForm() {
         {selectedKiosk && (
           <div className="rounded-xl bg-gray-50 px-3 py-2 text-center">
             <p className="text-xs text-gray-600">Kiosk</p>
-            <p className="text-3xl font-black text-arena-red">{selectedKiosk.number}</p>
+            <p className="text-3xl font-black text-arena-red">{kioskLabel(selectedKiosk)}</p>
           </div>
         )}
 
@@ -131,7 +132,7 @@ function NewIncidentForm() {
           onChange={(e) => setKioskId(e.target.value)}
           options={[
             { value: '', label: 'Kies een kiosk…' },
-            ...kiosks.map((kiosk) => ({ value: kiosk.id, label: `Kiosk ${kiosk.number}` })),
+            ...kiosks.map((kiosk) => ({ value: kiosk.id, label: kioskTitle(kiosk) })),
           ]}
         />
 

@@ -55,6 +55,8 @@ export interface Kiosk {
   ringId: string
   number: number
   name?: string
+  /** Wat de vloer dit telpunt noemt, als dat niet gewoon het nummer is. */
+  label?: string
   sortOrder: number
   isActive: boolean
   location?: string

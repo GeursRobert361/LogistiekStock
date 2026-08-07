@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -113,7 +114,7 @@ export default function IncidentsPage() {
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <p className="font-semibold text-gray-900">
-                          Kiosk {kiosks.get(incident.kioskId)?.number ?? incident.kioskId} —{' '}
+                          {kioskTitle(kiosks.get(incident.kioskId)) || incident.kioskId} —{' '}
                           {CATEGORY_LABEL[incident.category]}
                         </p>
                         <p className="mt-0.5 truncate text-sm text-gray-700">

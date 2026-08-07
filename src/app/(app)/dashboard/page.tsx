@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
@@ -196,7 +197,7 @@ export default function DashboardPage() {
                       className="block"
                     >
                       <Button size="lg" className="w-full">
-                        Verder met telling — kiosk {kiosks.get(nextKioskId)?.number ?? ''}
+                        Verder met telling — {kioskTitle(kiosks.get(nextKioskId))}
                       </Button>
                       <p className="mt-1 text-center text-sm text-gray-600">
                         {overview.completedCount + overview.skippedCount} van{' '}

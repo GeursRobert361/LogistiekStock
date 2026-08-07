@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -247,7 +248,7 @@ export default function RestockPlanningPage({
                                   className="flex justify-between px-3 py-1.5 text-sm"
                                 >
                                   <span className="text-gray-700">
-                                    Kiosk {kiosks.get(entry.kioskId)?.number ?? entry.kioskId}
+                                    {kioskTitle(kiosks.get(entry.kioskId)) || entry.kioskId}
                                   </span>
                                   <span className="font-semibold text-gray-900">
                                     {entry.packages}

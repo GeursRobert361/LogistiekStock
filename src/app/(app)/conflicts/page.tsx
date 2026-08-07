@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { kioskTitle } from '@/lib/kiosk'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -109,7 +110,7 @@ export default function ConflictsPage() {
                   <CardContent className="space-y-3 py-3">
                     <div>
                       <p className="font-semibold text-gray-900">
-                        {kiosk ? `Kiosk ${kiosk.number} — ` : ''}
+                        {kiosk ? `${kioskTitle(kiosk)} — ` : ''}
                         {product?.name ?? item.local.productId}
                       </p>
                       <p className="text-xs text-gray-600">

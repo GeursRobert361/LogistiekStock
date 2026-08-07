@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useCallback, useEffect, useState } from 'react'
+import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -290,7 +291,7 @@ export default function RestockRoundDetailPage({
                   <div className="flex min-h-14 items-center justify-between px-4 py-3">
                     <div className="min-w-0">
                       <p className="font-semibold text-gray-900">
-                        {index + 1}. Kiosk {kiosks.get(stop.kioskId)?.number ?? stop.kioskId}
+                        {index + 1}. {kioskTitle(kiosks.get(stop.kioskId)) || stop.kioskId}
                       </p>
                       <p className="truncate text-xs text-gray-600">
                         {stopItems
@@ -334,7 +335,7 @@ export default function RestockRoundDetailPage({
           {isRunning && nextStop && (
             <Link href={`/restock-rounds/${roundId}/stop/${nextStop.id}`} className="block">
               <Button size="lg" className="w-full">
-                Verder — kiosk {kiosks.get(nextStop.kioskId)?.number ?? ''}
+                Verder — {kioskTitle(kiosks.get(nextStop.kioskId))}
               </Button>
             </Link>
           )}

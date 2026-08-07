@@ -4,9 +4,10 @@
  *
  * Twee dingen die uit die lijsten blijken en die het model bepalen:
  *
- *   1. Niet elke kiosk verkoopt hetzelfde. Kiosk 110 heeft wijn en snoep maar
- *      geen koffiehoek, 120 heeft een hotdogkar, 116 en 120 hebben patat.
- *      Een kiosk telt dus alleen wat hij daadwerkelijk voert.
+ *   1. Niet elk telpunt verkoopt hetzelfde. Kiosk 110 heeft wijn en snoep maar
+ *      geen koffiehoek; 116, 120 en 126 hebben patat; de cubes tegenover 120
+ *      verkopen alleen warme snacks. Een telpunt telt dus alleen wat het
+ *      daadwerkelijk voert.
  *   2. Alleen bepaalde kiosken hebben een grote drankkoeling. Zonder koeling
  *      staat er geen gekoelde drank, en hoeft die daar dus ook niet geteld of
  *      gevuld te worden.
@@ -25,8 +26,12 @@ export const KIOSKS_WITH_DRINKS_FRIDGE = new Set([
 /** Kiosken met een patatpunt: extra bakjes, vorkjes en sauzen in emmers. */
 export const KIOSKS_WITH_FRIES = new Set([116, 120, 126, 407, 419])
 
-/** Kiosken met een hotdogkar ernaast. */
-export const KIOSKS_WITH_HOTDOG = new Set([120, 419])
+/**
+ * De cubes: drie hokjes tegenover kiosk 120 met hotdogs, kroketten en
+ * kipburgers. Een eigen telpunt met een eigen, korte lijst — geen drank, geen
+ * koffie, geen chips.
+ */
+export const CUBE_KIOSK_NUMBERS = new Set([1201])
 
 /** Kiosken die ook snoep en wijn voeren. */
 export const KIOSKS_WITH_SWEETS = new Set([110, 401])
@@ -55,6 +60,30 @@ export function assortmentForKiosk(kioskNumber: number): AssortmentItem[] {
   const items: AssortmentItem[] = []
   const add = (productId: string, target: number) => {
     if (target > 0) items.push({ productId, target })
+  }
+
+  // ── Cubes: een eigen, korte lijst ────────────────────────────────────────
+  // Warme snacks en wat erbij hoort. Geen drank, geen koffie, geen chips —
+  // dat staat allemaal in de kiosk ertegenover.
+  if (CUBE_KIOSK_NUMBERS.has(kioskNumber)) {
+    add('hotdog-broodjes', 15)
+    add('hotdog-worsten', 15)
+    add('kroketten', 12)
+    add('kipburgers', 12)
+    add('broodjes', 10)
+
+    add('rectangular-bakjes', 2)
+    add('square-bakjes', 4)
+    add('servetten', 4)
+    add('patat-vorkjes', 1)
+
+    add('ketchup-flessen', 15)
+    add('mosterd-flessen', 15)
+    add('mayo-flessen', 8)
+
+    add('tork-rol', 6)
+    add('vuilniszakken', 4)
+    return items
   }
 
   // ── Bierbekers — overal, en de grootste stroom van allemaal ──────────────
@@ -126,11 +155,6 @@ export function assortmentForKiosk(kioskNumber: number): AssortmentItem[] {
     add('mayo-flessen', 15)
     add('ketchup-flessen', 15)
     add('mosterd-flessen', 15)
-  }
-
-  if (KIOSKS_WITH_HOTDOG.has(kioskNumber)) {
-    add('hotdog-broodjes', 15)
-    add('hotdog-worsten', 15)
   }
 
   // ── Schoonmaak — overal ──────────────────────────────────────────────────

@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { kioskLabel, kioskTitle } from '@/lib/kiosk'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -21,12 +22,14 @@ interface KioskDraft {
   location: string
   notes: string
   isActive: boolean
+  label: string
 }
 
 function toDraft(kiosk: Kiosk | undefined, fallbackRingId: string): KioskDraft {
   return {
     ringId: kiosk?.ringId ?? fallbackRingId,
     number: kiosk ? String(kiosk.number) : '',
+    label: kiosk?.label ?? '',
     name: kiosk?.name ?? '',
     sortOrder: String(kiosk?.sortOrder ?? 0),
     location: kiosk?.location ?? '',
@@ -111,6 +114,7 @@ export default function AdminKiosksPage() {
     const values = {
       ringId: draft.ringId,
       number,
+      label: draft.label.trim() || undefined,
       name: draft.name.trim() || undefined,
       sortOrder: Number.parseInt(draft.sortOrder, 10) || 0,
       location: draft.location.trim() || undefined,
@@ -168,11 +172,11 @@ export default function AdminKiosksPage() {
                 <Card className="active:bg-gray-100">
                   <CardContent className="flex min-h-20 flex-col items-center justify-center py-3 text-center">
                     <p
-                      className={`text-2xl font-bold ${
-                        kiosk.isActive ? 'text-gray-900' : 'text-gray-400 line-through'
-                      }`}
+                      className={`font-bold ${
+                        kioskLabel(kiosk).length > 4 ? 'text-lg' : 'text-2xl'
+                      } ${kiosk.isActive ? 'text-gray-900' : 'text-gray-400 line-through'}`}
                     >
-                      {kiosk.number}
+                      {kioskLabel(kiosk)}
                     </p>
                     {kiosk.name && (
                       <p className="mt-0.5 w-full truncate text-[11px] text-gray-600">
@@ -194,7 +198,7 @@ export default function AdminKiosksPage() {
 
       <EditSheet
         open={editing !== null}
-        title={editing === 'new' || editing === null ? 'Nieuwe kiosk' : `Kiosk ${editing.number}`}
+        title={editing === 'new' || editing === null ? 'Nieuwe kiosk' : kioskTitle(editing)}
         onClose={() => setEditing(null)}
         onSubmit={handleSave}
       >
@@ -218,6 +222,15 @@ export default function AdminKiosksPage() {
             onChange={(e) => setDraft({ ...draft, sortOrder: e.target.value })}
           />
         </div>
+        <Input
+          label="Opschrift (optioneel)"
+          placeholder={draft.number || 'Bijv. 120 Cubes'}
+          value={draft.label}
+          onChange={(e) => setDraft({ ...draft, label: e.target.value })}
+        />
+        <p className="-mt-2 text-xs text-gray-600">
+          Wat er groot op het bord komt te staan. Leeg laten toont het kiosknummer.
+        </p>
         <Input
           label="Naam"
           value={draft.name}

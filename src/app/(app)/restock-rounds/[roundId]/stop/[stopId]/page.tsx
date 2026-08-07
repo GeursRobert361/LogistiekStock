@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useCallback, useEffect, useState } from 'react'
+import { kioskLabel } from '@/lib/kiosk'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
@@ -37,6 +38,7 @@ export default function RestockStopPage({
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
+    setIsLoading(true)
     const plan = await getStopPlan(roundId, stopId)
     const [productList, kioskData] = await Promise.all([
       repositories.product().getProducts({ activeOnly: false }),
@@ -99,7 +101,10 @@ export default function RestockStopPage({
     }
   }
 
-  if (isLoading) {
+  // Net als bij het tellen hergebruikt de router dit component tussen twee
+  // haltes. Zolang de plan-state nog van de vorige halte is, tonen we niets:
+  // anders bevestigt de vuller aantallen die bij de vorige kiosk horen.
+  if (isLoading || (stopPlan && stopPlan.stop.id !== stopId)) {
     return (
       <>
         <AppHeader title="Aflevering" backHref={`/restock-rounds/${roundId}`} />
@@ -128,7 +133,7 @@ export default function RestockStopPage({
       {/* Het kiosknummer als bord — dit is waar de vuller op stuurt */}
       <div className="sticky top-14 z-30 border-b border-concrete-line bg-concrete px-4 py-2.5">
         <KioskPlate
-          number={kiosk?.number}
+          label={kioskLabel(kiosk)}
           eyebrow={`Stop ${stopPlan.stopNumber} van ${stopPlan.totalStops}`}
           status={stopPlan.isCompleted ? 'Afgerond' : undefined}
         />

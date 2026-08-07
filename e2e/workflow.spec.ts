@@ -6,9 +6,13 @@ import { login, resetAppData, fillAllCounts } from './helpers'
  * goedkeuren → vulplanning → pallet laden → afleveren → restant terug in de
  * planning.
  */
+/** Ring 1: kiosk 101 t/m 128 plus de cubes tegenover 120. */
+const ROUTE_LENGTH = 29
+
 test.describe('Volledige workflow', () => {
   // Deze test loopt de hele keten door en vult per kiosk het volledige
-  // assortiment in; dat kost meer dan de standaardlimiet.
+  // assortiment in — ruim veertig producten per kiosk, plus 27 kiosken die
+  // stuk voor stuk met een reden worden overgeslagen.
   test.setTimeout(240_000)
 
   test.beforeEach(async ({ page }) => {
@@ -27,7 +31,7 @@ test.describe('Volledige workflow', () => {
     await page.waitForURL(/\/kiosk\/kiosk-116/)
 
     await expect(page.getByRole('heading', { level: 2 })).toHaveText('116')
-    await expect(page.getByText(/Stop 1 van 28/)).toBeVisible()
+    await expect(page.getByText(/Stop 1 van 29/)).toBeVisible()
 
     // ── 2. Kiosk 116 tellen: expliciet 0 en een kwartwaarde ────────────────
     await fillAllCounts(page, '1')
@@ -50,7 +54,8 @@ test.describe('Volledige workflow', () => {
     await page.waitForURL(/\/kiosk\/kiosk-118/)
 
     // ── 4. De rest van de ring bewust overslaan ────────────────────────────
-    for (let index = 0; index < 26; index++) {
+    // Ring 1 telt 29 stops (101–128 plus 120 Cubes); twee zijn er geteld.
+    for (let index = 0; index < ROUTE_LENGTH - 2; index++) {
       await skipCurrentKiosk(page)
     }
 
@@ -58,7 +63,7 @@ test.describe('Volledige workflow', () => {
     await page.waitForURL(/\/count\/review/)
 
     // ── 5. Review kent de hele route ───────────────────────────────────────
-    await expect(page.getByText('2 van 28 kiosken afgerond')).toBeVisible()
+    await expect(page.getByText('2 van 29 kiosken afgerond')).toBeVisible()
     await expect(page.getByText('Totaal bijvullen')).toBeVisible()
 
     // ── 6. Goedkeuren ──────────────────────────────────────────────────────
@@ -159,9 +164,12 @@ test.describe('Volledige workflow', () => {
 
 /** Slaat de kiosk waar we nu staan over, met een reden. */
 async function skipCurrentKiosk(page: Page): Promise<void> {
+  const before = page.url()
   await page.getByRole('button', { name: 'Overslaan', exact: true }).click()
   await page.getByRole('radio', { name: 'Kiosk gesloten' }).check()
   await page.getByRole('button', { name: 'Overslaan' }).last().click()
-  // Wachten tot de dialoog weg is en de volgende pagina staat.
-  await expect(page.getByRole('radio', { name: 'Kiosk gesloten' })).toHaveCount(0)
+  // De dialoog sluit voordat de navigatie rond is. Wachten tot de URL echt
+  // verspringt, anders belandt de volgende klik op dezelfde kiosk en slaan we
+  // er per saldo één over.
+  await page.waitForURL((url) => url.toString() !== before)
 }

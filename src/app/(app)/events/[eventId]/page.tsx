@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useCallback, useEffect, useState } from 'react'
+import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -108,7 +109,7 @@ export default function EventDetailPage({
                     className="block"
                   >
                     <Button className="w-full" size="lg">
-                      Verder met telling — kiosk {nextKiosk?.number ?? ''}
+                      Verder met telling — {kioskTitle(nextKiosk)}
                     </Button>
                   </Link>
                 )}

@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { kioskLabel } from '@/lib/kiosk'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -287,7 +288,12 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
     }
   }
 
-  if (isLoading) {
+  // Bij het doorklikken naar de volgende kiosk hergebruikt de router dit
+  // component: de state van de vórige kiosk staat er dan nog even in. Zonder
+  // deze controle zijn "Afronden" en "Overslaan" één frame lang actief op de
+  // verkeerde kiosk — en slaat een snelle teller de vorige nóg eens over in
+  // plaats van deze.
+  if (isLoading || kioskCount?.kioskId !== kioskId) {
     return (
       <>
         <AppHeader title="Kiosk" backHref={`/events/${eventId}`} />
@@ -332,7 +338,7 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
 
           <KioskPlate
             className="flex-1"
-            number={kiosk?.number}
+            label={kioskLabel(kiosk)}
             eyebrow={`Stop ${stopNumber} van ${totalKiosks}`}
             status={
               isDone
@@ -468,7 +474,7 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
 
       <SkipKioskDialog
         open={showSkipDialog}
-        kioskNumber={kiosk?.number}
+        kioskLabel={kioskLabel(kiosk)}
         onClose={() => setShowSkipDialog(false)}
         onConfirm={(reason) => void handleSkip(reason)}
       />

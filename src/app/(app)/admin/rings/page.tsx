@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import { kioskTitle } from '@/lib/kiosk'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
@@ -69,7 +70,7 @@ export default function AdminRingsPage() {
       ? kiosks
           .filter((kiosk) => kiosk.ringId === editing.id)
           .sort((a, b) => a.sortOrder - b.sortOrder)
-          .map((kiosk) => ({ value: kiosk.id, label: `Kiosk ${kiosk.number}` }))
+          .map((kiosk) => ({ value: kiosk.id, label: kioskTitle(kiosk) }))
       : []
 
   async function handleSave() {

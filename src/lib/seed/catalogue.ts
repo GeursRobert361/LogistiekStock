@@ -191,6 +191,15 @@ export const demoProducts: Product[] = [
     ...SMALL,
     refrigerated: true,
   }),
+  product('kroketten', CAT_VERPAKKINGEN_ID, 'Kroketten', 'Kroketten', 'zak', 'dozen', 80, {
+    ...SMALL,
+    refrigerated: true,
+  }),
+  product('kipburgers', CAT_VERPAKKINGEN_ID, 'Kipburgers', 'Kipburgers', 'zak', 'dozen', 81, {
+    ...SMALL,
+    refrigerated: true,
+  }),
+  product('broodjes', CAT_VERPAKKINGEN_ID, 'Broodjes', 'Broodjes', 'zak', 'zakken', 82, SMALL),
 
   // ── Sauzen ─────────────────────────────────────────────────────────────
   product('mayo-emmers', CAT_SAUZEN_ID, 'Mayo Emmers', 'Mayo emmer', 'emmer', 'emmers', 80, SMALL),

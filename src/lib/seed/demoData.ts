@@ -50,7 +50,9 @@ function makeKiosks(ringId: string, start: number, count: number): Kiosk[] {
       ringId,
       number,
       name: `Kiosk ${number}`,
-      sortOrder: i + 1,
+      // Stappen van 10: dan past er een telpunt tussen twee kiosken in,
+      // zoals de cubes tegenover 120.
+      sortOrder: (i + 1) * 10,
       isActive: true,
       location: undefined,
       notes: undefined,
@@ -60,10 +62,29 @@ function makeKiosks(ringId: string, start: number, count: number): Kiosk[] {
   })
 }
 
+/**
+ * De cubes: drie hokjes tegenover kiosk 120 met hotdogs, kroketten en
+ * kipburgers. Fysiek een eigen stop, dus een eigen telpunt — met een eigen
+ * naam, want "1201" zegt niemand iets.
+ */
+const cubes120: Kiosk = {
+  id: 'kiosk-120-cubes',
+  ringId: RING1_ID,
+  number: 1201,
+  label: '120 Cubes',
+  name: 'Cubes tegenover kiosk 120',
+  location: 'Tegenover kiosk 120',
+  sortOrder: 205, // direct na 120 (200), vóór 121 (210)
+  isActive: true,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+}
+
 export const demoKiosks: Kiosk[] = [
   ...makeKiosks(RING1_ID, 101, 28), // 101–128
+  cubes120,
   ...makeKiosks(RING2_ID, 401, 29), // 401–429, daarna wrapt de ring naar 401
-]
+].sort((a, b) => a.sortOrder - b.sortOrder)
 
 // ─── Users / Profiles ────────────────────────────────────────────────────
 

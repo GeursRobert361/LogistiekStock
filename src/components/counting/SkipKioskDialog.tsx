@@ -7,7 +7,7 @@ import { SKIP_REASONS, OTHER_SKIP_REASON } from '@/lib/reasons'
 
 interface SkipKioskDialogProps {
   open: boolean
-  kioskNumber?: number
+  kioskLabel?: string
   onClose: () => void
   onConfirm: (reason: string) => void
 }
@@ -18,7 +18,7 @@ interface SkipKioskDialogProps {
  */
 export function SkipKioskDialog({
   open,
-  kioskNumber,
+  kioskLabel,
   onClose,
   onConfirm,
 }: SkipKioskDialogProps) {
@@ -52,7 +52,7 @@ export function SkipKioskDialog({
     <Dialog
       open={open}
       onClose={onClose}
-      title={kioskNumber ? `Kiosk ${kioskNumber} overslaan` : 'Kiosk overslaan'}
+      title={kioskLabel ? `${kioskLabel} overslaan` : 'Kiosk overslaan'}
     >
       <fieldset className="mb-3">
         <legend className="mb-2 text-sm font-medium text-gray-700">Reden</legend>

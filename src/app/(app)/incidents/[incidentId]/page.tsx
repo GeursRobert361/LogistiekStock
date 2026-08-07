@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useCallback, useEffect, useState } from 'react'
+import { kioskLabel } from '@/lib/kiosk'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -98,7 +99,7 @@ export default function IncidentDetailPage({
         <div className="rounded-xl bg-gray-50 px-3 py-3 text-center">
           <p className="text-xs text-gray-600">Kiosk</p>
           <p className="text-4xl font-black text-arena-red">
-            {kiosk?.number ?? incident.kioskId}
+            {kioskLabel(kiosk) || incident.kioskId}
           </p>
         </div>
 

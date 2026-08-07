@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { kioskLabel, kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
@@ -135,7 +136,7 @@ export default function AdminStandardsPage() {
                 onChange={(e) => setSelectedKioskId(e.target.value)}
                 options={matrix.kiosks.map((kiosk) => ({
                   value: kiosk.id,
-                  label: `Kiosk ${kiosk.number}`,
+                  label: kioskTitle(kiosk),
                 }))}
               />
 
@@ -167,9 +168,10 @@ export default function AdminStandardsPage() {
                       {matrix.kiosks.map((kiosk) => (
                         <th
                           key={kiosk.id}
-                          className="min-w-[3.5rem] px-1 py-2 text-center font-medium text-gray-600"
+                          title={kioskTitle(kiosk)}
+                          className="min-w-[3.5rem] px-1 py-2 text-center font-medium leading-tight text-gray-600"
                         >
-                          {kiosk.number}
+                          {kioskLabel(kiosk)}
                         </th>
                       ))}
                     </tr>
@@ -339,13 +341,15 @@ function KioskPicker({
             type="button"
             onClick={() => onToggle(kiosk.id)}
             aria-pressed={selected.has(kiosk.id)}
-            className={`min-h-11 rounded-lg border text-sm font-medium ${
+            className={`min-h-11 rounded-lg border px-1 font-medium leading-tight ${
+              kioskLabel(kiosk).length > 4 ? 'text-xs' : 'text-sm'
+            } ${
               selected.has(kiosk.id)
                 ? 'border-arena-red bg-red-50 text-arena-red'
                 : 'border-gray-300 bg-white text-gray-700'
             }`}
           >
-            {kiosk.number}
+            {kioskLabel(kiosk)}
           </button>
         ))}
       </div>
@@ -389,7 +393,7 @@ function CopyStandardsDialog({
           label="Van kiosk"
           value={sourceId}
           onChange={(e) => setSourceId(e.target.value)}
-          options={kiosks.map((kiosk) => ({ value: kiosk.id, label: `Kiosk ${kiosk.number}` }))}
+          options={kiosks.map((kiosk) => ({ value: kiosk.id, label: kioskTitle(kiosk) }))}
         />
 
         <div>

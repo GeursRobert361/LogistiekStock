@@ -1,6 +1,7 @@
 'use client'
 
 import { use, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { kioskLabel, kioskTitle } from '@/lib/kiosk'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -30,7 +31,7 @@ export default function CountStartPage({
   const [isLoading, setIsLoading] = useState(true)
   const [isStarting, setIsStarting] = useState(false)
   const [startError, setStartError] = useState<string | null>(null)
-  const [previewRoute, setPreviewRoute] = useState<number[]>([])
+  const [previewRoute, setPreviewRoute] = useState<string[]>([])
 
   useEffect(() => {
     async function load() {
@@ -83,7 +84,7 @@ export default function CountStartPage({
         .slice(0, 5)
         .map((k) => {
           const kiosk = ringKiosks.find((rk) => rk.id === k.id)
-          return kiosk?.number ?? 0
+          return kioskLabel(kiosk)
         })
     )
   }, [startKioskId, direction, ringKiosks])
@@ -157,7 +158,7 @@ export default function CountStartPage({
             onChange={(e) => setStartKioskId(e.target.value)}
             options={ringKiosks.map((k) => ({
               value: k.id,
-              label: `Kiosk ${k.number}`,
+              label: kioskTitle(k),
             }))}
           />
 

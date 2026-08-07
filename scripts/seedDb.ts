@@ -107,13 +107,20 @@ async function seedKiosks(): Promise<void> {
     if (!ringId) continue
 
     const result = await client.query<{ id: string }>(
-      `insert into kiosks (ring_id, number, name, sort_order, is_active)
-       values ($1, $2, $3, $4, $5)
+      `insert into kiosks (ring_id, number, label, name, sort_order, is_active)
+       values ($1, $2, $3, $4, $5, $6)
        on conflict (ring_id, number) do update
-         set name = excluded.name, sort_order = excluded.sort_order,
-             is_active = excluded.is_active
+         set label = excluded.label, name = excluded.name,
+             sort_order = excluded.sort_order, is_active = excluded.is_active
        returning id`,
-      [ringId, kiosk.number, kiosk.name ?? null, kiosk.sortOrder, kiosk.isActive]
+      [
+        ringId,
+        kiosk.number,
+        kiosk.label ?? null,
+        kiosk.name ?? null,
+        kiosk.sortOrder,
+        kiosk.isActive,
+      ]
     )
     kioskIds.set(kiosk.id, result.rows[0]!.id)
   }

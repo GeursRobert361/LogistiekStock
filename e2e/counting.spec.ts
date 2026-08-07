@@ -39,7 +39,22 @@ test.describe('Telflow', () => {
     await startCountAt(page, KIOSK)
 
     await expect(page.getByRole('heading', { level: 2 })).toHaveText(String(KIOSK))
-    await expect(page.getByText(/Stop 1 van 28/)).toBeVisible()
+    await expect(page.getByText(/Stop 1 van 29/)).toBeVisible()
+  })
+
+  test('de cubes tegenover 120 zijn een eigen telpunt met eigen assortiment', async ({ page }) => {
+    await page.goto('/events/event-demo-ajax/count/start')
+    await page.getByLabel('Startkiosk').selectOption({ label: '120 Cubes' })
+    await page.getByRole('button', { name: /Telronde starten/ }).click()
+    await page.waitForURL(/\/kiosk\/kiosk-120-cubes/)
+
+    // Het bord toont het opschrift van de vloer, niet het interne nummer 1201.
+    await expect(page.getByRole('heading', { level: 2 })).toHaveText('120 Cubes')
+
+    // Daar staan hotdogs en kroketten, en geen tap.
+    await expect(page.locator('#product-hotdog-broodjes')).toBeVisible()
+    await expect(page.locator('#product-kroketten')).toBeVisible()
+    await expect(page.locator('#product-bierbeker-05')).toHaveCount(0)
   })
 
   test('een niet-geteld product is niet hetzelfde als nul', async ({ page }) => {
@@ -97,7 +112,7 @@ test.describe('Telflow', () => {
     await page.waitForURL(/\/kiosk\/kiosk-117/)
 
     await expect(page.getByRole('heading', { level: 2 })).toHaveText('117')
-    await expect(page.getByText(/Stop 2 van 28/)).toBeVisible()
+    await expect(page.getByText(/Stop 2 van 29/)).toBeVisible()
   })
 
   test('de laatst ingevoerde waarde gaat niet verloren bij direct afronden', async ({ page }) => {
