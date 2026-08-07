@@ -40,6 +40,8 @@ export const demoRings: Ring[] = [
     description: 'Kiosknummers 400-serie',
     isActive: true,
     sortOrder: 2,
+    // Tellen begint bij de lift; vullen komt er met een pallet anders in.
+    countStartKioskId: 'kiosk-429',
     restockStartKioskId: 'kiosk-423',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
@@ -68,7 +70,7 @@ function makeKiosks(ringId: string, start: number, count: number): Kiosk[] {
 
 export const demoKiosks: Kiosk[] = [
   ...makeKiosks(RING1_ID, 101, 28), // 101–128
-  ...makeKiosks(RING2_ID, 401, 28), // 401–428
+  ...makeKiosks(RING2_ID, 401, 29), // 401–429, daarna wrapt de ring naar 401
 ]
 
 // ─── Users / Profiles ────────────────────────────────────────────────────

@@ -130,7 +130,19 @@ export async function deleteLocalEntry(kioskCountId: string, productId: string):
 
 // ─── Outbox ───────────────────────────────────────────────────────────────────
 
-export const MAX_OUTBOX_ATTEMPTS = 8
+/**
+ * Wachttijd voor de volgende poging, oplopend per mislukking.
+ *
+ * De app geeft nooit uit zichzelf op: tijdens het tellen is er geen moment om
+ * een knop te zoeken. Wel wordt de tussenpoos groter, zodat een lange storing
+ * niet elke seconde het netwerk en de accu belast. Na de laatste stap blijft
+ * hij op twee minuten staan.
+ */
+const RETRY_BACKOFF_MS = [2_000, 5_000, 15_000, 30_000, 60_000, 120_000]
+
+export function getRetryDelayMs(attempts: number): number {
+  return RETRY_BACKOFF_MS[Math.min(attempts, RETRY_BACKOFF_MS.length - 1)]!
+}
 
 export async function addToOutbox(
   entry: Omit<OutboxEntry, 'attempts' | 'createdAt'>
@@ -139,23 +151,45 @@ export async function addToOutbox(
   await getOfflineDb().outbox.put({
     ...entry,
     // Een nieuwe mutatie op dezelfde entiteit vervangt de oude en begint
-    // opnieuw met tellen — de laatste waarde is immers de waarheid.
+    // opnieuw met tellen — de laatste waarde is immers de waarheid. Ook een
+    // eerdere weigering vervalt: de nieuwe inhoud kan best geldig zijn.
     attempts: 0,
     error: undefined,
+    nextAttemptAt: undefined,
+    isPermanent: undefined,
     createdAt: existing?.createdAt ?? new Date().toISOString(),
   })
 }
 
-export async function getPendingOutboxEntries(): Promise<OutboxEntry[]> {
+/** Mutaties die nu geprobeerd mogen worden. */
+export async function getDueOutboxEntries(): Promise<OutboxEntry[]> {
+  const now = Date.now()
   const all = await getOfflineDb().outbox.toArray()
   return all
-    .filter((e) => e.attempts < MAX_OUTBOX_ATTEMPTS)
+    .filter((e) => !e.isPermanent)
+    .filter((e) => !e.nextAttemptAt || new Date(e.nextAttemptAt).getTime() <= now)
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
 }
 
-export async function getFailedOutboxEntries(): Promise<OutboxEntry[]> {
+/** Alles wat nog naar de server moet, of het nu aan de beurt is of niet. */
+export async function getPendingOutboxEntries(): Promise<OutboxEntry[]> {
   const all = await getOfflineDb().outbox.toArray()
-  return all.filter((e) => e.attempts >= MAX_OUTBOX_ATTEMPTS)
+  return all.filter((e) => !e.isPermanent).sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+}
+
+/** Mutaties die de server heeft geweigerd; die lossen zichzelf niet op. */
+export async function getRejectedOutboxEntries(): Promise<OutboxEntry[]> {
+  const all = await getOfflineDb().outbox.toArray()
+  return all.filter((e) => e.isPermanent === true)
+}
+
+/** Vroegste moment waarop er weer iets te proberen valt, of null. */
+export async function getNextRetryAt(): Promise<Date | null> {
+  const pending = await getPendingOutboxEntries()
+  const moments = pending
+    .map((e) => (e.nextAttemptAt ? new Date(e.nextAttemptAt).getTime() : Date.now()))
+    .sort((a, b) => a - b)
+  return moments.length > 0 ? new Date(moments[0]!) : null
 }
 
 export async function countOutboxEntries(): Promise<number> {
@@ -166,15 +200,43 @@ export async function markOutboxEntrySuccess(id: string): Promise<void> {
   await getOfflineDb().outbox.delete(id)
 }
 
-export async function markOutboxEntryFailed(id: string, error: string): Promise<void> {
+export async function markOutboxEntryFailed(
+  id: string,
+  error: string,
+  options: { isPermanent?: boolean } = {}
+): Promise<void> {
   const entry = await getOfflineDb().outbox.get(id)
   if (!entry) return
+
+  const attempts = entry.attempts + 1
   await getOfflineDb().outbox.put({
     ...entry,
-    attempts: entry.attempts + 1,
+    attempts,
     error,
+    isPermanent: options.isPermanent === true,
     lastAttemptAt: new Date().toISOString(),
+    nextAttemptAt: new Date(Date.now() + getRetryDelayMs(attempts)).toISOString(),
   })
+}
+
+/**
+ * Zet alle mutaties meteen op de rol: wachttijd weg, weigeringen weer open.
+ *
+ * Gebruikt wanneer de verbinding terugkomt of iemand er zelf om vraagt. Op zo'n
+ * moment is wachten op de backoff precies verkeerd — de omstandigheden zijn
+ * net veranderd.
+ */
+export async function resetOutboxSchedule(): Promise<number> {
+  const all = await getOfflineDb().outbox.toArray()
+  for (const entry of all) {
+    await getOfflineDb().outbox.put({
+      ...entry,
+      isPermanent: undefined,
+      attempts: 0,
+      nextAttemptAt: undefined,
+    })
+  }
+  return all.length
 }
 
 // ─── Conflicten ───────────────────────────────────────────────────────────────

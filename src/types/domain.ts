@@ -345,6 +345,17 @@ export interface OutboxEntry {
   attempts: number
   lastAttemptAt?: string
   error?: string
+  /**
+   * Wanneer deze mutatie opnieuw geprobeerd mag worden. Loopt op bij elke
+   * mislukking, zodat een lange storing niet elke seconde het netwerk belast.
+   */
+  nextAttemptAt?: string
+  /**
+   * Gezet wanneer opnieuw proberen zinloos is: de server heeft de mutatie
+   * geweigerd (geen rechten, ongeldig verzoek). Alleen dán stopt de app met
+   * proberen — bij netwerk- of serverfouten blijft hij het proberen.
+   */
+  isPermanent?: boolean
 }
 
 // ─── Route Calculation ────────────────────────────────────────────────────────

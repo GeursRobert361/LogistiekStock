@@ -154,8 +154,10 @@ describe('saveCount', () => {
     expect(fakeCountRepo.entries).toHaveLength(0)
     expect(await getLocalEntries(KIOSK_COUNT_ID)).toHaveLength(1)
 
+    // Verbinding terug: de browser vuurt 'online', wat neerkomt op retryNow.
+    // Dat negeert de wachttijd, want de omstandigheden zijn net veranderd.
     fakeCountRepo.offline = false
-    await syncService.flush()
+    await syncService.retryNow()
 
     expect(fakeCountRepo.entries).toHaveLength(1)
     expect(fakeCountRepo.entries[0]!.countedQuantityQuarters).toBe(12)

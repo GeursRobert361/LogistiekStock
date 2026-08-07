@@ -12,9 +12,13 @@ import { PERMISSIONS } from '@/lib/permissions'
 /**
  * Permanente synchronisatiestatus.
  *
+ * De toon is bewust geruststellend zolang er niets verloren is. Alles wat je
+ * invoert staat direct op dit apparaat; deze balk gaat alleen over de reis
+ * naar de server. "Niet opgeslagen" zou tijdens het tellen onnodig laten
+ * schrikken, want dat is het niet.
+ *
  * Bewust niet alleen op `navigator.onLine`: die staat ook op "online" wanneer
- * er wél wifi is maar de server onbereikbaar is. Doorslaggevend is of de
- * laatste schrijfpoging slaagde.
+ * er wél wifi is maar de server onbereikbaar is.
  */
 export function SyncStatusBar() {
   const status = useSyncStatus()
@@ -28,14 +32,16 @@ export function SyncStatusBar() {
 
   const {
     pendingCount,
-    failedCount,
+    rejectedCount,
     conflictCount,
     isServerReachable,
     isBrowserOnline,
-    isEverythingSaved,
+    secondsUntilRetry,
   } = status
 
-  let tone: 'ok' | 'busy' | 'offline' | 'error'
+  const changes = (count: number) => `${count} wijziging${count === 1 ? '' : 'en'}`
+
+  let tone: 'ok' | 'busy' | 'waiting' | 'error'
   let icon: string
   let text: string
 
@@ -43,57 +49,59 @@ export function SyncStatusBar() {
     tone = 'error'
     icon = '⚠'
     text = `${conflictCount} telling${conflictCount === 1 ? '' : 'en'} wijkt af van de server`
-  } else if (failedCount > 0) {
+  } else if (rejectedCount > 0) {
     tone = 'error'
     icon = '⚠'
-    text = `Synchronisatiefout — ${failedCount} wijziging${failedCount === 1 ? '' : 'en'} niet opgeslagen`
-  } else if (!isBrowserOnline || !isServerReachable) {
-    tone = 'offline'
-    icon = '●'
-    text =
-      pendingCount > 0
-        ? `Offline — ${pendingCount} wijziging${pendingCount === 1 ? '' : 'en'} lokaal bewaard`
-        : 'Offline — wijzigingen worden lokaal bewaard'
-  } else if (pendingCount > 0) {
-    tone = 'busy'
-    icon = '↻'
-    text = `${pendingCount} wijziging${pendingCount === 1 ? '' : 'en'} synchroniseren`
-  } else {
+    text = `${changes(rejectedCount)} geweigerd door de server`
+  } else if (pendingCount === 0) {
     tone = 'ok'
     icon = '✓'
     text = 'Alles opgeslagen'
+  } else if (!isBrowserOnline || !isServerReachable) {
+    // Bewaard op dit apparaat; de app blijft vanzelf opnieuw proberen.
+    tone = 'waiting'
+    icon = '●'
+    text =
+      secondsUntilRetry !== null && secondsUntilRetry > 0
+        ? `${changes(pendingCount)} bewaard — opnieuw over ${secondsUntilRetry}s`
+        : `${changes(pendingCount)} bewaard — opnieuw proberen…`
+  } else {
+    tone = 'busy'
+    icon = '↻'
+    text = `${changes(pendingCount)} synchroniseren`
   }
 
-  // In rust neemt de balk geen aandacht weg, maar blijft hij wel leesbaar.
   return (
     <div
       role="status"
       aria-live="polite"
       className={cn(
         'flex items-center justify-center gap-1.5 px-4 py-1 text-xs font-medium',
-        tone === 'ok' && 'bg-gray-50 text-gray-500',
-        tone === 'busy' && 'bg-blue-50 text-blue-800',
-        tone === 'offline' && 'bg-gray-800 text-white',
+        tone === 'ok' && 'bg-concrete-light text-ink-muted',
+        tone === 'busy' && 'bg-blue-50 text-blue-900',
+        tone === 'waiting' && 'bg-amber-50 text-amber-900',
         tone === 'error' && 'bg-red-100 text-red-900'
       )}
     >
       <span aria-hidden="true">{icon}</span>
       <span>{text}</span>
+
       {conflictCount > 0 && canResolveConflicts && (
         <Link href="/conflicts" className="ml-2 underline underline-offset-2">
           Oplossen
         </Link>
       )}
-      {conflictCount === 0 && (tone === 'error' || (tone === 'offline' && pendingCount > 0)) && (
+
+      {/* Alleen aanbieden wanneer wachten niet vanzelf helpt. */}
+      {conflictCount === 0 && rejectedCount > 0 && (
         <button
           type="button"
-          onClick={() => void syncService.flush()}
+          onClick={() => void syncService.retryNow()}
           className="ml-2 underline underline-offset-2"
         >
           Opnieuw proberen
         </button>
       )}
-      {isEverythingSaved && <span className="sr-only">Er staan geen wijzigingen open.</span>}
     </div>
   )
 }
