@@ -2,11 +2,12 @@
 
 import {
   createContext,
+  useCallback,
   useContext,
   useEffect,
-  useState,
-  useCallback,
+  useMemo,
   useRef,
+  useState,
   type ReactNode,
 } from 'react'
 import type { Profile } from '@/types'
@@ -18,8 +19,11 @@ interface AuthContextValue {
   isLoading: boolean
   isAuthenticated: boolean
   hasRole: (role: UserRole) => boolean
+  hasAnyRole: (roles: UserRole[]) => boolean
   login: (email: string, password: string) => Promise<void>
   logout: () => Promise<void>
+  /** Gezet wanneer de sessie buiten de app om is verlopen. */
+  sessionExpired: boolean
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null)
@@ -27,23 +31,58 @@ const AuthContext = createContext<AuthContextValue | null>(null)
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  // Use a ref so the repo singleton doesn't change between renders
-  const authRepoRef = useRef(repositories.auth())
+  const [sessionExpired, setSessionExpired] = useState(false)
+  // Ref zodat de repository-singleton niet per render wisselt.
+  const authRepo = useRef(repositories.auth())
+  const wasAuthenticated = useRef(false)
 
   useEffect(() => {
-    authRepoRef.current.getCurrentProfile().then((p) => {
-      setProfile(p)
+    let cancelled = false
+
+    authRepo.current
+      .getCurrentProfile()
+      .then((currentProfile) => {
+        if (cancelled) return
+        setProfile(currentProfile)
+        wasAuthenticated.current = currentProfile !== null
+      })
+      .catch((error: unknown) => {
+        console.error('[auth] Huidige sessie ophalen mislukt.', error)
+        if (!cancelled) setProfile(null)
+      })
+      .finally(() => {
+        if (!cancelled) setIsLoading(false)
+      })
+
+    // In productie stuurt Supabase hier ook token-refreshes en verlopen
+    // sessies doorheen, zodat de app niet blijft hangen op oude gegevens.
+    const unsubscribe = authRepo.current.onAuthStateChange?.((nextProfile) => {
+      if (cancelled) return
+      if (nextProfile === null && wasAuthenticated.current) {
+        setSessionExpired(true)
+      }
+      wasAuthenticated.current = nextProfile !== null
+      setProfile(nextProfile)
       setIsLoading(false)
     })
+
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
   }, [])
 
   const login = useCallback(async (email: string, password: string) => {
-    const session = await authRepoRef.current.login({ email, password })
+    const session = await authRepo.current.login({ email, password })
+    wasAuthenticated.current = true
+    setSessionExpired(false)
     setProfile(session.profile)
   }, [])
 
   const logout = useCallback(async () => {
-    await authRepoRef.current.logout()
+    await authRepo.current.logout()
+    wasAuthenticated.current = false
+    setSessionExpired(false)
     setProfile(null)
   }, [])
 
@@ -52,20 +91,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     [profile]
   )
 
-  return (
-    <AuthContext.Provider
-      value={{
-        profile,
-        isLoading,
-        isAuthenticated: profile !== null,
-        hasRole,
-        login,
-        logout,
-      }}
-    >
-      {children}
-    </AuthContext.Provider>
+  const hasAnyRole = useCallback(
+    (roles: UserRole[]) => roles.some((role) => profile?.roles.includes(role) ?? false),
+    [profile]
   )
+
+  const value = useMemo(
+    () => ({
+      profile,
+      isLoading,
+      isAuthenticated: profile !== null,
+      hasRole,
+      hasAnyRole,
+      login,
+      logout,
+      sessionExpired,
+    }),
+    [profile, isLoading, hasRole, hasAnyRole, login, logout, sessionExpired]
+  )
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
 export function useAuth(): AuthContextValue {

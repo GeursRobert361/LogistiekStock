@@ -15,4 +15,11 @@ export interface IAuthRepository {
   logout(): Promise<void>
   getCurrentSession(): Promise<AuthSession | null>
   getCurrentProfile(): Promise<Profile | null>
+  /**
+   * Meldt wijzigingen in de aanmeldstatus: inloggen, uitloggen, een vernieuwd
+   * token of een verlopen sessie. Geeft een opzegfunctie terug.
+   *
+   * Optioneel: in demo-modus verandert de sessie niet buiten de app om.
+   */
+  onAuthStateChange?(handler: (profile: Profile | null) => void): () => void
 }
