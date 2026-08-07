@@ -97,11 +97,12 @@ export default function RestockRoundDetailPage({
     setIsWorking(true)
     try {
       await completeRound(roundId)
-      await load()
+      // De ronde is klaar; wat je nu wilt is de volgende pallet, niet nog een
+      // scherm over de vorige.
+      router.push('/restock-rounds')
     } catch (completeError) {
       console.error('[vulronde] Afronden mislukt.', completeError)
       setError('De ronde kon niet worden afgerond.')
-    } finally {
       setIsWorking(false)
     }
   }

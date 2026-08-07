@@ -133,13 +133,27 @@ export interface KioskProductStandardWithDetails extends KioskProductStandard {
 
 // ─── Event ───────────────────────────────────────────────────────────────────
 
+/**
+ * Eén regel uit de evenementenagenda: wat er op de kalender staat, nog zonder
+ * ringen, kiosken of telronde. Bij het aanmaken van een evenement wordt hieruit
+ * gekozen, zodat naam en datum niet elke keer overgetypt hoeven te worden.
+ */
+export interface AgendaEntry {
+  id: string
+  name: string
+  date: string
+  eventType: EventType
+  notes?: string
+  createdAt: string
+  updatedAt: string
+}
+
 export interface Event {
   id: string
   name: string
   date: string
   eventType: EventType
   status: EventStatus
-  expectedAttendees?: number
   notes?: string
   activeRingIds: string[]
   activeKioskIds: string[]

@@ -6,8 +6,10 @@ import {
   demoProducts,
   demoStandards,
   demoEvent,
+  demoAgenda,
 } from '@/lib/seed/demoData'
 import type {
+  AgendaEntry,
   Ring,
   Kiosk,
   ProductCategory,
@@ -38,6 +40,7 @@ export const demoTables = {
   products: new DemoTable<Product>('products', () => [...demoProducts]),
   standards: new DemoTable<KioskProductStandard>('standards', () => [...demoStandards]),
   events: new DemoTable<Event>('events', () => [demoEvent]),
+  agenda: new DemoTable<AgendaEntry>('agenda', () => [...demoAgenda]),
   countSessions: new DemoTable<CountSession>('countSessions', () => []),
   kioskCounts: new DemoTable<KioskCount>('kioskCounts', () => []),
   countEntries: new DemoTable<CountEntry>('countEntries', () => []),

@@ -117,6 +117,27 @@ test.describe('Startkiosk per ring', () => {
     await login(page, 'admin@demo.nl')
   })
 
+  test('agenda invullen en er een evenement uit kiezen', async ({ page }) => {
+    // Morgen, zodat deze regel gegarandeerd de eerstvolgende is.
+    const tomorrow = new Date(Date.now() + 86_400_000).toISOString().slice(0, 10)
+
+    await page.goto('/admin/agenda')
+    await page.getByRole('button', { name: '+ Nieuw' }).click()
+    await page.getByLabel('Naam').fill('Ajax – Sparta')
+    await page.getByLabel('Datum').fill(tomorrow)
+    await page.getByRole('button', { name: 'Opslaan' }).click()
+    await expect(page.getByText('Ajax – Sparta')).toBeVisible()
+
+    // Een nieuw evenement kiest uit de agenda in plaats van overtypen; de
+    // eerstvolgende staat meteen goed.
+    await page.goto('/events/new')
+    await expect(page.getByLabel('Naam')).toHaveValue('Ajax – Sparta')
+    await expect(page.getByLabel('Datum')).toHaveValue(tomorrow)
+
+    // Het aantal bezoekers vroeg niemand iets; dat veld is weg.
+    await expect(page.getByLabel(/bezoekers/i)).toHaveCount(0)
+  })
+
   test('ringbeheer is te vinden via het beheeroverzicht', async ({ page }) => {
     await page.goto('/dashboard')
     await page.getByRole('link', { name: /Alle instellingen/ }).click()

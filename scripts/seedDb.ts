@@ -21,6 +21,7 @@ import {
   demoProducts,
   demoStandards,
   demoProfiles,
+  demoAgenda,
   DEMO_PASSWORDS,
 } from '../src/lib/seed/demoData'
 
@@ -155,6 +156,19 @@ async function seedRingStartKiosks(): Promise<void> {
     )
   }
   console.log('✓ startkiosken per ring')
+}
+
+async function seedAgenda(): Promise<void> {
+  for (const entry of demoAgenda) {
+    await client.query(
+      `insert into event_agenda (name, date, event_type, notes)
+       values ($1, $2, $3, $4)
+       on conflict (date, name) do update
+         set event_type = excluded.event_type, notes = excluded.notes`,
+      [entry.name, entry.date, entry.eventType, entry.notes ?? null]
+    )
+  }
+  console.log(`✓ ${demoAgenda.length} agendaregels`)
 }
 
 async function seedCategories(): Promise<void> {
@@ -326,6 +340,7 @@ async function main(): Promise<void> {
     await seedRings()
     await seedKiosks()
     await seedRingStartKiosks()
+    await seedAgenda()
     await seedCategories()
     await seedProducts()
     await seedStandards()

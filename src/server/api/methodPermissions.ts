@@ -54,6 +54,11 @@ export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
   'event.updateEvent': 'MANAGE_EVENTS',
   'event.updateEventStatus': 'MANAGE_EVENTS',
   'event.deleteEvent': 'MANAGE_EVENTS',
+  // De agenda mag iedereen lezen — je kiest eruit bij het aanmaken van een
+  // evenement. Vullen doet de planner.
+  'event.getAgenda': 'AUTHENTICATED',
+  'event.upsertAgendaEntry': 'MANAGE_EVENTS',
+  'event.deleteAgendaEntry': 'MANAGE_EVENTS',
 
   // ─── tellen ──────────────────────────────────────────────────────────────
   'count.getSessions': 'AUTHENTICATED',

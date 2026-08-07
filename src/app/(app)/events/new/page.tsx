@@ -11,13 +11,27 @@ import { AccessDenied } from '@/components/auth/RequireRole'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import { PERMISSIONS } from '@/lib/permissions'
+import { EVENT_TYPE_LABEL } from '@/lib/eventLabels'
+import { formatDate } from '@/lib/utils'
 import { EventStatus, EventType } from '@/types'
-import type { Kiosk, Ring } from '@/types'
+import type { AgendaEntry, Kiosk, Ring } from '@/types'
 
-const EVENT_TYPE_LABEL: Record<EventType, string> = {
-  [EventType.VOETBAL]: 'Voetbal',
-  [EventType.CONCERT]: 'Concert',
-  [EventType.OVERIG]: 'Overig',
+/**
+ * De agendaregel die net is geweest en die eraan komt.
+ *
+ * Meer keuze is hier niet nodig: je maakt een evenement aan op de dag zelf of
+ * vlak ervoor. Staat er niets in de agenda, dan vul je het gewoon zelf in.
+ */
+function pickAround(entries: AgendaEntry[]): {
+  previous?: AgendaEntry
+  next?: AgendaEntry
+} {
+  const today = new Date().toISOString().slice(0, 10)
+  const sorted = [...entries].sort((a, b) => a.date.localeCompare(b.date))
+  return {
+    previous: [...sorted].reverse().find((entry) => entry.date < today),
+    next: sorted.find((entry) => entry.date >= today),
+  }
 }
 
 export default function NewEventPage() {
@@ -29,8 +43,8 @@ export default function NewEventPage() {
   const [name, setName] = useState('')
   const [date, setDate] = useState(() => new Date().toISOString().slice(0, 10))
   const [eventType, setEventType] = useState<EventType>(EventType.VOETBAL)
-  const [expectedAttendees, setExpectedAttendees] = useState('')
   const [notes, setNotes] = useState('')
+  const [agenda, setAgenda] = useState<AgendaEntry[]>([])
   const [selectedRingIds, setSelectedRingIds] = useState<Set<string>>(new Set())
   const [closedKioskIds, setClosedKioskIds] = useState<Set<string>>(new Set())
   const [isLoading, setIsLoading] = useState(true)
@@ -40,11 +54,20 @@ export default function NewEventPage() {
   const canManage = hasAnyRole([...PERMISSIONS.MANAGE_EVENTS])
 
   useEffect(() => {
-    Promise.all([repositories.kiosk().getRings(), repositories.kiosk().getKiosks()])
-      .then(([ringList, kioskList]) => {
+    Promise.all([
+      repositories.kiosk().getRings(),
+      repositories.kiosk().getKiosks(),
+      repositories.event().getAgenda(),
+    ])
+      .then(([ringList, kioskList, agendaList]) => {
         setRings(ringList)
         setKiosks(kioskList)
+        setAgenda(agendaList)
         setSelectedRingIds(new Set(ringList.map((ring) => ring.id)))
+
+        // De eerstvolgende agendaregel is verreweg de meest waarschijnlijke.
+        const next = pickAround(agendaList).next
+        if (next) applyAgendaEntry(next)
         setIsLoading(false)
       })
       .catch((loadError: unknown) => {
@@ -53,6 +76,13 @@ export default function NewEventPage() {
         setIsLoading(false)
       })
   }, [])
+
+  function applyAgendaEntry(entry: AgendaEntry) {
+    setName(entry.name)
+    setDate(entry.date)
+    setEventType(entry.eventType)
+    if (entry.notes) setNotes(entry.notes)
+  }
 
   if (!canManage) return <AccessDenied />
 
@@ -76,13 +106,11 @@ export default function NewEventPage() {
     setIsSaving(true)
     setError(null)
     try {
-      const attendees = Number.parseInt(expectedAttendees.replace(/\D/g, ''), 10)
       const event = await repositories.event().createEvent({
         name: name.trim(),
         date,
         eventType,
         status: EventStatus.READY_FOR_COUNTING,
-        expectedAttendees: Number.isFinite(attendees) ? attendees : undefined,
         notes: notes.trim() || undefined,
         activeRingIds: [...selectedRingIds],
         activeKioskIds: openKiosks.map((kiosk) => kiosk.id),
@@ -128,6 +156,13 @@ export default function NewEventPage() {
     <>
       <AppHeader title="Nieuw evenement" backHref="/events" />
       <form onSubmit={handleSubmit} className="space-y-4 p-4">
+        <AgendaPicker
+          agenda={agenda}
+          selectedName={name}
+          selectedDate={date}
+          onPick={applyAgendaEntry}
+        />
+
         <Input label="Naam" value={name} onChange={(e) => setName(e.target.value)} />
 
         <Input
@@ -145,13 +180,6 @@ export default function NewEventPage() {
             value,
             label: EVENT_TYPE_LABEL[value],
           }))}
-        />
-
-        <Input
-          label="Verwacht aantal bezoekers"
-          inputMode="numeric"
-          value={expectedAttendees}
-          onChange={(e) => setExpectedAttendees(e.target.value)}
         />
 
         <fieldset>
@@ -232,5 +260,73 @@ export default function NewEventPage() {
         </Button>
       </form>
     </>
+  )
+}
+
+/**
+ * Kiezen uit de agenda in plaats van overtypen. Alleen de regel die net is
+ * geweest en de eerstvolgende; de rest van de kalender hoort in het beheer.
+ */
+function AgendaPicker({
+  agenda,
+  selectedName,
+  selectedDate,
+  onPick,
+}: {
+  agenda: AgendaEntry[]
+  selectedName: string
+  selectedDate: string
+  onPick: (entry: AgendaEntry) => void
+}) {
+  const { previous, next } = pickAround(agenda)
+  const options = [
+    previous ? { entry: previous, label: 'Vorige' } : null,
+    next ? { entry: next, label: 'Volgende' } : null,
+  ].filter((option): option is { entry: AgendaEntry; label: string } => option !== null)
+
+  if (options.length === 0) {
+    return (
+      <p className="rounded-xl border border-gray-200 bg-white px-3 py-3 text-sm text-gray-600">
+        De agenda is leeg. Vul hem in onder Beheer → Agenda, dan hoef je naam en datum hier niet
+        meer over te typen.
+      </p>
+    )
+  }
+
+  return (
+    <fieldset>
+      <legend className="mb-2 text-sm font-medium text-gray-700">Uit de agenda</legend>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map(({ entry, label }) => {
+          const isSelected = entry.name === selectedName && entry.date === selectedDate
+          return (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => onPick(entry)}
+              aria-pressed={isSelected}
+              className={`min-h-16 rounded-xl border px-3 py-2 text-left ${
+                isSelected ? 'border-arena-red bg-red-50' : 'border-gray-300 bg-white'
+              }`}
+            >
+              <span
+                className={`block text-xs font-semibold uppercase tracking-wide ${
+                  isSelected ? 'text-arena-red' : 'text-gray-500'
+                }`}
+              >
+                {isSelected ? `✓ ${label}` : label}
+              </span>
+              <span className="block truncate text-sm font-semibold text-gray-900">
+                {entry.name}
+              </span>
+              <span className="block text-xs text-gray-600">{formatDate(entry.date)}</span>
+            </button>
+          )
+        })}
+      </div>
+      <p className="mt-1 text-xs text-gray-600">
+        Of vul hieronder zelf iets in. Beheer → Agenda houdt de kalender bij.
+      </p>
+    </fieldset>
   )
 }

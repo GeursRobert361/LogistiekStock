@@ -147,7 +147,11 @@ test.describe('Volledige workflow', () => {
     // ── 12. Ronde afsluiten ────────────────────────────────────────────────
     await page.getByRole('button', { name: /Vulronde afronden/ }).click()
     await page.getByRole('button', { name: 'Afronden', exact: true }).click()
-    await expect(page.getByText('Deels geleverd')).toBeVisible()
+
+    // Klaar met deze pallet: terug naar het vulmenu, niet nog een scherm over
+    // de ronde die net af is.
+    await page.waitForURL(/\/restock-rounds$/)
+    await expect(page.getByText('Deels geleverd').first()).toBeVisible()
 
     // ── 13. Het restant staat weer in de vulplanning ───────────────────────
     await page.goto('/events/event-demo-ajax/restock')
@@ -180,7 +184,8 @@ test.describe('Volledige workflow', () => {
     await expect(page.getByText(/staat nog open|staan nog open/)).toBeVisible()
     await page.getByRole('button', { name: 'Stoppen', exact: true }).click()
 
-    await expect(page.getByText('Deels geleverd')).toBeVisible()
+    await page.waitForURL(/\/restock-rounds$/)
+    await expect(page.getByText('Deels geleverd').first()).toBeVisible()
 
     // En het werk staat weer klaar voor een volgende pallet.
     await page.goto('/restock-rounds/new')

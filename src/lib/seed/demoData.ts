@@ -1,5 +1,6 @@
 import { assortmentForKiosk } from './assortment'
 import type {
+  AgendaEntry,
   Profile,
   Ring,
   Kiosk,
@@ -234,7 +235,6 @@ export const demoEvent: Event = {
   date: '2026-09-15',
   eventType: EventType.VOETBAL,
   status: EventStatus.READY_FOR_COUNTING,
-  expectedAttendees: 55000,
   notes: 'Demo evenement voor testdoeleinden',
   activeRingIds: [RING1_ID, RING2_ID],
   activeKioskIds: demoKiosks.map((k) => k.id),
@@ -243,3 +243,27 @@ export const demoEvent: Event = {
   createdAt: '2026-08-01T09:00:00Z',
   updatedAt: '2026-08-01T09:00:00Z',
 }
+
+/**
+ * De evenementenagenda: wat er op de kalender staat. Hieruit wordt gekozen bij
+ * het aanmaken van een evenement, zodat naam en datum niet elke keer met de
+ * hand overgetypt hoeven te worden.
+ */
+function agenda(id: string, name: string, date: string, eventType: EventType): AgendaEntry {
+  return {
+    id: `agenda-${id}`,
+    name,
+    date,
+    eventType,
+    createdAt: '2026-08-01T09:00:00Z',
+    updatedAt: '2026-08-01T09:00:00Z',
+  }
+}
+
+export const demoAgenda: AgendaEntry[] = [
+  agenda('psv', 'Ajax – PSV', '2026-08-30', EventType.VOETBAL),
+  agenda('demo-fc', 'Ajax – Demo FC', '2026-09-15', EventType.VOETBAL),
+  agenda('feyenoord', 'Ajax – Feyenoord', '2026-09-27', EventType.VOETBAL),
+  agenda('concert', 'Concert – Zomeravond', '2026-10-04', EventType.CONCERT),
+  agenda('twente', 'Ajax – FC Twente', '2026-10-18', EventType.VOETBAL),
+]

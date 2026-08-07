@@ -21,6 +21,12 @@ interface AdminLink {
  */
 const ADMIN_LINKS: AdminLink[] = [
   {
+    href: '/admin/agenda',
+    label: 'Agenda',
+    description: 'De kalender van het seizoen; hieruit kies je bij een nieuw evenement',
+    permission: 'MANAGE_EVENTS',
+  },
+  {
     href: '/admin/standards',
     label: 'Voorraadnormen',
     description: 'Hoeveel er van elk product in elke kiosk hoort te staan',

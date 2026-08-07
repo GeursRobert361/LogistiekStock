@@ -1,5 +1,5 @@
 import type { IEventRepository } from '../interfaces/IEventRepository'
-import type { Event } from '@/types'
+import type { AgendaEntry, Event } from '@/types'
 import { EventStatus } from '@/types'
 import { demoTables } from './demoTables'
 import { newId } from '@/lib/ids'
@@ -32,5 +32,33 @@ export class DemoEventRepository implements IEventRepository {
 
   async deleteEvent(id: string): Promise<void> {
     demoTables.events.remove(id)
+  }
+
+  // ─── Agenda ──────────────────────────────────────────────────────────────
+
+  async getAgenda(): Promise<AgendaEntry[]> {
+    return demoTables.agenda.filter(() => true).sort((a, b) => a.date.localeCompare(b.date))
+  }
+
+  async upsertAgendaEntry(
+    data: Omit<AgendaEntry, 'id' | 'createdAt' | 'updatedAt'> & { id?: string }
+  ): Promise<AgendaEntry> {
+    const now = new Date().toISOString()
+    if (data.id && demoTables.agenda.getById(data.id)) {
+      return demoTables.agenda.update(data.id, { ...data, updatedAt: now })
+    }
+
+    const entry: AgendaEntry = {
+      ...data,
+      id: data.id ?? `agenda-${newId()}`,
+      createdAt: now,
+      updatedAt: now,
+    }
+    demoTables.agenda.insert(entry)
+    return entry
+  }
+
+  async deleteAgendaEntry(id: string): Promise<void> {
+    demoTables.agenda.remove(id)
   }
 }

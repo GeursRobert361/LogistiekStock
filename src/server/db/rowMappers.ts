@@ -3,6 +3,7 @@
  * Alles op één plek, zodat de repositories vrij blijven van veldnamen.
  */
 import type {
+  AgendaEntry,
   Ring,
   Kiosk,
   ProductCategory,
@@ -48,8 +49,6 @@ const str = (value: unknown): string => (typeof value === 'string' ? value : Str
 const optStr = (value: unknown): string | undefined =>
   value === null || value === undefined ? undefined : String(value)
 const num = (value: unknown): number => (typeof value === 'number' ? value : Number(value ?? 0))
-const optNum = (value: unknown): number | undefined =>
-  value === null || value === undefined ? undefined : Number(value)
 const bool = (value: unknown): boolean => value === true
 
 /**
@@ -265,7 +264,6 @@ export function mapEvent(
     date: str(row.date),
     eventType: str(row.event_type) as EventType,
     status: str(row.status) as EventStatus,
-    expectedAttendees: optNum(row.expected_attendees),
     notes: optStr(row.notes),
     activeRingIds: relations.ringIds,
     activeKioskIds: relations.kioskIds,
@@ -282,9 +280,29 @@ export function eventToRow(data: Partial<Event>): Row {
   if (data.date !== undefined) row.date = data.date
   if (data.eventType !== undefined) row.event_type = data.eventType
   if (data.status !== undefined) row.status = data.status
-  if (data.expectedAttendees !== undefined) row.expected_attendees = data.expectedAttendees
   if (data.notes !== undefined) row.notes = data.notes
   if (data.createdById !== undefined) row.created_by_id = data.createdById
+  return row
+}
+
+export function mapAgendaEntry(row: Row): AgendaEntry {
+  return {
+    id: str(row.id),
+    name: str(row.name),
+    date: str(row.date),
+    eventType: str(row.event_type) as EventType,
+    notes: optStr(row.notes),
+    createdAt: str(row.created_at),
+    updatedAt: str(row.updated_at),
+  }
+}
+
+export function agendaEntryToRow(data: Partial<AgendaEntry>): Row {
+  const row: Row = {}
+  if (data.name !== undefined) row.name = data.name
+  if (data.date !== undefined) row.date = data.date
+  if (data.eventType !== undefined) row.event_type = data.eventType
+  if (data.notes !== undefined) row.notes = data.notes
   return row
 }
 

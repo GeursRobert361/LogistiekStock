@@ -47,6 +47,8 @@ const ROUTE_RULES: Array<{ prefix: string; permission: Permission; exact?: boole
   { prefix: '/admin', permission: 'MANAGE_STANDARDS', exact: true },
   { prefix: '/admin/standards', permission: 'MANAGE_STANDARDS' },
   { prefix: '/admin/import', permission: 'MANAGE_STANDARDS' },
+  // De agenda hoort bij het plannen van evenementen, niet bij de stamdata.
+  { prefix: '/admin/agenda', permission: 'MANAGE_EVENTS' },
   { prefix: '/admin', permission: 'MANAGE_MASTER_DATA' },
   { prefix: '/restock-rounds', permission: 'EXECUTE_RESTOCK' },
   { prefix: '/conflicts', permission: 'REVIEW_COUNTS' },

@@ -1,7 +1,7 @@
 import type { IEventRepository } from '@/repositories/interfaces/IEventRepository'
 import type { Event } from '@/types'
 import { query, queryOne, queryRequired, buildUpdate, transaction } from '@/server/db/pool'
-import { mapEvent, eventToRow } from '@/server/db/rowMappers'
+import { mapEvent, eventToRow, mapAgendaEntry, agendaEntryToRow } from '@/server/db/rowMappers'
 
 interface Relations {
   ringIds: string[]
@@ -128,5 +128,41 @@ export const eventRepository: IEventRepository = {
 
   async deleteEvent(id) {
     await queryRequired('delete from events where id = $1 returning id', [id])
+  },
+
+  // ─── Agenda ──────────────────────────────────────────────────────────────
+
+  async getAgenda() {
+    const rows = await query('select * from event_agenda order by date')
+    return rows.map(mapAgendaEntry)
+  },
+
+  async upsertAgendaEntry(data) {
+    if (data.id) {
+      const statement = buildUpdate('event_agenda', agendaEntryToRow(data), data.id)
+      if (!statement) {
+        return mapAgendaEntry(
+          await queryRequired('select * from event_agenda where id = $1', [data.id])
+        )
+      }
+      return mapAgendaEntry(await queryRequired(statement.text, statement.params))
+    }
+
+    const row = agendaEntryToRow(data)
+    const columns = Object.keys(row)
+    return mapAgendaEntry(
+      await queryRequired(
+        `insert into event_agenda (${columns.join(', ')})
+         values (${columns.map((_, i) => `$${i + 1}`).join(', ')})
+         on conflict (date, name) do update set event_type = excluded.event_type,
+           notes = excluded.notes
+         returning *`,
+        Object.values(row)
+      )
+    )
+  },
+
+  async deleteAgendaEntry(id) {
+    await queryRequired('delete from event_agenda where id = $1 returning id', [id])
   },
 }
