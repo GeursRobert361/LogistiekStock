@@ -179,7 +179,7 @@ export default function EventDetailPage({
                 </Button>
               </Link>
 
-              <Link href={`/events/${eventId}/data`} className="block">
+              <Link href={`/data?event=${eventId}`} className="block">
                 <Button variant="secondary" className="w-full" size="lg">
                   Verbruik
                 </Button>

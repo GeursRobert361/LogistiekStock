@@ -53,6 +53,12 @@ describe('rolrechten', () => {
     expect(hasPermission(VULLER, 'INCIDENTS')).toBe(true)
   })
 
+  it('houdt de verbruikscijfers bij planner en admin', () => {
+    expect(hasPermission(TELLER, 'REVIEW_COUNTS')).toBe(false)
+    expect(hasPermission(VULLER, 'REVIEW_COUNTS')).toBe(false)
+    expect(hasPermission(PLANNER, 'REVIEW_COUNTS')).toBe(true)
+  })
+
   it('een vuller stelt zijn eigen pallet samen, maar plant niet', () => {
     // Zelf pakken en rijden mag; het planningsoverzicht van álle tekorten
     // blijft bij de planner.

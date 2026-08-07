@@ -89,6 +89,48 @@ export function key(kioskId: string, productId: string): string {
  * Een product telt mee zodra het in één van de bronnen voorkomt: ook een kiosk
  * die alleen bijgevuld is (telling nul) heeft verbruik.
  */
+export interface ProductTotal {
+  productId: string
+  /** Verbruik over alle kiosken heen, in kwarteenheden. */
+  consumedQuarters: number
+  /** Aflopend: waar ging het meeste doorheen. */
+  perKiosk: Array<{ kioskId: string; consumedQuarters: number }>
+}
+
+/**
+ * Verbruik per product, opgeteld over de kiosken.
+ *
+ * Negatieve uitkomsten tellen als nul: die komen van bijvullen buiten de app om
+ * en zouden een totaal anders naar beneden trekken. Bij het product zelf blijft
+ * het onvertaald zichtbaar.
+ */
+export function totalsByProduct(rows: ConsumptionRow[]): ProductTotal[] {
+  const byProduct = new Map<string, ProductTotal>()
+
+  for (const row of rows) {
+    for (const product of row.products) {
+      if (product.consumedQuarters === null) continue
+      const consumed = Math.max(0, product.consumedQuarters)
+      if (consumed === 0) continue
+
+      const total = byProduct.get(product.productId) ?? {
+        productId: product.productId,
+        consumedQuarters: 0,
+        perKiosk: [],
+      }
+      total.consumedQuarters += consumed
+      total.perKiosk.push({ kioskId: row.kioskId, consumedQuarters: consumed })
+      byProduct.set(product.productId, total)
+    }
+  }
+
+  for (const total of byProduct.values()) {
+    total.perKiosk.sort((a, b) => b.consumedQuarters - a.consumedQuarters)
+  }
+
+  return [...byProduct.values()].sort((a, b) => b.consumedQuarters - a.consumedQuarters)
+}
+
 export function buildConsumptionRows(sources: ConsumptionSources): ConsumptionRow[] {
   const { countedBefore, delivered, countedAfter } = sources
 

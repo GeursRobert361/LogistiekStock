@@ -155,7 +155,7 @@ test.describe('Startkiosk per ring', () => {
     await page.getByLabel('Naam').fill('Ajax – Vitesse')
     await page.getByLabel('Datum').fill(tomorrow)
     await page.getByRole('button', { name: 'Evenement aanmaken' }).click()
-    await page.waitForURL(/\/events\/[^/]+$/)
+    await page.waitForURL(/\/events\/(?!new$)[^/]+$/)
 
     // Het demo-evenement staat op een latere datum, dus dat telt niet als
     // voorganger; er is er hier geen.

@@ -55,6 +55,18 @@ export function IconRestock({ className = base }: IconProps) {
   )
 }
 
+export function IconData({ className = base }: IconProps) {
+  // Staafjes van verschillende hoogte: het verbruik naast elkaar.
+  return (
+    <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">
+      <path d="M4 20h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+      <rect x="5.5" y="12" width="3.5" height="6" rx="0.8" fill="currentColor" />
+      <rect x="10.5" y="6" width="3.5" height="12" rx="0.8" fill="currentColor" />
+      <rect x="15.5" y="9.5" width="3.5" height="8.5" rx="0.8" fill="currentColor" />
+    </svg>
+  )
+}
+
 export function IconIncident({ className = base }: IconProps) {
   return (
     <svg viewBox="0 0 24 24" fill="none" className={className} aria-hidden="true">

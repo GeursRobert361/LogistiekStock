@@ -52,6 +52,8 @@ const ROUTE_RULES: Array<{ prefix: string; permission: Permission; exact?: boole
   { prefix: '/admin', permission: 'MANAGE_MASTER_DATA' },
   { prefix: '/restock-rounds', permission: 'EXECUTE_RESTOCK' },
   { prefix: '/conflicts', permission: 'REVIEW_COUNTS' },
+  // Verbruikscijfers zijn planningsinformatie, niet iets voor de vloer.
+  { prefix: '/data', permission: 'REVIEW_COUNTS' },
 ]
 
 /** Rechten die nodig zijn voor een pad, of `null` wanneer er geen regel geldt. */

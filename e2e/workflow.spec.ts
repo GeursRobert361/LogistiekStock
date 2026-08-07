@@ -192,7 +192,7 @@ test.describe('Volledige workflow', () => {
     await expect(page.getByRole('button', { name: new RegExp(roundProductName!) })).toBeVisible()
 
     // ── 16. Verbruik wacht op de telling van het volgende evenement ────────
-    await page.goto('/events/event-demo-ajax/data')
+    await page.goto('/data?event=event-demo-ajax')
     await expect(page.getByText(/volgende evenement/)).toBeVisible()
   })
 })

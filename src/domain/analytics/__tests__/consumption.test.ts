@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculateConsumption, buildConsumptionRows, key } from '../consumption'
+import { calculateConsumption, buildConsumptionRows, totalsByProduct, key } from '../consumption'
 import { toQuarterUnits, fromQuarterUnits } from '@/lib/quarterUnits'
 
 const qu = toQuarterUnits
@@ -122,5 +122,64 @@ describe('buildConsumptionRows', () => {
     })
 
     expect(fromQuarterUnits(rows[0]!.products[0]!.consumedQuarters!)).toBe(4)
+  })
+})
+
+describe('totalsByProduct', () => {
+  const rows = buildConsumptionRows({
+    countedBefore: new Map([
+      [key('kiosk-101', 'water'), qu(4)],
+      [key('kiosk-102', 'water'), qu(1)],
+      [key('kiosk-101', 'cola'), qu(2)],
+    ]),
+    delivered: new Map([
+      [key('kiosk-101', 'water'), 11],
+      [key('kiosk-102', 'water'), 5],
+    ]),
+    countedAfter: new Map([
+      [key('kiosk-101', 'water'), qu(3)],
+      [key('kiosk-102', 'water'), qu(2)],
+      [key('kiosk-101', 'cola'), qu(1)],
+    ]),
+  })
+
+  it('telt een product op over alle kiosken', () => {
+    const water = totalsByProduct(rows).find((total) => total.productId === 'water')!
+
+    expect(fromQuarterUnits(water.consumedQuarters)).toBe(16) // 12 + 4
+    expect(water.perKiosk).toHaveLength(2)
+  })
+
+  it('zet het drukste product vooraan, en binnen een product de drukste kiosk', () => {
+    const totals = totalsByProduct(rows)
+
+    expect(totals.map((total) => total.productId)).toEqual(['water', 'cola'])
+    expect(totals[0]!.perKiosk[0]!.kioskId).toBe('kiosk-101')
+  })
+
+  it('laat een product zonder verbruik weg', () => {
+    const empty = buildConsumptionRows({
+      countedBefore: new Map([[key('kiosk-101', 'water'), qu(4)]]),
+      delivered: new Map(),
+      countedAfter: new Map([[key('kiosk-101', 'water'), qu(4)]]),
+    })
+
+    expect(totalsByProduct(empty)).toEqual([])
+  })
+
+  it('trekt een onmogelijk negatief getal niet van het totaal af', () => {
+    const odd = buildConsumptionRows({
+      countedBefore: new Map([
+        [key('kiosk-101', 'water'), qu(10)],
+        [key('kiosk-102', 'water'), qu(1)],
+      ]),
+      delivered: new Map(),
+      countedAfter: new Map([
+        [key('kiosk-101', 'water'), qu(2)],
+        [key('kiosk-102', 'water'), qu(6)], // meer dan er stond
+      ]),
+    })
+
+    expect(fromQuarterUnits(totalsByProduct(odd)[0]!.consumedQuarters)).toBe(8)
   })
 })

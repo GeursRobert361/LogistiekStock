@@ -9,6 +9,7 @@ import { PERMISSIONS, type Permission } from '@/lib/permissions'
 import {
   IconAdmin,
   IconCount,
+  IconData,
   IconDashboard,
   IconIncident,
   IconRestock,
@@ -26,6 +27,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: '/events', label: 'Tellen', Icon: IconCount, permission: 'COUNT' },
   { href: '/restock-rounds', label: 'Vullen', Icon: IconRestock, permission: 'EXECUTE_RESTOCK' },
   { href: '/incidents', label: 'Storingen', Icon: IconIncident, permission: 'INCIDENTS' },
+  { href: '/data', label: 'Data', Icon: IconData, permission: 'REVIEW_COUNTS' },
   { href: '/admin', label: 'Beheer', Icon: IconAdmin, permission: 'MANAGE_STANDARDS' },
 ]
 
