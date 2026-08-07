@@ -23,7 +23,7 @@ export const KIOSKS_WITH_DRINKS_FRIDGE = new Set([
 ])
 
 /** Kiosken met een patatpunt: extra bakjes, vorkjes en sauzen in emmers. */
-export const KIOSKS_WITH_FRIES = new Set([116, 120, 407, 419])
+export const KIOSKS_WITH_FRIES = new Set([116, 120, 126, 407, 419])
 
 /** Kiosken met een hotdogkar ernaast. */
 export const KIOSKS_WITH_HOTDOG = new Set([120, 419])
