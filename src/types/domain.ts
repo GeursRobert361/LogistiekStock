@@ -40,6 +40,10 @@ export interface Ring {
   description?: string
   isActive: boolean
   sortOrder: number
+  /** Kiosk waar een telronde standaard begint — waar je de lift uitkomt. */
+  countStartKioskId?: string
+  /** Kiosk waar een vulronde standaard begint. */
+  restockStartKioskId?: string
   createdAt: string
   updatedAt: string
 }

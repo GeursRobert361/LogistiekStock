@@ -15,12 +15,24 @@ const KIOSKS: Kiosk[] = Array.from({ length: 6 }, (_, i) => ({
   updatedAt: '',
 }))
 
+/** Startkiosk voor vullen; per test aanpasbaar. */
+let restockStartKioskId: string | undefined
+
 vi.mock('@/repositories', () => ({
   repositories: {
     restock: () => fakeRestockRepo,
     kiosk: () => ({
       getKiosks: async (ringId?: string) =>
         KIOSKS.filter((k) => ringId === undefined || k.ringId === ringId),
+      getRingById: async (id: string) => ({
+        id,
+        name: 'Ring 1',
+        isActive: true,
+        sortOrder: 1,
+        restockStartKioskId,
+        createdAt: '',
+        updatedAt: '',
+      }),
     }),
   },
 }))
@@ -92,6 +104,7 @@ async function seedRequirements(productId: string, perKiosk: number[]) {
 
 beforeEach(() => {
   fakeRestockRepo.reset()
+  restockStartKioskId = undefined
 })
 
 describe('planRestock', () => {
@@ -481,5 +494,62 @@ describe('vulronde uitvoeren', () => {
 
     // 2 open bij kiosk 101 en de volle 4 bij kiosk 102.
     expect(mixedPalletItems[0]!.totalRequiredPackages).toBe(6)
+  })
+})
+
+describe('startkiosk van de ring', () => {
+  it('begint de vulroute bij de ingestelde kiosk', async () => {
+    // Vraag bij 101, 103 en 105; de ring start bij 103.
+    await seedRequirements('water', [4, 0, 4, 0, 4, 0])
+    restockStartKioskId = 'kiosk-103'
+
+    const round = await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+    await setLoadedQuantities(round.id, new Map([['water', 12]]))
+
+    const plan = await getRoundPlan(round.id)
+    // Circulair vanaf 103: dus 103, 105, en dan wrapt hij naar 101.
+    expect(plan.stops.map((s) => s.kioskId)).toEqual(['kiosk-103', 'kiosk-105', 'kiosk-101'])
+  })
+
+  it('start ook wanneer de ingestelde kiosk zelf geen vraag heeft', async () => {
+    // Alleen vraag bij 101 en 105; de ring start bij 103, dat zelf niets nodig heeft.
+    await seedRequirements('water', [4, 0, 0, 0, 4, 0])
+    restockStartKioskId = 'kiosk-103'
+
+    const round = await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+    await setLoadedQuantities(round.id, new Map([['water', 8]]))
+
+    const plan = await getRoundPlan(round.id)
+    // Je komt de ring binnen bij 103; de eerste halte is dan 105.
+    expect(plan.stops.map((s) => s.kioskId)).toEqual(['kiosk-105', 'kiosk-101'])
+  })
+
+  it('valt terug op de eerste kiosk met vraag zonder instelling', async () => {
+    await seedRequirements('water', [0, 0, 4, 0, 4, 0])
+    restockStartKioskId = undefined
+
+    const round = await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+    await setLoadedQuantities(round.id, new Map([['water', 8]]))
+
+    const plan = await getRoundPlan(round.id)
+    expect(plan.stops.map((s) => s.kioskId)).toEqual(['kiosk-103', 'kiosk-105'])
   })
 })

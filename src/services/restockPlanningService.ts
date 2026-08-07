@@ -252,10 +252,11 @@ async function buildStops(
   loadedByProduct: Map<string, number>
 ): Promise<PlannedStop[]> {
   const restock = repositories.restock()
-  const [requirements, ringKiosks, reservations] = await Promise.all([
+  const [requirements, ringKiosks, reservations, ring] = await Promise.all([
     restock.getRequirements(round.eventId),
     repositories.kiosk().getKiosks(round.ringId),
     restock.getReservationsForRound(round.id),
+    repositories.kiosk().getRingById(round.ringId),
   ])
 
   // Alleen de behoeften die aan déze ronde zijn toegewezen.
@@ -275,6 +276,17 @@ async function buildStops(
     demandByKiosk.set(requirement.kioskId, perProduct)
   }
 
+  // Vullen begint op een andere plek dan tellen: met een pallet rijd je een
+  // andere kant op dan waar je de lift uitkomt.
+  //
+  // De startkiosk hoeft zelf geen vraag te hebben — je komt daar de ring
+  // binnen. De eerste halte wordt dan gewoon de eerstvolgende kiosk waar wél
+  // iets heen moet. Staat er niets ingesteld, dan begint de route bij de
+  // eerste kiosk met vraag.
+  const preferredStart = ring?.restockStartKioskId
+  const startKioskId =
+    preferredStart !== undefined && kioskIds.has(preferredStart) ? preferredStart : undefined
+
   return planRoundStops({
     ringKiosks: ringKiosks.map((k: Kiosk) => ({
       id: k.id,
@@ -283,6 +295,7 @@ async function buildStops(
     })),
     demandByKiosk,
     loadedByProduct,
+    startKioskId,
     direction: RouteDirection.ASCENDING,
   })
 }

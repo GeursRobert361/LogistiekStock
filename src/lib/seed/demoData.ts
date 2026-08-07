@@ -28,6 +28,9 @@ export const demoRings: Ring[] = [
     description: 'Kiosknummers 100-serie',
     isActive: true,
     sortOrder: 1,
+    // Tellen begint bij de lift; vullen komt er met een pallet anders in.
+    countStartKioskId: 'kiosk-127',
+    restockStartKioskId: 'kiosk-122',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   },
@@ -37,6 +40,7 @@ export const demoRings: Ring[] = [
     description: 'Kiosknummers 400-serie',
     isActive: true,
     sortOrder: 2,
+    restockStartKioskId: 'kiosk-423',
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
   },

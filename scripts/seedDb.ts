@@ -120,6 +120,36 @@ async function seedKiosks(): Promise<void> {
   console.log(`✓ ${kioskIds.size} kiosken`)
 }
 
+/**
+ * Zet de standaard startkiosken per ring. Moet ná de kiosken, want die moeten
+ * eerst bestaan. Een kiosk die niet bestaat wordt overgeslagen en gemeld —
+ * beter dan stilzwijgend niets instellen.
+ */
+async function seedRingStartKiosks(): Promise<void> {
+  for (const ring of demoRings) {
+    const ringId = ringIds.get(ring.id)
+    if (!ringId) continue
+
+    const countStart = ring.countStartKioskId ? kioskIds.get(ring.countStartKioskId) : null
+    const restockStart = ring.restockStartKioskId ? kioskIds.get(ring.restockStartKioskId) : null
+
+    for (const [label, wanted, resolved] of [
+      ['tellen', ring.countStartKioskId, countStart],
+      ['vullen', ring.restockStartKioskId, restockStart],
+    ] as const) {
+      if (wanted && !resolved) {
+        console.warn(`  ! ${ring.name}: startkiosk ${label} (${wanted}) bestaat niet — overgeslagen`)
+      }
+    }
+
+    await client.query(
+      'update rings set count_start_kiosk_id = $1, restock_start_kiosk_id = $2 where id = $3',
+      [countStart ?? null, restockStart ?? null, ringId]
+    )
+  }
+  console.log('✓ startkiosken per ring')
+}
+
 async function seedCategories(): Promise<void> {
   const idByName = await upsertByName(
     'product_categories',
@@ -245,6 +275,7 @@ async function main(): Promise<void> {
     await checkSchema()
     await seedRings()
     await seedKiosks()
+    await seedRingStartKiosks()
     await seedCategories()
     await seedProducts()
     await seedStandards()

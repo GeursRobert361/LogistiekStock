@@ -56,12 +56,20 @@ export default function CountStartPage({
     [kiosks, selectedRingId]
   )
 
+  // Voorkeurskiosk van de ring: daar kom je de lift uit. Bestaat hij niet
+  // (of is hij dicht voor dit evenement), dan de eerste kiosk van de ring.
   useEffect(() => {
     if (ringKiosks.length === 0) return
-    if (!startKioskId && ringKiosks[0]) {
-      setStartKioskId(ringKiosks[0].id)
-    }
-  }, [ringKiosks, startKioskId])
+
+    const ring = rings.find((r) => r.id === selectedRingId)
+    const preferred = ring?.countStartKioskId
+    const isUsable = preferred !== undefined && ringKiosks.some((k) => k.id === preferred)
+
+    setStartKioskId((current) => {
+      if (current && ringKiosks.some((k) => k.id === current)) return current
+      return isUsable ? preferred : (ringKiosks[0]?.id ?? '')
+    })
+  }, [ringKiosks, rings, selectedRingId])
 
   useEffect(() => {
     if (!startKioskId || ringKiosks.length === 0) return
