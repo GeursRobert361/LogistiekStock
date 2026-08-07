@@ -70,12 +70,6 @@ export function getOfflineDb(): OfflineDatabase {
   return db
 }
 
-/** Alleen voor tests: vervangt de singleton door een verse database. */
-export function __setOfflineDbForTests(name: string): OfflineDatabase {
-  db = new OfflineDatabase(name)
-  return db
-}
-
 // ─── Telrondes ────────────────────────────────────────────────────────────────
 
 export async function saveCountSessionLocally(session: CountSession): Promise<void> {
