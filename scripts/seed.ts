@@ -298,9 +298,35 @@ async function seedUsers(): Promise<void> {
 
 // ─── Uitvoeren ───────────────────────────────────────────────────────────────
 
+/**
+ * Controleert vooraf of de migraties gedraaid zijn. Zonder deze check krijg
+ * je een PostgREST-fout over een ontbrekend schema, en dat leest niet als
+ * "je moet eerst setup.sql uitvoeren".
+ */
+async function checkSchema(): Promise<void> {
+  const required = ['rings', 'kiosks', 'products', 'restock_stop_items']
+  const missing: string[] = []
+
+  for (const table of required) {
+    const { error } = await db.from(table).select('id').limit(1)
+    if (error) missing.push(table)
+  }
+
+  if (missing.length === 0) return
+
+  console.error(
+    `De database mist ${missing.length === required.length ? 'het schema' : 'tabellen'}: ` +
+      `${missing.join(', ')}.\n\n` +
+      'Voer eerst supabase/setup.sql uit in de SQL Editor van Supabase.\n' +
+      '(Opnieuw genereren kan met: npm run db:setup-sql)'
+  )
+  process.exit(1)
+}
+
 async function main(): Promise<void> {
   console.log(`Seeden naar ${url}\n`)
 
+  await checkSchema()
   await seedRings()
   await seedKiosks()
   await seedCategories()

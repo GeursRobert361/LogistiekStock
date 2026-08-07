@@ -13,7 +13,8 @@
     "test:ui": "vitest --ui",
     "test:e2e": "playwright test",
     "typecheck": "tsc --noEmit",
-    "seed": "tsx scripts/seed.ts"
+    "seed": "tsx scripts/seed.ts",
+    "db:setup-sql": "tsx scripts/buildSetupSql.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
