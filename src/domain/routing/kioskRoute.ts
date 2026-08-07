@@ -14,8 +14,10 @@ export interface RouteKiosk {
  * Only active kiosks that are open for the event are included.
  * The route is circular: after the last kiosk it wraps back to the first.
  *
- * Ascending  (rechtsom): increasing sortOrder, wrapping from max back to min
- * Descending (linksom):  decreasing sortOrder, wrapping from min back to max
+ * Ascending  (linksom):  increasing sortOrder, wrapping from max back to min
+ *                        — bijvoorbeeld 120 → 121 → 122
+ * Descending (rechtsom): decreasing sortOrder, wrapping from min back to max
+ *                        — bijvoorbeeld 122 → 121 → 120
  *
  * Returns an empty array when no eligible kiosks exist.
  * Returns all eligible kiosks (starting from index 0) when startKioskId

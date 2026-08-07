@@ -158,8 +158,8 @@ export default function CountStartPage({
             <legend className="mb-2 text-sm font-medium text-gray-700">Looprichting</legend>
             <div className="grid grid-cols-2 gap-2">
               {[
-                { value: RouteDirection.ASCENDING, label: '↪ Rechtsom (oplopend)' },
-                { value: RouteDirection.DESCENDING, label: '↩ Linksom (aflopend)' },
+                { value: RouteDirection.ASCENDING, label: '↺ Linksom (oplopend)' },
+                { value: RouteDirection.DESCENDING, label: '↻ Rechtsom (aflopend)' },
               ].map((opt) => (
                 <label
                   key={opt.value}
