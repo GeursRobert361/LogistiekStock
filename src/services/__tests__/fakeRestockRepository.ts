@@ -4,6 +4,7 @@ import type {
   RestockRound,
   RestockRoundItem,
   RestockRoundStop,
+  RestockStopItem,
   RestockDelivery,
   StockReservation,
 } from '@/types'
@@ -15,6 +16,7 @@ export class FakeRestockRepository implements IRestockRepository {
   rounds: RestockRound[] = []
   items: RestockRoundItem[] = []
   stops: RestockRoundStop[] = []
+  stopItems: RestockStopItem[] = []
   deliveries: RestockDelivery[] = []
   reservations: StockReservation[] = []
 
@@ -23,6 +25,7 @@ export class FakeRestockRepository implements IRestockRepository {
     this.rounds = []
     this.items = []
     this.stops = []
+    this.stopItems = []
     this.deliveries = []
     this.reservations = []
   }
@@ -139,6 +142,33 @@ export class FakeRestockRepository implements IRestockRepository {
     const updated = { ...this.stops[index]!, ...data }
     this.stops[index] = updated
     return updated
+  }
+
+  async deleteRoundStops(roundId: string): Promise<void> {
+    const stopIds = new Set(this.stops.filter((s) => s.restockRoundId === roundId).map((s) => s.id))
+    this.stops = this.stops.filter((s) => !stopIds.has(s.id))
+    this.stopItems = this.stopItems.filter((i) => !stopIds.has(i.restockRoundStopId))
+  }
+
+  async getStopItems(stopId: string): Promise<RestockStopItem[]> {
+    return this.stopItems.filter((i) => i.restockRoundStopId === stopId)
+  }
+
+  async getStopItemsForRound(roundId: string): Promise<RestockStopItem[]> {
+    const stopIds = new Set(this.stops.filter((s) => s.restockRoundId === roundId).map((s) => s.id))
+    return this.stopItems.filter((i) => stopIds.has(i.restockRoundStopId))
+  }
+
+  async createStopItems(
+    items: Array<Omit<RestockStopItem, 'id' | 'createdAt'>>
+  ): Promise<RestockStopItem[]> {
+    const created = items.map((item) => ({
+      ...item,
+      id: newId(),
+      createdAt: new Date().toISOString(),
+    }))
+    this.stopItems.push(...created)
+    return created
   }
 
   async createDelivery(data: Omit<RestockDelivery, 'id' | 'createdAt'>): Promise<RestockDelivery> {

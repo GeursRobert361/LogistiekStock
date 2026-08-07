@@ -243,6 +243,24 @@ export interface RestockRoundStop {
   sortOrder: number
   completedAt?: string
   notes?: string
+  skipReason?: string
+}
+
+/**
+ * Wat er bij één halte van één product geleverd moet worden.
+ *
+ * De verdeling van de geladen hoeveelheid over de kiosken ligt hiermee vast,
+ * zodat het te leveren aantal per kiosk niet verschuift zodra er onderweg al
+ * iets is afgeleverd.
+ */
+export interface RestockStopItem {
+  id: string
+  restockRoundStopId: string
+  productId: string
+  /** Behoefte waar deze levering op afboekt. */
+  restockRequirementId?: string
+  plannedPackages: number
+  createdAt: string
 }
 
 export interface RestockDelivery {

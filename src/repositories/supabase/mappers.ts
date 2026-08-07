@@ -16,6 +16,7 @@ import type {
   RestockRound,
   RestockRoundItem,
   RestockRoundStop,
+  RestockStopItem,
   RestockDelivery,
   StockReservation,
   Incident,
@@ -445,6 +446,7 @@ export function mapRoundStop(row: Row): RestockRoundStop {
     sortOrder: num(row.sort_order),
     completedAt: optStr(row.completed_at),
     notes: optStr(row.notes),
+    skipReason: optStr(row.skip_reason),
   }
 }
 
@@ -455,7 +457,28 @@ export function roundStopToRow(data: Partial<RestockRoundStop>): Row {
   if (data.sortOrder !== undefined) row.sort_order = data.sortOrder
   if (data.completedAt !== undefined) row.completed_at = data.completedAt
   if (data.notes !== undefined) row.notes = data.notes
+  if (data.skipReason !== undefined) row.skip_reason = data.skipReason
   return row
+}
+
+export function mapStopItem(row: Row): RestockStopItem {
+  return {
+    id: str(row.id),
+    restockRoundStopId: str(row.restock_round_stop_id),
+    productId: str(row.product_id),
+    restockRequirementId: optStr(row.restock_requirement_id),
+    plannedPackages: num(row.planned_packages),
+    createdAt: str(row.created_at),
+  }
+}
+
+export function stopItemToRow(data: Omit<RestockStopItem, 'id' | 'createdAt'>): Row {
+  return {
+    restock_round_stop_id: data.restockRoundStopId,
+    product_id: data.productId,
+    restock_requirement_id: data.restockRequirementId ?? null,
+    planned_packages: data.plannedPackages,
+  }
 }
 
 export function mapDelivery(row: Row): RestockDelivery {

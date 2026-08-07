@@ -3,6 +3,7 @@ import type {
   RestockRound,
   RestockRoundItem,
   RestockRoundStop,
+  RestockStopItem,
   RestockDelivery,
   StockReservation,
 } from '@/types'
@@ -32,6 +33,11 @@ export interface IRestockRepository {
   getRoundStops(roundId: string): Promise<RestockRoundStop[]>
   createRoundStops(stops: Array<Omit<RestockRoundStop, 'id'>>): Promise<RestockRoundStop[]>
   updateStop(stopId: string, data: Partial<RestockRoundStop>): Promise<RestockRoundStop>
+  deleteRoundStops(roundId: string): Promise<void>
+
+  getStopItems(stopId: string): Promise<RestockStopItem[]>
+  getStopItemsForRound(roundId: string): Promise<RestockStopItem[]>
+  createStopItems(items: Array<Omit<RestockStopItem, 'id' | 'createdAt'>>): Promise<RestockStopItem[]>
 
   // ─── Leveringen ────────────────────────────────────────────────────────────
   createDelivery(data: Omit<RestockDelivery, 'id' | 'createdAt'>): Promise<RestockDelivery>

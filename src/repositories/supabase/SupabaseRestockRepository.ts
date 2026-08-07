@@ -4,6 +4,7 @@ import type {
   RestockRound,
   RestockRoundItem,
   RestockRoundStop,
+  RestockStopItem,
   RestockDelivery,
   StockReservation,
 } from '@/types'
@@ -13,6 +14,8 @@ import {
   mapRound,
   mapRoundItem,
   mapRoundStop,
+  mapStopItem,
+  stopItemToRow,
   mapDelivery,
   mapReservation,
   requirementToRow,
@@ -164,6 +167,47 @@ export class SupabaseRestockRepository implements IRestockRepository {
         .single()
     )
     return mapRoundStop(row)
+  }
+
+  async deleteRoundStops(roundId: string): Promise<void> {
+    // stop items hangen met on delete cascade aan de haltes.
+    const { error } = await this.db
+      .from('restock_round_stops')
+      .delete()
+      .eq('restock_round_id', roundId)
+    if (error) throw new Error(`[supabase] ${error.message}`)
+  }
+
+  async getStopItems(stopId: string): Promise<RestockStopItem[]> {
+    const rows = unwrapList<Row>(
+      await this.db.from('restock_stop_items').select('*').eq('restock_round_stop_id', stopId)
+    )
+    return rows.map(mapStopItem)
+  }
+
+  async getStopItemsForRound(roundId: string): Promise<RestockStopItem[]> {
+    const stops = await this.getRoundStops(roundId)
+    if (stops.length === 0) return []
+    const rows = unwrapList<Row>(
+      await this.db
+        .from('restock_stop_items')
+        .select('*')
+        .in(
+          'restock_round_stop_id',
+          stops.map((s) => s.id)
+        )
+    )
+    return rows.map(mapStopItem)
+  }
+
+  async createStopItems(
+    items: Array<Omit<RestockStopItem, 'id' | 'createdAt'>>
+  ): Promise<RestockStopItem[]> {
+    if (items.length === 0) return []
+    const rows = unwrapList<Row>(
+      await this.db.from('restock_stop_items').insert(items.map(stopItemToRow)).select()
+    )
+    return rows.map(mapStopItem)
   }
 
   // ─── Leveringen ──────────────────────────────────────────────────────────

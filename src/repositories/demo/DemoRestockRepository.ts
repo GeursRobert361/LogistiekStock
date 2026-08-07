@@ -4,6 +4,7 @@ import type {
   RestockRound,
   RestockRoundItem,
   RestockRoundStop,
+  RestockStopItem,
   RestockDelivery,
   StockReservation,
 } from '@/types'
@@ -121,6 +122,37 @@ export class DemoRestockRepository implements IRestockRepository {
 
   async updateStop(stopId: string, data: Partial<RestockRoundStop>): Promise<RestockRoundStop> {
     return demoTables.restockRoundStops.update(stopId, data)
+  }
+
+  async deleteRoundStops(roundId: string): Promise<void> {
+    for (const stop of demoTables.restockRoundStops.filter((s) => s.restockRoundId === roundId)) {
+      for (const item of demoTables.restockStopItems.filter(
+        (i) => i.restockRoundStopId === stop.id
+      )) {
+        demoTables.restockStopItems.remove(item.id)
+      }
+      demoTables.restockRoundStops.remove(stop.id)
+    }
+  }
+
+  async getStopItems(stopId: string): Promise<RestockStopItem[]> {
+    return demoTables.restockStopItems.filter((i) => i.restockRoundStopId === stopId)
+  }
+
+  async getStopItemsForRound(roundId: string): Promise<RestockStopItem[]> {
+    const stopIds = new Set(
+      demoTables.restockRoundStops.filter((s) => s.restockRoundId === roundId).map((s) => s.id)
+    )
+    return demoTables.restockStopItems.filter((i) => stopIds.has(i.restockRoundStopId))
+  }
+
+  async createStopItems(
+    items: Array<Omit<RestockStopItem, 'id' | 'createdAt'>>
+  ): Promise<RestockStopItem[]> {
+    const now = new Date().toISOString()
+    const created = items.map((item) => ({ ...item, id: newId(), createdAt: now }))
+    demoTables.restockStopItems.putMany(created)
+    return created
   }
 
   // ─── Leveringen ────────────────────────────────────────────────────────────

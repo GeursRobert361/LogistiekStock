@@ -1,22 +1,29 @@
-import { RoundType } from '@/types/enums'
+import { RoundType, RestockRoundType } from '@/types/enums'
 import type { Product, RestockRequirement } from '@/types/domain'
+import { unplannedPackages } from './buildRequirements'
 
 export interface RestockPlanItem {
   product: Product
+  /** Nog te plannen verpakkingen (openstaand min gereserveerd). */
   totalRequiredPackages: number
   affectedKioskIds: string[]
-  proposedRoundType: 'PRODUCT_ROUND' | 'MIXED_PALLET'
+  proposedRoundType: RestockRoundType
   estimatedPalletLoad: number
   priority: number
+  /** Waarom dit een eigen ronde wordt. Handig om in de UI te tonen. */
+  ownRoundReason?: 'PRODUCT_INSTELLING' | 'AANTAL' | 'PALLETBELASTING'
 }
 
-const OWN_ROUND_PALLET_THRESHOLD = 80
+/** Boven deze geschatte palletbelasting krijgt een AUTO-product een eigen ronde. */
+export const OWN_ROUND_PALLET_THRESHOLD = 80
 
 /**
- * Generates a restock plan from open requirements.
- * Returns items sorted by priority (highest first), split into:
- * - productRoundItems: each gets its own round
- * - mixedPalletItems: combined on shared pallets
+ * Zet openstaande behoeften om in een voorstel voor vulrondes.
+ *
+ * Producten met roundType PRODUCT_ROUND krijgen altijd een eigen ronde.
+ * AUTO-producten krijgen er een zodra het aantal de ingestelde drempel haalt
+ * of de geschatte palletbelasting te groot wordt — denk aan water en
+ * bierbekers. De rest gaat op een gemengde pallet.
  */
 export function planRestock(
   requirements: RestockRequirement[],
@@ -25,17 +32,16 @@ export function planRestock(
   productRoundItems: RestockPlanItem[]
   mixedPalletItems: RestockPlanItem[]
 } {
-  // Aggregate requirements per product
   const aggregated = new Map<string, { required: number; kiosks: string[] }>()
 
-  for (const req of requirements) {
-    const remaining = req.requiredPackages - req.deliveredPackages - req.reservedPackages
+  for (const requirement of requirements) {
+    const remaining = unplannedPackages(requirement)
     if (remaining <= 0) continue
 
-    const existing = aggregated.get(req.productId) ?? { required: 0, kiosks: [] }
-    aggregated.set(req.productId, {
+    const existing = aggregated.get(requirement.productId) ?? { required: 0, kiosks: [] }
+    aggregated.set(requirement.productId, {
       required: existing.required + remaining,
-      kiosks: [...existing.kiosks, req.kioskId],
+      kiosks: [...existing.kiosks, requirement.kioskId],
     })
   }
 
@@ -48,18 +54,26 @@ export function planRestock(
 
     const totalLoad = product.estimatedPalletLoad * required
 
-    let proposedRoundType: 'PRODUCT_ROUND' | 'MIXED_PALLET'
+    let proposedRoundType: RestockRoundType
+    let ownRoundReason: RestockPlanItem['ownRoundReason']
 
     if (product.roundType === RoundType.PRODUCT_ROUND) {
-      proposedRoundType = 'PRODUCT_ROUND'
+      proposedRoundType = RestockRoundType.PRODUCT_ROUND
+      ownRoundReason = 'PRODUCT_INSTELLING'
     } else if (product.roundType === RoundType.MIXED_PALLET) {
-      proposedRoundType = 'MIXED_PALLET'
+      proposedRoundType = RestockRoundType.MIXED_PALLET
     } else {
-      // AUTO: own round when quantity exceeds threshold OR pallet load is high
-      proposedRoundType =
-        required >= product.ownRoundThreshold || totalLoad >= OWN_ROUND_PALLET_THRESHOLD
-          ? 'PRODUCT_ROUND'
-          : 'MIXED_PALLET'
+      // AUTO. Een drempel van 0 betekent "niet ingesteld" en telt dus niet mee.
+      const reachesCountThreshold =
+        product.ownRoundThreshold > 0 && required >= product.ownRoundThreshold
+      const reachesPalletThreshold = totalLoad >= OWN_ROUND_PALLET_THRESHOLD
+
+      if (reachesCountThreshold || reachesPalletThreshold) {
+        proposedRoundType = RestockRoundType.PRODUCT_ROUND
+        ownRoundReason = reachesCountThreshold ? 'AANTAL' : 'PALLETBELASTING'
+      } else {
+        proposedRoundType = RestockRoundType.MIXED_PALLET
+      }
     }
 
     const item: RestockPlanItem = {
@@ -69,17 +83,19 @@ export function planRestock(
       proposedRoundType,
       estimatedPalletLoad: totalLoad,
       priority: product.priority,
+      ownRoundReason,
     }
 
-    if (proposedRoundType === 'PRODUCT_ROUND') {
+    if (proposedRoundType === RestockRoundType.PRODUCT_ROUND) {
       productRoundItems.push(item)
     } else {
       mixedPalletItems.push(item)
     }
   }
 
-  // Sort by priority desc
-  const byPriority = (a: RestockPlanItem, b: RestockPlanItem) => b.priority - a.priority
+  const byPriority = (a: RestockPlanItem, b: RestockPlanItem) =>
+    b.priority - a.priority || b.totalRequiredPackages - a.totalRequiredPackages
+
   return {
     productRoundItems: productRoundItems.sort(byPriority),
     mixedPalletItems: mixedPalletItems.sort(byPriority),
