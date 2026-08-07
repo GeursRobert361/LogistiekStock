@@ -12,6 +12,7 @@ import { join } from 'node:path'
 
 const MIGRATIONS_DIR = join(process.cwd(), 'supabase', 'migrations')
 const SUPABASE_DIR = join(process.cwd(), 'src', 'repositories', 'supabase')
+const MAPPERS_FILE = join(process.cwd(), 'src', 'server', 'db', 'rowMappers.ts')
 
 interface Schema {
   tables: Map<string, Set<string>>
@@ -89,7 +90,7 @@ function readSupabaseSource(): string {
 const schema = parseSchema()
 const source = readSupabaseSource()
 /** Alleen de mappers vertalen naar kolomnamen; elders zijn object-sleutels gewoon code. */
-const mappersSource = readFileSync(join(SUPABASE_DIR, 'mappers.ts'), 'utf8')
+const mappersSource = readFileSync(MAPPERS_FILE, 'utf8')
 
 describe('migraties', () => {
   it('bevat de tabellen waar de app op leunt', () => {

@@ -1,7 +1,7 @@
 import type { IKioskRepository } from '../interfaces/IKioskRepository'
 import type { Kiosk, Ring } from '@/types'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import { mapKiosk, mapRing, kioskToRow, ringToRow } from './mappers'
+import { mapKiosk, mapRing, kioskToRow, ringToRow } from '@/server/db/rowMappers'
 import { unwrap, unwrapList, unwrapMaybe } from './supabaseHelpers'
 
 type Row = Record<string, unknown>

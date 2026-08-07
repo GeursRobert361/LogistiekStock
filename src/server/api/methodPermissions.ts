@@ -1,0 +1,118 @@
+import type { Permission } from '@/lib/permissions'
+
+/**
+ * Welk recht elke aanroep nodig heeft.
+ *
+ * De API is één ingang die naar de repositories dispatcht. Zonder deze tabel
+ * zou dat een open doorgeefluik naar de database zijn. Daarom:
+ *
+ *   - alles wat hier niet in staat wordt geweigerd (standaard dicht);
+ *   - een test controleert dat élke methode van élke repository-interface een
+ *     regel heeft, zodat een nieuwe methode niet per ongeluk onbeschermd blijft.
+ *
+ * `AUTHENTICATED` betekent: elke ingelogde gebruiker mag dit. Dat geldt voor
+ * stamdata die iedereen op de vloer nodig heeft — kiosknummers, producten,
+ * normen — en niet voor iets gevoeligs.
+ */
+export type MethodRule = Permission | 'AUTHENTICATED'
+
+export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
+  // ─── auth ────────────────────────────────────────────────────────────────
+  'auth.listProfiles': 'MANAGE_MASTER_DATA',
+
+  // ─── kiosk & ring ────────────────────────────────────────────────────────
+  'kiosk.getRings': 'AUTHENTICATED',
+  'kiosk.getRingById': 'AUTHENTICATED',
+  'kiosk.createRing': 'MANAGE_MASTER_DATA',
+  'kiosk.updateRing': 'MANAGE_MASTER_DATA',
+  'kiosk.getKiosks': 'AUTHENTICATED',
+  'kiosk.getKioskById': 'AUTHENTICATED',
+  'kiosk.getKiosksByEvent': 'AUTHENTICATED',
+  'kiosk.createKiosk': 'MANAGE_MASTER_DATA',
+  'kiosk.updateKiosk': 'MANAGE_MASTER_DATA',
+  'kiosk.deleteKiosk': 'MANAGE_MASTER_DATA',
+  'kiosk.updateEventKiosks': 'MANAGE_EVENTS',
+
+  // ─── product, categorie & norm ───────────────────────────────────────────
+  'product.getCategories': 'AUTHENTICATED',
+  'product.createCategory': 'MANAGE_MASTER_DATA',
+  'product.updateCategory': 'MANAGE_MASTER_DATA',
+  'product.getProducts': 'AUTHENTICATED',
+  'product.getProductById': 'AUTHENTICATED',
+  'product.createProduct': 'MANAGE_MASTER_DATA',
+  'product.updateProduct': 'MANAGE_MASTER_DATA',
+  'product.deleteProduct': 'MANAGE_MASTER_DATA',
+  'product.getStandards': 'AUTHENTICATED',
+  'product.getStandardMatrix': 'AUTHENTICATED',
+  'product.upsertStandard': 'MANAGE_STANDARDS',
+  'product.bulkUpsertStandards': 'MANAGE_STANDARDS',
+
+  // ─── evenement ───────────────────────────────────────────────────────────
+  'event.getEvents': 'AUTHENTICATED',
+  'event.getEventById': 'AUTHENTICATED',
+  'event.createEvent': 'MANAGE_EVENTS',
+  'event.updateEvent': 'MANAGE_EVENTS',
+  'event.updateEventStatus': 'MANAGE_EVENTS',
+  'event.deleteEvent': 'MANAGE_EVENTS',
+
+  // ─── tellen ──────────────────────────────────────────────────────────────
+  'count.getSessions': 'AUTHENTICATED',
+  'count.getSessionById': 'AUTHENTICATED',
+  'count.createSession': 'COUNT',
+  'count.updateSession': 'COUNT',
+  'count.updateSessionStatus': 'COUNT',
+  'count.getKioskCountsForSession': 'AUTHENTICATED',
+  'count.upsertKioskCount': 'COUNT',
+  'count.getEntriesForKioskCount': 'AUTHENTICATED',
+  'count.upsertCountEntry': 'COUNT',
+  'count.bulkUpsertCountEntries': 'COUNT',
+  'count.deleteCountEntry': 'COUNT',
+
+  // ─── bijvullen ───────────────────────────────────────────────────────────
+  'restock.getRequirements': 'AUTHENTICATED',
+  // Vullers boeken hun levering af op de behoefte, dus die hebben schrijfrecht.
+  'restock.upsertRequirement': 'EXECUTE_RESTOCK',
+  'restock.bulkUpsertRequirements': 'REVIEW_COUNTS',
+  'restock.updateRequirement': 'EXECUTE_RESTOCK',
+  'restock.getRounds': 'AUTHENTICATED',
+  'restock.getRoundById': 'AUTHENTICATED',
+  'restock.createRound': 'PLAN_RESTOCK',
+  'restock.updateRound': 'EXECUTE_RESTOCK',
+  'restock.getRoundItems': 'AUTHENTICATED',
+  'restock.upsertRoundItem': 'EXECUTE_RESTOCK',
+  'restock.getRoundStops': 'AUTHENTICATED',
+  'restock.createRoundStops': 'PLAN_RESTOCK',
+  'restock.updateStop': 'EXECUTE_RESTOCK',
+  'restock.deleteRoundStops': 'PLAN_RESTOCK',
+  'restock.getStopItems': 'AUTHENTICATED',
+  'restock.getStopItemsForRound': 'AUTHENTICATED',
+  'restock.createStopItems': 'PLAN_RESTOCK',
+  'restock.createDelivery': 'EXECUTE_RESTOCK',
+  'restock.getDeliveriesForStop': 'AUTHENTICATED',
+  'restock.getDeliveriesForRound': 'AUTHENTICATED',
+  'restock.createReservation': 'PLAN_RESTOCK',
+  'restock.getReservationsForRound': 'AUTHENTICATED',
+  'restock.getReservationsForEvent': 'AUTHENTICATED',
+  'restock.releaseReservation': 'EXECUTE_RESTOCK',
+  'restock.releaseReservationsForRound': 'EXECUTE_RESTOCK',
+
+  // ─── storingen ───────────────────────────────────────────────────────────
+  'incident.getIncidents': 'INCIDENTS',
+  'incident.getIncidentById': 'INCIDENTS',
+  'incident.createIncident': 'INCIDENTS',
+  'incident.updateIncident': 'REVIEW_COUNTS',
+}
+
+/** Methodes die de client niet via de API mag aanroepen. */
+export const CLIENT_ONLY_METHODS = new Set([
+  // Inloggen en uitloggen lopen via eigen endpoints met cookie-afhandeling.
+  'auth.login',
+  'auth.logout',
+  'auth.getCurrentSession',
+  'auth.getCurrentProfile',
+  'auth.onAuthStateChange',
+])
+
+export function getMethodRule(resource: string, method: string): MethodRule | null {
+  return METHOD_PERMISSIONS[`${resource}.${method}`] ?? null
+}

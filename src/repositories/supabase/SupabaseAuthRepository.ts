@@ -2,7 +2,7 @@ import type { IAuthRepository, LoginCredentials, AuthSession } from '../interfac
 import type { Profile } from '@/types'
 import { UserRole } from '@/types'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import { mapProfile } from './mappers'
+import { mapProfile } from '@/server/db/rowMappers'
 import { unwrapList, unwrapMaybe } from './supabaseHelpers'
 
 /**

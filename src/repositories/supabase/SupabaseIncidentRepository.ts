@@ -2,7 +2,7 @@ import type { IIncidentRepository, IncidentFilter } from '../interfaces/IInciden
 import type { Incident } from '@/types'
 import { IncidentStatus } from '@/types'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import { mapIncident, incidentToRow } from './mappers'
+import { mapIncident, incidentToRow } from '@/server/db/rowMappers'
 import { unwrap, unwrapList, unwrapMaybe } from './supabaseHelpers'
 
 type Row = Record<string, unknown>

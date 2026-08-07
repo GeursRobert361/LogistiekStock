@@ -24,7 +24,7 @@ import {
   roundStopToRow,
   deliveryToRow,
   reservationToRow,
-} from './mappers'
+} from '@/server/db/rowMappers'
 import { unwrap, unwrapList, unwrapMaybe } from './supabaseHelpers'
 
 type Row = Record<string, unknown>

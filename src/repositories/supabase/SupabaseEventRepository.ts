@@ -2,7 +2,7 @@ import type { IEventRepository } from '../interfaces/IEventRepository'
 import type { Event } from '@/types'
 import { EventStatus } from '@/types'
 import { getSupabaseClient } from '@/lib/supabase/client'
-import { mapEvent, eventToRow } from './mappers'
+import { mapEvent, eventToRow } from '@/server/db/rowMappers'
 import { unwrap, unwrapList, unwrapMaybe } from './supabaseHelpers'
 
 type Row = Record<string, unknown>

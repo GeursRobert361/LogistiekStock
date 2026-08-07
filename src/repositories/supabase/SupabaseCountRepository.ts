@@ -9,7 +9,7 @@ import {
   countSessionToRow,
   kioskCountToRow,
   countEntryToRow,
-} from './mappers'
+} from '@/server/db/rowMappers'
 import { unwrap, unwrapList, unwrapMaybe } from './supabaseHelpers'
 
 type Row = Record<string, unknown>
