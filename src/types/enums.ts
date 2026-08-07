@@ -72,6 +72,12 @@ export enum PalletStatus {
   CANCELLED = 'CANCELLED',
 }
 
+/** Soort vulronde. Los van `RoundType`, dat een productvoorkeur uitdrukt. */
+export enum RestockRoundType {
+  PRODUCT_ROUND = 'PRODUCT_ROUND',
+  MIXED_PALLET = 'MIXED_PALLET',
+}
+
 export enum RestockRoundStatus {
   DRAFT = 'DRAFT',
   PICKING = 'PICKING',

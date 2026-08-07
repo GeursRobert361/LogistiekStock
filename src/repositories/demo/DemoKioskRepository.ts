@@ -1,66 +1,60 @@
 import type { IKioskRepository } from '../interfaces/IKioskRepository'
 import type { Kiosk, Ring } from '@/types'
-import { demoRings, demoKiosks, demoEvent } from '@/lib/seed/demoData'
+import { demoTables } from './demoTables'
+import { newId } from '@/lib/ids'
 
 export class DemoKioskRepository implements IKioskRepository {
-  private rings = [...demoRings]
-  private kiosks = [...demoKiosks]
-
   async getRings(): Promise<Ring[]> {
-    return this.rings.filter((r) => r.isActive)
+    return demoTables.rings.filter((r) => r.isActive).sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
   async getRingById(id: string): Promise<Ring | null> {
-    return this.rings.find((r) => r.id === id) ?? null
+    return demoTables.rings.getById(id)
   }
 
   async getKiosks(ringId?: string): Promise<Kiosk[]> {
-    return this.kiosks.filter((k) => k.isActive && (ringId == null || k.ringId === ringId))
+    return demoTables.kiosks
+      .filter((k) => k.isActive && (ringId == null || k.ringId === ringId))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
   }
 
   async getKioskById(id: string): Promise<Kiosk | null> {
-    return this.kiosks.find((k) => k.id === id) ?? null
+    return demoTables.kiosks.getById(id)
   }
 
   async getKiosksByEvent(eventId: string): Promise<Array<Kiosk & { isOpenForEvent: boolean }>> {
-    const event = demoEvent.id === eventId ? demoEvent : null
+    const event = demoTables.events.getById(eventId)
     if (!event) return []
-    return this.kiosks
+    return demoTables.kiosks
       .filter((k) => k.isActive)
-      .map((k) => ({
-        ...k,
-        isOpenForEvent: event.activeKioskIds.includes(k.id),
-      }))
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map((k) => ({ ...k, isOpenForEvent: event.activeKioskIds.includes(k.id) }))
   }
 
   async createKiosk(data: Omit<Kiosk, 'id' | 'createdAt' | 'updatedAt'>): Promise<Kiosk> {
-    const kiosk: Kiosk = {
-      ...data,
-      id: `kiosk-${crypto.randomUUID()}`,
-      createdAt: new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-    }
-    this.kiosks.push(kiosk)
+    const now = new Date().toISOString()
+    const kiosk: Kiosk = { ...data, id: `kiosk-${newId()}`, createdAt: now, updatedAt: now }
+    demoTables.kiosks.insert(kiosk)
     return kiosk
   }
 
   async updateKiosk(id: string, data: Partial<Kiosk>): Promise<Kiosk> {
-    const idx = this.kiosks.findIndex((k) => k.id === id)
-    if (idx === -1) throw new Error(`Kiosk niet gevonden: ${id}`)
-    const updated = { ...this.kiosks[idx]!, ...data, updatedAt: new Date().toISOString() }
-    this.kiosks[idx] = updated
-    return updated
+    return demoTables.kiosks.update(id, { ...data, updatedAt: new Date().toISOString() })
   }
 
   async deleteKiosk(id: string): Promise<void> {
     await this.updateKiosk(id, { isActive: false })
   }
 
-  async updateEventKiosks(
-    _eventId: string,
-    _kioskIds: string[],
-    _openIds: string[]
-  ): Promise<void> {
-    // In demo mode this is a no-op since event data is static
+  async updateEventKiosks(eventId: string, kioskIds: string[], openIds: string[]): Promise<void> {
+    const event = demoTables.events.getById(eventId)
+    if (!event) throw new Error(`Evenement niet gevonden: ${eventId}`)
+    demoTables.events.update(eventId, {
+      activeKioskIds: kioskIds,
+      // `openIds` bepaalt welke kiosken tijdens dit evenement echt open zijn.
+      // In demo-modus vallen die samen met de actieve kiosken van het evenement.
+      ...(openIds.length > 0 ? { activeKioskIds: openIds } : {}),
+      updatedAt: new Date().toISOString(),
+    })
   }
 }

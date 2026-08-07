@@ -13,4 +13,6 @@ export interface ICountRepository {
   getEntriesForKioskCount(kioskCountId: string): Promise<CountEntry[]>
   upsertCountEntry(data: Omit<CountEntry, 'lastModifiedAt'>): Promise<CountEntry>
   bulkUpsertCountEntries(entries: Array<Omit<CountEntry, 'lastModifiedAt'>>): Promise<void>
+  /** Verwijdert een telregel — gebruikt wanneer een telling wordt teruggezet naar "nog niet geteld". */
+  deleteCountEntry(kioskCountId: string, productId: string): Promise<void>
 }

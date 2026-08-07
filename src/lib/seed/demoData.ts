@@ -311,21 +311,39 @@ function standard(
   }
 }
 
-// Normen voor kiosken 101-110
-const standardKioskNumbers = [101, 102, 103, 104, 105, 106, 107, 108, 109, 110]
+/**
+ * Iedere kiosk krijgt een basisassortiment. Even kiosknummers krijgen daarnaast
+ * een aantal kleinere producten, zodat gemengde pallets in de vulplanning
+ * realistisch zijn. Normen zijn altijd hele verpakkingen.
+ */
+export const demoStandards: KioskProductStandard[] = demoKiosks.flatMap((kiosk) => {
+  const num = kiosk.number
+  const variation = num % 3 // 0, 1 of 2 — zorgt voor verschillen tussen kiosken
 
-export const demoStandards: KioskProductStandard[] = standardKioskNumbers.flatMap((num) => [
-  standard(`kiosk-${num}`, 'prod-bierbeker-05', 15),
-  standard(`kiosk-${num}`, 'prod-bierbeker-04', 10),
-  standard(`kiosk-${num}`, 'prod-water-blauw', 12),
-  standard(`kiosk-${num}`, 'prod-water-rood', 8),
-  standard(`kiosk-${num}`, 'prod-chips-blauw', 6),
-  standard(`kiosk-${num}`, 'prod-chips-rood', 6),
-  standard(`kiosk-${num}`, 'prod-servetten', 4),
-  standard(`kiosk-${num}`, 'prod-patatbakjes', 3),
-  standard(`kiosk-${num}`, 'prod-torkrollen', 2),
-  standard(`kiosk-${num}`, 'prod-vuilniszakken', 2),
-])
+  const base: KioskProductStandard[] = [
+    standard(kiosk.id, 'prod-bierbeker-05', 15),
+    standard(kiosk.id, 'prod-bierbeker-04', 10),
+    standard(kiosk.id, 'prod-water-blauw', 12 + variation),
+    standard(kiosk.id, 'prod-water-rood', 8),
+    standard(kiosk.id, 'prod-chips-blauw', 6),
+    standard(kiosk.id, 'prod-chips-rood', 6),
+    standard(kiosk.id, 'prod-servetten', 4),
+    standard(kiosk.id, 'prod-patatbakjes', 3 + variation),
+    standard(kiosk.id, 'prod-torkrollen', 2),
+    standard(kiosk.id, 'prod-vuilniszakken', 2),
+  ]
+
+  if (num % 2 !== 0) return base
+
+  return [
+    ...base,
+    standard(kiosk.id, 'prod-red-bull', 4),
+    standard(kiosk.id, 'prod-bacardi-cola', 3),
+    standard(kiosk.id, 'prod-koffiebekers', 2),
+    standard(kiosk.id, 'prod-snackbakjes', 3),
+    standard(kiosk.id, 'prod-biertrays', 5),
+  ]
+})
 
 // ─── Demo event ───────────────────────────────────────────────────────────
 

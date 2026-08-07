@@ -9,6 +9,7 @@ import type {
   InputStep,
   RouteDirection,
   RestockRoundStatus,
+  RestockRoundType,
   IncidentStatus,
   IncidentUrgency,
   IncidentCategory,
@@ -210,6 +211,8 @@ export interface RestockRound {
   eventId: string
   ringId: string
   name: string
+  /** PRODUCT_ROUND = één product, MIXED_PALLET = meerdere producten op één pallet */
+  roundType: RestockRoundType
   status: RestockRoundStatus
   createdById: string
   assignedUserId?: string
