@@ -10,6 +10,20 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
+# NEXT_PUBLIC_*-variabelen worden tijdens het bouwen in de browserbundle
+# ingebakken. Ze moeten dus hier beschikbaar zijn: als runtime-variabele in
+# docker-compose komen ze nooit in de client terecht, en zou de app altijd in
+# demo-modus blijven staan.
+ARG NEXT_PUBLIC_APP_MODE=demo
+ARG NEXT_PUBLIC_SUPABASE_URL=
+ARG NEXT_PUBLIC_SUPABASE_ANON_KEY=
+ARG NEXT_PUBLIC_APP_URL=
+
+ENV NEXT_PUBLIC_APP_MODE=$NEXT_PUBLIC_APP_MODE
+ENV NEXT_PUBLIC_SUPABASE_URL=$NEXT_PUBLIC_SUPABASE_URL
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=$NEXT_PUBLIC_SUPABASE_ANON_KEY
+ENV NEXT_PUBLIC_APP_URL=$NEXT_PUBLIC_APP_URL
+
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV NODE_ENV=production
 

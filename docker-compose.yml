@@ -3,6 +3,14 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      # Moet bij het bouwen mee: NEXT_PUBLIC_* wordt in de browserbundle
+      # ingebakken. Na het wijzigen van een van deze waarden is een herbouw
+      # nodig (`docker compose up -d --build`), een herstart is niet genoeg.
+      args:
+        NEXT_PUBLIC_APP_MODE: ${NEXT_PUBLIC_APP_MODE:-demo}
+        NEXT_PUBLIC_SUPABASE_URL: ${NEXT_PUBLIC_SUPABASE_URL:-}
+        NEXT_PUBLIC_SUPABASE_ANON_KEY: ${NEXT_PUBLIC_SUPABASE_ANON_KEY:-}
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-https://stock.niettegeloven.com}
     container_name: logistiek-stock
     restart: unless-stopped
     ports:
