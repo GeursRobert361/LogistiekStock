@@ -1,5 +1,14 @@
 import { describe, it, expect } from 'vitest'
-import { mapRing, ringToRow, mapKiosk, kioskToRow, mapProduct, productToRow } from '../rowMappers'
+import {
+  mapRing,
+  ringToRow,
+  mapKiosk,
+  kioskToRow,
+  mapProduct,
+  productToRow,
+  mapCountSession,
+  countSessionToRow,
+} from '../rowMappers'
 import { InputStep, RoundType, ProductSize } from '@/types'
 
 /**
@@ -132,5 +141,59 @@ describe('mapProduct', () => {
     expect(backToRow.input_step).toBe('0.5')
     expect(backToRow.own_round_threshold).toBe(30)
     expect(backToRow.storage_location).toBe('Stelling A')
+  })
+})
+
+describe('mapCountSession', () => {
+  const row = {
+    id: 'sessie-1',
+    user_id: 'teller-1',
+    event_id: 'event-1',
+    ring_id: 'ring-1',
+    start_kiosk_id: 'kiosk-127',
+    direction: 'ascending',
+    kiosk_route: ['kiosk-127', 'kiosk-128', 'kiosk-101'],
+    started_at: '2026-08-07T10:00:00Z',
+    status: 'IN_PROGRESS',
+    sync_status: 'LOCAL',
+    created_at: '',
+    updated_at: '',
+  }
+
+  it('leest de route uit een jsonb-kolom', () => {
+    expect(mapCountSession(row).kioskRoute).toEqual(['kiosk-127', 'kiosk-128', 'kiosk-101'])
+  })
+
+  it('leest de route ook wanneer die als tekst binnenkomt', () => {
+    const asText = { ...row, kiosk_route: '["kiosk-127","kiosk-128"]' }
+    expect(mapCountSession(asText).kioskRoute).toEqual(['kiosk-127', 'kiosk-128'])
+  })
+
+  it('geeft een lege route bij onbruikbare inhoud in plaats van te crashen', () => {
+    expect(mapCountSession({ ...row, kiosk_route: null }).kioskRoute).toEqual([])
+    expect(mapCountSession({ ...row, kiosk_route: 'geen json' }).kioskRoute).toEqual([])
+  })
+
+  /**
+   * De reden dat deze test bestaat: een JavaScript-array als queryparameter
+   * wordt door de driver een Postgres-array ({a,b}), niet JSON (["a","b"]).
+   * Voor een jsonb-kolom is dat een fout, en die kwam pas in productie boven.
+   */
+  it('schrijft de route als JSON-tekst, niet als array', () => {
+    const written = countSessionToRow({ kioskRoute: ['kiosk-127', 'kiosk-128'] })
+
+    expect(typeof written.kiosk_route).toBe('string')
+    expect(written.kiosk_route).toBe('["kiosk-127","kiosk-128"]')
+    // Een Postgres-array zou hiermee beginnen.
+    expect(written.kiosk_route as string).not.toMatch(/^\{/)
+  })
+
+  it('overleeft een rondje heen en terug', () => {
+    const session = mapCountSession(row)
+    const backToRow = countSessionToRow(session)
+
+    expect(mapCountSession({ ...row, kiosk_route: backToRow.kiosk_route }).kioskRoute).toEqual(
+      session.kioskRoute
+    )
   })
 })

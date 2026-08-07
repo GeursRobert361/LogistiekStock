@@ -52,6 +52,29 @@ const optNum = (value: unknown): number | undefined =>
   value === null || value === undefined ? undefined : Number(value)
 const bool = (value: unknown): boolean => value === true
 
+/**
+ * Waarde voor een jsonb-kolom.
+ *
+ * Een JavaScript-array wordt door de databasedriver omgezet naar een Postgres
+ * array (`{a,b}`), niet naar JSON (`["a","b"]`). Voor een jsonb-kolom levert
+ * dat "invalid input syntax for type json" op. Zelf serialiseren dus.
+ */
+const toJsonb = (value: unknown): string => JSON.stringify(value)
+
+/** Leest een jsonb-kolom uit; de driver geeft die al geparsed terug. */
+function jsonArray(value: unknown): string[] {
+  if (Array.isArray(value)) return value as string[]
+  if (typeof value === 'string') {
+    try {
+      const parsed: unknown = JSON.parse(value)
+      return Array.isArray(parsed) ? (parsed as string[]) : []
+    } catch {
+      return []
+    }
+  }
+  return []
+}
+
 function parseInputStep(value: unknown): InputStep {
   const parsed = Number(value)
   if (parsed === 0.25) return InputStep.QUARTER
@@ -270,7 +293,7 @@ export function mapCountSession(row: Row): CountSession {
     ringId: str(row.ring_id),
     startKioskId: str(row.start_kiosk_id),
     direction: str(row.direction) as RouteDirection,
-    kioskRoute: Array.isArray(row.kiosk_route) ? (row.kiosk_route as string[]) : [],
+    kioskRoute: jsonArray(row.kiosk_route),
     startedAt: str(row.started_at),
     completedAt: optStr(row.completed_at),
     status: str(row.status) as CountSessionStatus,
@@ -288,7 +311,9 @@ export function countSessionToRow(data: Partial<CountSession>): Row {
   if (data.ringId !== undefined) row.ring_id = data.ringId
   if (data.startKioskId !== undefined) row.start_kiosk_id = data.startKioskId
   if (data.direction !== undefined) row.direction = data.direction
-  if (data.kioskRoute !== undefined) row.kiosk_route = data.kioskRoute
+  // kiosk_route is jsonb: zelf serialiseren, anders maakt de driver er een
+  // Postgres-array van en weigert de database het.
+  if (data.kioskRoute !== undefined) row.kiosk_route = toJsonb(data.kioskRoute)
   if (data.startedAt !== undefined) row.started_at = data.startedAt
   if (data.completedAt !== undefined) row.completed_at = data.completedAt
   if (data.status !== undefined) row.status = data.status
