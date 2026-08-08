@@ -13,17 +13,20 @@ import { ConfirmDialog } from '@/components/ui/Dialog'
 import { KioskReviewDetail } from '@/components/counting/KioskReviewDetail'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
-import { loadEntryList, loadSessionsForEvent, reopenKiosk } from '@/services/countingService'
+import { loadEntryList, loadSessionsForEvent } from '@/services/countingService'
 import { syncService } from '@/services/syncService'
 import {
   approveSession,
-  getApprovalBlockers,
+  prepareSessionForApproval,
+  reopenApprovedKiosk,
   getSessionOverview,
+  RequirementInUseError,
   ROUTE_STATUS_LABEL,
   type SessionOverview,
   type RouteKioskStatus,
 } from '@/services/countSessionService'
 import { aggregateRestockTotals } from '@/domain/restocking/aggregateTotals'
+import { SESSION_STATUS_LABEL } from '@/domain/counting/sessionStatus'
 import { CountSessionStatus, UserRole } from '@/types'
 import type { CountEntry, Kiosk, KioskCount, Product, ProductCategory, Ring } from '@/types'
 
@@ -169,8 +172,8 @@ export default function CountReviewPage({
   async function openApproveDialog(sessionId: string) {
     const overview = overviews.find((o) => o.session.id === sessionId)
     if (!overview) return
-    const blockers = await getApprovalBlockers(overview)
-    setApprovalBlockers(blockers.map((b) => b.message))
+    const prepared = await prepareSessionForApproval(overview.session)
+    setApprovalBlockers(prepared.blockers.map((b) => b.message))
     setApprovingSessionId(sessionId)
   }
 
@@ -182,26 +185,48 @@ export default function CountReviewPage({
     try {
       const result = await approveSession(overview.session)
       setMessage(
-        `Telling goedgekeurd. ${result.requirementCount} bijvulregels aangemaakt ` +
-          `(${result.totalPackages} verpakkingen).`
+        `Telling goedgekeurd. ${result.requirementCount} bijvulregels ` +
+          `(${result.totalPackages} verpakkingen)` +
+          (result.clearedCount > 0
+            ? `; ${result.clearedCount} vervallen na correctie.`
+            : '.')
       )
       setApprovingSessionId(null)
       await load()
     } catch (approveError) {
       console.error('[review] Goedkeuren mislukt.', approveError)
+      setApprovingSessionId(null)
       setError(
-        approveError instanceof Error ? approveError.message : 'Goedkeuren is mislukt.'
+        approveError instanceof RequirementInUseError
+          ? describeRequirementsInUse(approveError, kioskById)
+          : approveError instanceof Error
+            ? approveError.message
+            : 'Goedkeuren is mislukt.'
       )
     } finally {
       setIsApproving(false)
     }
   }
 
-  async function handleReopen(kioskCount: KioskCount) {
+  async function handleReopen(session: SessionOverview['session'], kioskCount: KioskCount) {
     try {
-      await reopenKiosk(kioskCount)
+      const result = await reopenApprovedKiosk({ session, kioskCount })
       await load()
-      setMessage('Kiosk heropend. De teller kan de kiosk opnieuw invullen.')
+      setMessage(
+        'Kiosk heropend. De teller kan de kiosk opnieuw invullen.' +
+          (result.clearedRequirements > 0
+            ? ` ${result.clearedRequirements} bijvulregel${
+                result.clearedRequirements === 1 ? '' : 's'
+              } van deze kiosk ${
+                result.clearedRequirements === 1 ? 'is' : 'zijn'
+              } vervallen tot de telling opnieuw is goedgekeurd.`
+            : '') +
+          (result.requirementsInUse > 0
+            ? ` Let op: voor ${result.requirementsInUse} regel${
+                result.requirementsInUse === 1 ? '' : 's'
+              } is al voorraad ingepland of geleverd. Annuleer die vulronde voordat je opnieuw goedkeurt.`
+            : '')
+      )
     } catch (reopenError) {
       console.error('[review] Heropenen mislukt.', reopenError)
       setError('De kiosk kon niet worden heropend.')
@@ -407,7 +432,9 @@ export default function CountReviewPage({
                           }
                           productById={productById}
                           canReopen={canApprove}
-                          onReopen={handleReopen}
+                          onReopen={(kioskCount) => {
+                            void handleReopen(overview.session, kioskCount)
+                          }}
                         />
                       </div>
                     )}
@@ -462,13 +489,19 @@ export default function CountReviewPage({
   )
 }
 
-const SESSION_STATUS_LABEL: Record<CountSessionStatus, string> = {
-  [CountSessionStatus.NOT_STARTED]: 'Niet gestart',
-  [CountSessionStatus.IN_PROGRESS]: 'Bezig',
-  [CountSessionStatus.PAUSED]: 'Gepauzeerd',
-  [CountSessionStatus.SUBMITTED]: 'Ingediend',
-  [CountSessionStatus.APPROVED]: 'Goedgekeurd',
-  [CountSessionStatus.REOPENED]: 'Heropend',
+/** Noemt de kiosken waarvoor al voorraad vastligt, zodat de planner weet waar. */
+function describeRequirementsInUse(
+  error: RequirementInUseError,
+  kioskById: Map<string, Kiosk>
+): string {
+  const names = error.kioskIds
+    .map((id) => kioskTitle(kioskById.get(id)) || id)
+    .join(', ')
+  return (
+    'Deze telling kan niet zonder controle opnieuw worden goedgekeurd, omdat er al ' +
+    `voorraad is ingepland of geleverd voor ${names}. ` +
+    'Annuleer eerst de betreffende vulronde(s).'
+  )
 }
 
 function Stat({ value, label, tone }: { value: number; label: string; tone: string }) {
