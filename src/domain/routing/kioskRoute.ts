@@ -14,10 +14,14 @@ export interface RouteKiosk {
  * Only active kiosks that are open for the event are included.
  * The route is circular: after the last kiosk it wraps back to the first.
  *
- * Ascending  (linksom):  increasing sortOrder, wrapping from max back to min
- *                        — bijvoorbeeld 120 → 121 → 122
- * Descending (rechtsom): decreasing sortOrder, wrapping from min back to max
- *                        — bijvoorbeeld 122 → 121 → 120
+ * Ascending:  increasing sortOrder, wrapping from max back to min
+ *             — bijvoorbeeld 120 → 121 → 122
+ * Descending: decreasing sortOrder, wrapping from min back to max
+ *             — bijvoorbeeld 122 → 121 → 120
+ *
+ * Bewust niet "linksom" en "rechtsom": of oplopend tellen linksom of rechtsom
+ * uitpakt hangt af van hoe de ring genummerd en gebouwd is, en daar legt niets
+ * in de configuratie iets over vast.
  *
  * Returns an empty array when no eligible kiosks exist.
  * Returns all eligible kiosks (starting from index 0) when startKioskId

@@ -14,8 +14,24 @@ export interface RestockPlanItem {
   ownRoundReason?: 'PRODUCT_INSTELLING' | 'AANTAL' | 'PALLETBELASTING'
 }
 
-/** Boven deze geschatte palletbelasting krijgt een AUTO-product een eigen ronde. */
+/**
+ * Boven deze geschatte palletbelasting krijgt een AUTO-product een eigen ronde.
+ *
+ * De waarde is tegelijk de schaal van `estimatedPalletLoad`: dit is wat er op
+ * één pallet gaat. Water met belasting 2 vult bij 40 verpakkingen een pallet.
+ */
 export const OWN_ROUND_PALLET_THRESHOLD = 80
+
+/**
+ * Geschatte palletbelasting omgerekend naar hele pallets.
+ *
+ * Nadrukkelijk een schatting: `estimatedPalletLoad` is per product met de hand
+ * ingevuld. Bedoeld om ladingen met elkaar te vergelijken, niet om een
+ * vrachtbrief mee te vullen.
+ */
+export function toPalletEquivalents(totalLoad: number): number {
+  return totalLoad / OWN_ROUND_PALLET_THRESHOLD
+}
 
 /**
  * Zet openstaande behoeften om in een voorstel voor vulrondes.

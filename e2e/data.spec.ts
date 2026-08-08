@@ -114,5 +114,5 @@ async function approve(page: Page, eventUrl: string) {
   await page.goto(`${eventUrl}/count/review`)
   await page.getByRole('button', { name: /Telling goedkeuren/ }).click()
   await page.getByRole('button', { name: 'Goedkeuren', exact: true }).click()
-  await expect(page.getByText(/bijvulregels aangemaakt/)).toBeVisible()
+  await expect(page.getByText(/Telling goedgekeurd\. \d+ bijvulregels/)).toBeVisible()
 }

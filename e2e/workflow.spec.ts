@@ -71,7 +71,7 @@ test.describe('Volledige workflow', () => {
     await page.getByRole('button', { name: /Telling goedkeuren/ }).click()
     await page.getByRole('button', { name: 'Goedkeuren', exact: true }).click()
 
-    await expect(page.getByText(/bijvulregels aangemaakt/)).toBeVisible()
+    await expect(page.getByText(/Telling goedgekeurd\. \d+ bijvulregels/)).toBeVisible()
 
     // ── 7. Vulplanning toont de tekorten ───────────────────────────────────
     await page.goto('/events/event-demo-ajax/restock')
@@ -162,8 +162,10 @@ test.describe('Volledige workflow', () => {
       .filter({ hasText: roundProductName! })
       .first()
     await expect(remaining).toBeVisible()
+    // Het openstaande aantal staat er met de kiosken en de ring erbij; niet als
+    // "Totaal", want dat suggereerde een optelling over ringen heen.
     await expect(
-      page.getByText(`Totaal: ${shortfall} `, { exact: false }).first()
+      page.getByText(new RegExp(`${shortfall} \\S+ · \\d+ kiosken · `)).first()
     ).toBeVisible()
 
     // ── 14. Het restant zelf oppakken: pallet pakken en meteen rijden ──────

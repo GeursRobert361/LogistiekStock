@@ -15,6 +15,8 @@ import {
   startPalletRound,
 } from '@/services/restockPlanningService'
 import { orderEventsByRelevance } from '@/domain/events/eventSelection'
+import { toPalletEquivalents } from '@/domain/restocking/planRestock'
+import { formatQuantity } from '@/lib/quarterUnits'
 import { EventStatus } from '@/types'
 import type { Event, Product, Ring } from '@/types'
 
@@ -22,7 +24,7 @@ import type { Event, Product, Ring } from '@/types'
 interface OpenProduct {
   product: Product
   packages: number
-  kioskCount: number
+  kioskIds: string[]
 }
 
 export default function PickPalletPage() {
@@ -81,7 +83,7 @@ export default function PickPalletPage() {
           .map(([productId, demand]) => ({
             product: products.get(productId),
             packages: demand.total,
-            kioskCount: demand.perKiosk.length,
+            kioskIds: demand.perKiosk.map((entry) => entry.kioskId),
           }))
           .filter((row): row is OpenProduct => row.product !== undefined)
           .sort((a, b) => b.packages - a.packages),
@@ -111,7 +113,17 @@ export default function PickPalletPage() {
 
   const rows = openByRing.get(ringId) ?? []
   const selectedRows = rows.filter((row) => selected.has(row.product.id))
-  const selectedPackages = selectedRows.reduce((sum, row) => sum + row.packages, 0)
+
+  // Verpakkingen van verschillende producten optellen levert een getal op dat
+  // niets voorstelt: 40 pakken water en 43 pakjes servetten zijn geen 83 van
+  // iets. Het aantal kiosken zegt hoe lang je onderweg bent, en de geschatte
+  // palletbelasting of het überhaupt op één pallet past.
+  const selectedKioskCount = new Set(selectedRows.flatMap((row) => row.kioskIds)).size
+  const selectedPalletLoad = selectedRows.reduce(
+    (sum, row) => sum + row.product.estimatedPalletLoad * row.packages,
+    0
+  )
+  const currentRing = rings.find((ring) => ring.id === ringId)
 
   function toggle(productId: string) {
     setSelected((previous) => {
@@ -170,6 +182,14 @@ export default function PickPalletPage() {
             onChange={(e) => setEventId(e.target.value)}
             options={events.map((event) => ({ value: event.id, label: event.name }))}
           />
+        )}
+
+        {/* Welke ring je inrijdt is het eerste wat je moet weten, ook als er
+            maar één te kiezen valt. */}
+        {ringsWithWork.length === 1 && currentRing && (
+          <p className="border-b-2 border-arena-red pb-1 text-lg font-bold text-gray-900">
+            {currentRing.name}
+          </p>
         )}
 
         {ringsWithWork.length > 1 && (
@@ -249,7 +269,7 @@ export default function PickPalletPage() {
                           {row.product.name}
                         </span>
                         <span className="block text-xs text-gray-600">
-                          {row.kioskCount} {row.kioskCount === 1 ? 'kiosk' : 'kiosken'}
+                          {row.kioskIds.length} {row.kioskIds.length === 1 ? 'kiosk' : 'kiosken'}
                         </span>
                       </span>
                       <span className="whitespace-nowrap text-right">
@@ -271,6 +291,17 @@ export default function PickPalletPage() {
 
       {rows.length > 0 && (
         <div className="fixed bottom-[4.5rem] left-0 right-0 z-30 border-t border-gray-200 bg-white p-4 shadow-[0_-4px_12px_rgba(0,0,0,0.06)]">
+          {selectedRows.length > 0 && (
+            <p className="mb-2 text-center text-sm text-gray-700">
+              {selectedRows.length} {selectedRows.length === 1 ? 'product' : 'producten'} ·{' '}
+              {selectedKioskCount} {selectedKioskCount === 1 ? 'kiosk' : 'kiosken'}
+              {selectedPalletLoad > 0 && (
+                <span className="block text-xs text-gray-600">
+                  Geschatte lading: {formatQuantity(toPalletEquivalents(selectedPalletLoad))} pallet
+                </span>
+              )}
+            </p>
+          )}
           <Button
             size="lg"
             className="w-full"
@@ -281,9 +312,7 @@ export default function PickPalletPage() {
               ? 'Bezig…'
               : selectedRows.length === 0
                 ? 'Tik aan wat je hebt gepakt'
-                : `Rijden — ${selectedRows.length} ${
-                    selectedRows.length === 1 ? 'product' : 'producten'
-                  }, ${selectedPackages} verpakkingen →`}
+                : `Rijden — ${currentRing?.name ?? 'deze ring'} →`}
           </Button>
         </div>
       )}

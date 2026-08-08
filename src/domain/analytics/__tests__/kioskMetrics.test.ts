@@ -42,7 +42,7 @@ describe('calculateKioskMetrics', () => {
   })
 
   it('weegt de logistieke belasting met de palletbelasting per product', () => {
-    // 6 water × 2 + 10 servetten × 0,1 = 13.
+    // 6 water × 2 + 10 servetten × 0,1 = 13 belasting, oftewel 13/80 pallet.
     const rows = buildConsumptionRows({
       countedBefore: new Map([
         [key('kiosk-101', 'water'), qu(10)],
@@ -55,7 +55,7 @@ describe('calculateKioskMetrics', () => {
       ]),
     })
 
-    expect(calculateKioskMetrics(rows, PALLET_LOAD)[0]!.estimatedPalletLoad).toBeCloseTo(13)
+    expect(calculateKioskMetrics(rows, PALLET_LOAD)[0]!.estimatedPalletLoad).toBeCloseTo(13 / 80)
   })
 
   it('rekent alleen met wat betrouwbaar gemeten is', () => {
@@ -73,7 +73,7 @@ describe('calculateKioskMetrics', () => {
     expect(metrics.measuredProductCount).toBe(1)
     expect(metrics.unknownProductCount).toBe(1)
     expect(metrics.averageConsumptionRatio).toBeCloseTo(0.5)
-    expect(metrics.estimatedPalletLoad).toBeCloseTo(10) // alleen het water
+    expect(metrics.estimatedPalletLoad).toBeCloseTo(10 / 80) // alleen het water
   })
 
   it('telt een voorraadverschil niet mee', () => {

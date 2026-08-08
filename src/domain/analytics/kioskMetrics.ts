@@ -1,4 +1,5 @@
 import { fromQuarterUnits } from '@/lib/quarterUnits'
+import { toPalletEquivalents } from '@/domain/restocking/planRestock'
 import { isReliable, type ConsumptionRow } from './consumption'
 
 /**
@@ -51,7 +52,7 @@ export function calculateKioskMetrics(
     const measured = row.products.filter(isReliable)
 
     const ratios: number[] = []
-    let estimatedPalletLoad = 0
+    let totalLoad = 0
 
     for (const product of measured) {
       const consumedQuarters = product.consumedQuarters ?? 0
@@ -61,7 +62,7 @@ export function calculateKioskMetrics(
         ratios.push(consumedQuarters / product.availableQuarters)
       }
 
-      estimatedPalletLoad +=
+      totalLoad +=
         (palletLoadByProduct.get(product.productId) ?? 0) * fromQuarterUnits(consumedQuarters)
     }
 
@@ -69,7 +70,7 @@ export function calculateKioskMetrics(
       kioskId: row.kioskId,
       averageConsumptionRatio:
         ratios.length > 0 ? ratios.reduce((sum, ratio) => sum + ratio, 0) / ratios.length : null,
-      estimatedPalletLoad,
+      estimatedPalletLoad: toPalletEquivalents(totalLoad),
       measuredProductCount: measured.length,
       unknownProductCount: row.products.length - measured.length,
     }

@@ -234,9 +234,13 @@ export default function CountStartPage({ params }: { params: Promise<{ eventId: 
               <fieldset>
                 <legend className="mb-2 text-sm font-medium text-gray-700">Looprichting</legend>
                 <div className="grid grid-cols-2 gap-2">
+                  {/* Neutrale labels. Of oplopend nu linksom of rechtsom
+                      uitpakt hangt af van hoe de ring genummerd en gebouwd is,
+                      en dat staat nergens vastgelegd. Het nummerverloop klopt
+                      altijd, en dat is precies wat de teller voor zich ziet. */}
                   {[
-                    { value: RouteDirection.ASCENDING, label: '↺ Linksom (oplopend)' },
-                    { value: RouteDirection.DESCENDING, label: '↻ Rechtsom (aflopend)' },
+                    { value: RouteDirection.ASCENDING, label: 'Oplopend — 123 → 124' },
+                    { value: RouteDirection.DESCENDING, label: 'Aflopend — 123 → 122' },
                   ].map((opt) => (
                     <label
                       key={opt.value}
