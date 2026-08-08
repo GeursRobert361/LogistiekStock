@@ -208,6 +208,123 @@ export const restockRepository: IRestockRepository = {
     )
   },
 
+  async registerDeliveryAtomic({ delivery, roundId, requirementId }) {
+    return transaction(async (client) => {
+      /** Het rondetotaal opnieuw optellen uit de leveringen zelf. */
+      const recalculateRoundItem = async () => {
+        const rows = await client.query(
+          `update restock_round_items i
+              set delivered_packages = coalesce((
+                    select sum(d.delivered_packages)::int
+                      from restock_deliveries d
+                      join restock_round_stops s on s.id = d.restock_round_stop_id
+                     where s.restock_round_id = i.restock_round_id
+                       and d.product_id = i.product_id
+                  ), 0)
+            where i.restock_round_id = $1 and i.product_id = $2
+            returning *`,
+          [roundId, delivery.productId]
+        )
+        return rows.rows[0] ? mapRoundItem(rows.rows[0] as Record<string, unknown>) : null
+      }
+
+      // Eerst het slot op de behoefte, dan pas schrijven. Een gelijktijdige
+      // levering of reservering voor dezelfde behoefte wacht hierop.
+      const requirementRow = requirementId
+        ? ((
+            await client.query('select * from restock_requirements where id = $1 for update', [
+              requirementId,
+            ])
+          ).rows[0] ?? null)
+        : null
+      const requirement = requirementRow
+        ? mapRequirement(requirementRow as Record<string, unknown>)
+        : null
+
+      const reservationRow = requirement
+        ? ((
+            await client.query(
+              `select * from stock_reservations
+                where restock_requirement_id = $1 and restock_round_id = $2
+                for update`,
+              [requirement.id, roundId]
+            )
+          ).rows[0] ?? null)
+        : null
+
+      // Het id komt van de client, dus een herhaalde poging raakt dezelfde rij.
+      const row = deliveryToRow(delivery)
+      const columns = Object.keys(row)
+      const inserted =
+        (
+          await client.query(
+            `insert into restock_deliveries (${columns.join(', ')})
+             values (${columns.map((_, i) => `$${i + 1}`).join(', ')})
+             on conflict (id) do nothing
+             returning *`,
+            Object.values(row)
+          )
+        ).rows[0] ?? null
+
+      if (!inserted) {
+        // Al vastgelegd. Niets bijtellen: anders zou een tweede verzending de
+        // behoefte een tweede keer afboeken.
+        const existing = await client.query('select * from restock_deliveries where id = $1', [
+          delivery.id,
+        ])
+        return {
+          delivery: mapDelivery(existing.rows[0] as Record<string, unknown>),
+          isNew: false,
+          requirement,
+          roundItem: await recalculateRoundItem(),
+        }
+      }
+
+      let updatedRequirement = requirement
+      if (requirement) {
+        const delivered = Math.min(
+          requirement.requiredPackages,
+          requirement.deliveredPackages + delivery.deliveredPackages
+        )
+        // De reservering van deze ronde vervalt in zijn geheel; wat niet
+        // geleverd is komt daarmee vanzelf terug in de vulplanning.
+        const released = reservationRow
+          ? mapReservation(reservationRow as Record<string, unknown>).reservedPackages
+          : 0
+        const reserved = Math.min(
+          Math.max(0, requirement.reservedPackages - released),
+          requirement.requiredPackages - delivered
+        )
+
+        updatedRequirement = mapRequirement(
+          (
+            await client.query(
+              `update restock_requirements
+                  set delivered_packages = $2, reserved_packages = $3
+                where id = $1
+                returning *`,
+              [requirement.id, delivered, reserved]
+            )
+          ).rows[0] as Record<string, unknown>
+        )
+
+        if (reservationRow) {
+          await client.query(
+            'delete from stock_reservations where restock_requirement_id = $1 and restock_round_id = $2',
+            [requirement.id, roundId]
+          )
+        }
+      }
+
+      return {
+        delivery: mapDelivery(inserted as Record<string, unknown>),
+        isNew: true,
+        requirement: updatedRequirement,
+        roundItem: await recalculateRoundItem(),
+      }
+    })
+  },
+
   async getDeliveriesForStop(stopId) {
     const rows = await query('select * from restock_deliveries where restock_round_stop_id = $1', [
       stopId,

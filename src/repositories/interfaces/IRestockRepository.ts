@@ -26,6 +26,22 @@ export type ReserveRoundResult =
   /** Alles was al gereserveerd of geleverd tegen de tijd dat we de rijen hadden. */
   | { ok: false; reason: 'NOTHING_AVAILABLE' }
 
+export interface RegisterDeliveryInput {
+  /** De levering, met het id dat de client heeft gemaakt. */
+  delivery: RestockDelivery
+  roundId: string
+  /** Behoefte waar deze levering op afboekt, als die bekend is. */
+  requirementId?: string
+}
+
+export interface RegisterDeliveryResult {
+  delivery: RestockDelivery
+  /** False wanneer deze levering er al was; er is dan niets bijgeteld. */
+  isNew: boolean
+  requirement: RestockRequirement | null
+  roundItem: RestockRoundItem | null
+}
+
 export interface IRestockRepository {
   // ─── Behoeften (bijvullijst) ───────────────────────────────────────────────
   getRequirements(eventId: string): Promise<RestockRequirement[]>
@@ -64,6 +80,18 @@ export interface IRestockRepository {
    * later nog eens vanuit de outbox — levert één regel op.
    */
   createDelivery(data: RestockDelivery): Promise<RestockDelivery>
+  /**
+   * Legt een levering vast en boekt hem in één transactie af.
+   *
+   * De levering, de behoefte, de reservering en het rondepost-totaal horen bij
+   * elkaar: strandt het halverwege, dan staat er een levering die nergens op is
+   * afgeboekt en blijft de voorraad gereserveerd terwijl hij al op de kiosk
+   * staat. Alles slaagt, of niets.
+   *
+   * Idempotent op het id van de levering: een tweede aanbieding — rechtstreeks
+   * of later vanuit de outbox — telt niets bij en geeft `isNew: false`.
+   */
+  registerDeliveryAtomic(input: RegisterDeliveryInput): Promise<RegisterDeliveryResult>
   getDeliveriesForStop(stopId: string): Promise<RestockDelivery[]>
   getDeliveriesForRound(roundId: string): Promise<RestockDelivery[]>
 

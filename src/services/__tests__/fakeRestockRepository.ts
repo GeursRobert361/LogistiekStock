@@ -2,6 +2,8 @@ import type {
   IRestockRepository,
   ReserveRoundInput,
   ReserveRoundResult,
+  RegisterDeliveryInput,
+  RegisterDeliveryResult,
 } from '@/repositories/interfaces/IRestockRepository'
 import type {
   RestockRequirement,
@@ -188,6 +190,74 @@ export class FakeRestockRepository implements IRestockRepository {
     }
     this.deliveries.push(delivery)
     return delivery
+  }
+
+  async registerDeliveryAtomic({
+    delivery,
+    roundId,
+    requirementId,
+  }: RegisterDeliveryInput): Promise<RegisterDeliveryResult> {
+    const recalculateRoundItem = (): RestockRoundItem | null => {
+      const index = this.items.findIndex(
+        (item) => item.restockRoundId === roundId && item.productId === delivery.productId
+      )
+      if (index === -1) return null
+
+      const stopIds = new Set(this.stops.filter((s) => s.restockRoundId === roundId).map((s) => s.id))
+      const delivered = this.deliveries
+        .filter((d) => stopIds.has(d.restockRoundStopId) && d.productId === delivery.productId)
+        .reduce((sum, d) => sum + d.deliveredPackages, 0)
+
+      const updated = { ...this.items[index]!, deliveredPackages: delivered }
+      this.items[index] = updated
+      return updated
+    }
+
+    const requirement = requirementId
+      ? (this.requirements.find((r) => r.id === requirementId) ?? null)
+      : null
+    const reservation = requirement
+      ? (this.reservations.find(
+          (r) => r.restockRequirementId === requirement.id && r.restockRoundId === roundId
+        ) ?? null)
+      : null
+
+    const existing = this.deliveries.find((d) => d.id === delivery.id)
+    if (existing) {
+      return { delivery: existing, isNew: false, requirement, roundItem: recalculateRoundItem() }
+    }
+
+    const stored: RestockDelivery = {
+      ...delivery,
+      createdAt: delivery.createdAt || new Date().toISOString(),
+    }
+    this.deliveries.push(stored)
+
+    let updatedRequirement = requirement
+    if (requirement) {
+      const delivered = Math.min(
+        requirement.requiredPackages,
+        requirement.deliveredPackages + delivery.deliveredPackages
+      )
+      const reserved = Math.min(
+        Math.max(0, requirement.reservedPackages - (reservation?.reservedPackages ?? 0)),
+        requirement.requiredPackages - delivered
+      )
+      updatedRequirement = await this.updateRequirement(requirement.id, {
+        deliveredPackages: delivered,
+        reservedPackages: reserved,
+      })
+      if (reservation) {
+        this.reservations = this.reservations.filter((r) => r.id !== reservation.id)
+      }
+    }
+
+    return {
+      delivery: stored,
+      isNew: true,
+      requirement: updatedRequirement,
+      roundItem: recalculateRoundItem(),
+    }
   }
 
   async getDeliveriesForStop(stopId: string): Promise<RestockDelivery[]> {

@@ -2,6 +2,8 @@ import type {
   IRestockRepository,
   ReserveRoundInput,
   ReserveRoundResult,
+  RegisterDeliveryInput,
+  RegisterDeliveryResult,
 } from '../interfaces/IRestockRepository'
 import type {
   RestockRequirement,
@@ -173,6 +175,83 @@ export class DemoRestockRepository implements IRestockRepository {
     }
     demoTables.restockDeliveries.insert(delivery)
     return delivery
+  }
+
+  /**
+   * Demo-variant: dezelfde volgorde en dezelfde rekenregels, zonder transactie.
+   * De browser draait dit in één keer af, dus er kan niemand tussen komen.
+   */
+  async registerDeliveryAtomic({
+    delivery,
+    roundId,
+    requirementId,
+  }: RegisterDeliveryInput): Promise<RegisterDeliveryResult> {
+    const recalculateRoundItem = (): RestockRoundItem | null => {
+      const item = demoTables.restockRoundItems.find(
+        (candidate) =>
+          candidate.restockRoundId === roundId && candidate.productId === delivery.productId
+      )
+      if (!item) return null
+
+      const stopIds = new Set(
+        demoTables.restockRoundStops.filter((s) => s.restockRoundId === roundId).map((s) => s.id)
+      )
+      const delivered = demoTables.restockDeliveries
+        .filter((d) => stopIds.has(d.restockRoundStopId) && d.productId === delivery.productId)
+        .reduce((sum, d) => sum + d.deliveredPackages, 0)
+
+      const updated = { ...item, deliveredPackages: delivered, updatedAt: new Date().toISOString() }
+      demoTables.restockRoundItems.put(updated)
+      return updated
+    }
+
+    const requirement = requirementId
+      ? demoTables.restockRequirements.getById(requirementId)
+      : null
+    const reservation = requirement
+      ? (demoTables.stockReservations.find(
+          (r) => r.restockRequirementId === requirement.id && r.restockRoundId === roundId
+        ) ?? null)
+      : null
+
+    if (demoTables.restockDeliveries.getById(delivery.id)) {
+      return {
+        delivery: demoTables.restockDeliveries.getById(delivery.id)!,
+        isNew: false,
+        requirement,
+        roundItem: recalculateRoundItem(),
+      }
+    }
+
+    demoTables.restockDeliveries.insert({
+      ...delivery,
+      createdAt: delivery.createdAt || new Date().toISOString(),
+    })
+
+    let updatedRequirement = requirement
+    if (requirement) {
+      const delivered = Math.min(
+        requirement.requiredPackages,
+        requirement.deliveredPackages + delivery.deliveredPackages
+      )
+      const reserved = Math.min(
+        Math.max(0, requirement.reservedPackages - (reservation?.reservedPackages ?? 0)),
+        requirement.requiredPackages - delivered
+      )
+      updatedRequirement = demoTables.restockRequirements.update(requirement.id, {
+        deliveredPackages: delivered,
+        reservedPackages: reserved,
+        updatedAt: new Date().toISOString(),
+      })
+      if (reservation) demoTables.stockReservations.remove(reservation.id)
+    }
+
+    return {
+      delivery: demoTables.restockDeliveries.getById(delivery.id)!,
+      isNew: true,
+      requirement: updatedRequirement,
+      roundItem: recalculateRoundItem(),
+    }
   }
 
   async getDeliveriesForStop(stopId: string): Promise<RestockDelivery[]> {

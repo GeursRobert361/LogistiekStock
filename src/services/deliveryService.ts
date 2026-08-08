@@ -11,8 +11,19 @@ import type {
   RestockRoundStop,
   RestockStopItem,
   RestockDelivery,
-  RestockRequirement,
 } from '@/types'
+
+/**
+ * Wat er in de outbox belandt bij een levering.
+ *
+ * Niet alleen de levering: de behoefte moet er ook op afgeboekt worden, en dat
+ * hoort in dezelfde transactie te gebeuren als waarin de levering landt.
+ */
+export interface DeliverySyncPayload {
+  delivery: RestockDelivery
+  roundId: string
+  requirementId?: string
+}
 
 /**
  * Uitvoeren van een vulronde: kiosk voor kiosk afleveren.
@@ -257,71 +268,20 @@ export async function registerDelivery(params: RegisterDeliveryParams): Promise<
     createdAt: new Date().toISOString(),
   }
 
-  await writeQueue.run(`delivery:${stopId}:${productId}`, async () => {
-    await restock.createDelivery(delivery)
-  })
-  await syncService.enqueue('restockDelivery', delivery.id, 'create', delivery)
-
-  await applyDeliveryToRequirement(plan, stopId, productId, deliveredPackages)
-  await updateRoundItemDelivered(roundId, productId)
-}
-
-/**
- * Boekt de levering af op de behoefte en geeft de reservering vrij.
- *
- * Wat niet geleverd is blijft openstaan: `requiredPackages - deliveredPackages`
- * is groter dan nul en de reservering verdwijnt, waardoor het restant vanzelf
- * weer in de vulplanning opduikt.
- */
-async function applyDeliveryToRequirement(
-  plan: RoundPlan,
-  stopId: string,
-  productId: string,
-  deliveredPackages: number
-): Promise<void> {
-  const restock = repositories.restock()
-  const stopItem = plan.stopItems.find(
+  // De behoefte waar deze levering op afboekt ligt vast bij het laden van de
+  // pallet; die verschuift onderweg niet meer.
+  const requirementId = plan.stopItems.find(
     (item) => item.restockRoundStopId === stopId && item.productId === productId
-  )
-  if (!stopItem?.restockRequirementId) return
+  )?.restockRequirementId
 
-  const requirements = await restock.getRequirements(plan.round.eventId)
-  const requirement = requirements.find(
-    (r: RestockRequirement) => r.id === stopItem.restockRequirementId
-  )
-  if (!requirement) return
+  const payload: DeliverySyncPayload = { delivery, roundId, requirementId }
 
-  const reservation = (await restock.getReservationsForRound(plan.round.id)).find(
-    (r) => r.restockRequirementId === requirement.id
-  )
-
-  await restock.updateRequirement(requirement.id, {
-    deliveredPackages: Math.min(
-      requirement.requiredPackages,
-      requirement.deliveredPackages + deliveredPackages
-    ),
-    reservedPackages: Math.max(
-      0,
-      requirement.reservedPackages - (reservation?.reservedPackages ?? 0)
-    ),
+  // Levering, behoefte, reservering en rondetotaal in één keer. Strandde dat
+  // vroeger halverwege, dan stond er een levering die nergens op afboekte.
+  await writeQueue.run(`delivery:${stopId}:${productId}`, async () => {
+    await restock.registerDeliveryAtomic(payload)
   })
-
-  if (reservation) {
-    await restock.releaseReservation(plan.round.id, requirement.id)
-  }
-}
-
-async function updateRoundItemDelivered(roundId: string, productId: string): Promise<void> {
-  const restock = repositories.restock()
-  const plan = await getRoundPlan(roundId)
-  const item = plan.items.find((i) => i.productId === productId)
-  if (!item) return
-
-  const delivered = plan.deliveries
-    .filter((d) => d.productId === productId)
-    .reduce((sum, d) => sum + d.deliveredPackages, 0)
-
-  await restock.upsertRoundItem({ ...item, deliveredPackages: delivered })
+  await syncService.enqueue('restockDelivery', delivery.id, 'create', payload)
 }
 
 export async function completeStop(stopId: string, notes?: string): Promise<RestockRoundStop> {

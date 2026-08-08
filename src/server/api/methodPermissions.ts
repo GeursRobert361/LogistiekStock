@@ -96,6 +96,7 @@ export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
   'restock.getStopItemsForRound': 'AUTHENTICATED',
   'restock.createStopItems': 'COMPOSE_PALLET',
   'restock.createDelivery': 'EXECUTE_RESTOCK',
+  'restock.registerDeliveryAtomic': 'EXECUTE_RESTOCK',
   'restock.getDeliveriesForStop': 'AUTHENTICATED',
   'restock.getDeliveriesForRound': 'AUTHENTICATED',
   // Ronde maken én de voorraad ervoor vastleggen is één handeling; het recht

@@ -1,5 +1,6 @@
 import { repositories } from '@/repositories'
 import { syncService } from './syncService'
+import type { DeliverySyncPayload } from './deliveryService'
 import type {
   CountSession,
   KioskCount,
@@ -61,6 +62,16 @@ export function registerSyncHandlers(): void {
   })
 
   syncService.registerHandler('restockDelivery', async (payload) => {
+    const queued = payload as Partial<DeliverySyncPayload>
+    if (queued.delivery && queued.roundId) {
+      await repositories.restock().registerDeliveryAtomic({
+        delivery: queued.delivery,
+        roundId: queued.roundId,
+        requirementId: queued.requirementId,
+      })
+      return
+    }
+    // Wachtrijen van vóór deze versie bevatten alleen de levering zelf.
     await repositories.restock().createDelivery(payload as RestockDelivery)
   })
 

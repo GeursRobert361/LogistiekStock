@@ -698,6 +698,94 @@ describe('vulronde uitvoeren', () => {
     expect(await fakeRestockRepo.getDeliveriesForStop(plan.stops[0]!.id)).toHaveLength(1)
   })
 
+  it('boekt dezelfde levering maar één keer af op de behoefte', async () => {
+    // De levering gaat rechtstreeks weg én via de outbox. Zou de tweede
+    // aanbieding opnieuw afboeken, dan telde de behoefte dubbel af.
+    const round = await readyRound()
+    const plan = await getRoundPlan(round.id)
+    const stopId = plan.stops[0]!.id
+    const requirementId = plan.stopItems.find(
+      (item) => item.restockRoundStopId === stopId
+    )!.restockRequirementId
+
+    const delivery = {
+      id: 'levering-1',
+      restockRoundStopId: stopId,
+      productId: 'water',
+      plannedPackages: 6,
+      deliveredPackages: 6,
+      notDeliveredPackages: 0,
+      deliveredAt: '2026-08-08T12:00:00.000Z',
+      deliveredById: VULLER,
+      createdAt: '2026-08-08T12:00:00.000Z',
+    }
+
+    const first = await fakeRestockRepo.registerDeliveryAtomic({
+      delivery,
+      roundId: round.id,
+      requirementId,
+    })
+    const second = await fakeRestockRepo.registerDeliveryAtomic({
+      delivery,
+      roundId: round.id,
+      requirementId,
+    })
+
+    expect(first.isNew).toBe(true)
+    expect(second.isNew).toBe(false)
+    expect(await fakeRestockRepo.getDeliveriesForStop(stopId)).toHaveLength(1)
+
+    const requirement = (await fakeRestockRepo.getRequirements(EVENT_ID)).find(
+      (r) => r.kioskId === 'kiosk-101'
+    )!
+    expect(requirement.deliveredPackages).toBe(6)
+    expect(requirement.reservedPackages).toBe(0)
+
+    const item = (await fakeRestockRepo.getRoundItems(round.id))[0]!
+    expect(item.deliveredPackages).toBe(6)
+  })
+
+  it('geeft na een gedeeltelijke levering het restant direct terug aan de planning', async () => {
+    await seedRequirements('water', [10])
+    const round = await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+    await setLoadedQuantities(round.id, new Map([['water', 10]]))
+    const plan = await getRoundPlan(round.id)
+
+    expect((await fakeRestockRepo.getRequirements(EVENT_ID))[0]!.reservedPackages).toBe(10)
+
+    await registerDelivery({
+      roundId: round.id,
+      stopId: plan.stops[0]!.id,
+      productId: 'water',
+      plannedPackages: 10,
+      deliveredPackages: 6,
+      reason: DeliveryReason.ONVOLDOENDE_VOORRAAD,
+      userId: VULLER,
+    })
+
+    const requirement = (await fakeRestockRepo.getRequirements(EVENT_ID))[0]!
+    expect(requirement.deliveredPackages).toBe(6)
+    expect(requirement.reservedPackages).toBe(0)
+    expect(openPackages(requirement)).toBe(4)
+    expect(unplannedPackages(requirement)).toBe(4)
+    // De invariant die de database sinds migratie 006 ook bewaakt.
+    expect(requirement.reservedPackages + requirement.deliveredPackages).toBeLessThanOrEqual(
+      requirement.requiredPackages
+    )
+
+    const { mixedPalletItems } = planRestock(
+      await fakeRestockRepo.getRequirements(EVENT_ID),
+      new Map([['water', product('water', { roundType: RoundType.MIXED_PALLET })]])
+    )
+    expect(mixedPalletItems[0]!.totalRequiredPackages).toBe(4)
+  })
+
   it('stopt een ronde halverwege en geeft de rest terug aan de vulplanning', async () => {
     const round = await readyRound()
     const plan = await getRoundPlan(round.id)
