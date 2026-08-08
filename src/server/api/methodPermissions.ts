@@ -112,7 +112,10 @@ export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
   'incident.getIncidents': 'INCIDENTS',
   'incident.getIncidentById': 'INCIDENTS',
   'incident.createIncident': 'INCIDENTS',
-  'incident.updateIncident': 'REVIEW_COUNTS',
+  // De melder mag zijn eigen openstaande melding bijstellen; status en
+  // toewijzing blijven bij de planner. Dat onderscheid staat in entityGuards,
+  // omdat het van de melding zelf afhangt en niet van de rol alleen.
+  'incident.updateIncident': 'INCIDENTS',
 }
 
 /** Methodes die de client niet via de API mag aanroepen. */

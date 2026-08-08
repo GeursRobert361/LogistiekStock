@@ -3,6 +3,8 @@ import { getCurrentUser } from '@/server/auth/session'
 import { serverRepositories, type ServerResource } from '@/server/repositories'
 import { getMethodRule, CLIENT_ONLY_METHODS } from '@/server/api/methodPermissions'
 import { isBusinessRuleError } from '@/server/api/errors'
+import { getEntityGuard } from '@/server/api/entityGuards'
+import { checkArguments } from '@/server/api/schemas'
 import { hasPermission } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
@@ -58,6 +60,13 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Geen toegang tot deze actie.' }, { status: 403 })
   }
 
+  // Vorm van de invoer vóór de rechten op het record: een guard die een id uit
+  // rommel probeert te vissen kan geen zinnig antwoord geven.
+  const check = checkArguments(resource, method, args ?? [])
+  if (!check.ok) {
+    return NextResponse.json({ error: check.message ?? 'Ongeldige invoer.' }, { status: 400 })
+  }
+
   const repository = serverRepositories[resource as ServerResource] as
     | Record<string, unknown>
     | undefined
@@ -67,6 +76,12 @@ export async function POST(request: Request) {
   }
 
   try {
+    // Tweede rechtenlaag: mag deze gebruiker bij dít record?
+    const guard = getEntityGuard(resource, method)
+    if (guard) {
+      await guard({ id: user.id, roles: user.roles }, args ?? [])
+    }
+
     const result: unknown = await (handler as (...a: unknown[]) => Promise<unknown>).apply(
       repository,
       args ?? []
