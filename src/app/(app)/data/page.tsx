@@ -8,13 +8,14 @@ import { Select } from '@/components/ui/Select'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ListSkeleton } from '@/components/shared/LoadingSkeleton'
 import { ConsumptionBar } from '@/components/data/ConsumptionBar'
+import { ConsumptionIssue } from '@/components/data/ConsumptionIssue'
 import { repositories } from '@/repositories'
 import {
   findNextEvent,
   getConsumptionOverview,
   type ConsumptionOverview,
 } from '@/services/consumptionService'
-import { totalsByProduct } from '@/domain/analytics/consumption'
+import { totalsByProduct, isReliable } from '@/domain/analytics/consumption'
 import { fromQuarterUnits, formatQuantity } from '@/lib/quarterUnits'
 import { formatDate } from '@/lib/utils'
 import type { Event, Kiosk, Product } from '@/types'
@@ -114,7 +115,9 @@ function DataView() {
   const kioskTotals = useMemo(
     () =>
       (overview?.rows ?? [])
-        .filter((row) => row.totalConsumedQuarters > 0)
+        // Ook een kiosk waar niets te meten viel hoort in de lijst: die zegt
+        // iets over de telling, en dat verdient aandacht.
+        .filter((row) => row.totalConsumedQuarters > 0 || row.unknownCount > 0)
         .sort((a, b) => b.totalConsumedQuarters - a.totalConsumedQuarters),
     [overview]
   )
@@ -238,15 +241,21 @@ function DataView() {
                 {kioskTotals.map((row) => {
                   const isOpen = openId === row.kioskId
                   const max = kioskTotals[0]!.totalConsumedQuarters
-                  const perProduct = row.products
-                    .filter((item) => (item.consumedQuarters ?? 0) > 0)
+                  const measured = row.products
+                    .filter((item) => isReliable(item) && (item.consumedQuarters ?? 0) > 0)
                     .sort((a, b) => (b.consumedQuarters ?? 0) - (a.consumedQuarters ?? 0))
+                  // Wat niet te meten viel verdwijnt niet: dan zou een kiosk met
+                  // een halve telling er net zo goed uitzien als een volledige.
+                  const issues = row.products.filter((item) => !isReliable(item))
 
                   return (
                     <div key={row.kioskId}>
                       <ConsumptionBar
                         label={kioskTitle(kiosks.get(row.kioskId)) || row.kioskId}
-                        sublabel={`${perProduct.length} producten`}
+                        sublabel={
+                          `${measured.length} producten gemeten` +
+                          (issues.length > 0 ? ` · ${issues.length} onbekend` : '')
+                        }
                         value={formatQuantity(fromQuarterUnits(row.totalConsumedQuarters))}
                         amount={row.totalConsumedQuarters}
                         max={max}
@@ -255,7 +264,7 @@ function DataView() {
                       />
                       {isOpen && (
                         <div className="divide-y divide-gray-100 border-t border-gray-100 bg-gray-50 pl-3">
-                          {perProduct.map((item) => (
+                          {measured.map((item) => (
                             <ConsumptionBar
                               key={item.productId}
                               label={products.get(item.productId)?.name ?? item.productId}
@@ -263,7 +272,15 @@ function DataView() {
                                 fromQuarterUnits(item.consumedQuarters ?? 0)
                               )} ${products.get(item.productId)?.packagingUnit ?? ''}`}
                               amount={item.consumedQuarters ?? 0}
-                              max={perProduct[0]!.consumedQuarters ?? 1}
+                              max={measured[0]!.consumedQuarters ?? 1}
+                            />
+                          ))}
+                          {issues.map((item) => (
+                            <ConsumptionIssue
+                              key={item.productId}
+                              label={products.get(item.productId)?.name ?? item.productId}
+                              unit={products.get(item.productId)?.packagingUnit}
+                              consumption={item}
                             />
                           ))}
                         </div>

@@ -112,16 +112,118 @@ describe('buildConsumptionRows', () => {
     expect(rows[0]!.totalConsumedQuarters).toBe(0)
   })
 
-  it('telt een ontbrekende volgende telling als leeg, niet als onbekend', () => {
-    // Het product stond er wel, maar is bij de volgende telling niet ingevuld:
-    // dan is er niets meer, dus alles is op.
+  it('behandelt een ontbrekende volgende telling als onbekend, niet als nul', () => {
+    // Het product stond er wel, maar is bij de volgende telling niet ingevuld.
+    // Dat als "alles op" lezen verzint verbruik dat niemand gemeten heeft.
     const rows = buildConsumptionRows({
       countedBefore: new Map([[key('kiosk-101', 'water'), qu(4)]]),
       delivered: new Map(),
       countedAfter: new Map([[key('kiosk-101', 'cola'), qu(1)]]),
     })
 
+    const water = rows[0]!.products.find((p) => p.productId === 'water')!
+    expect(water.consumedQuarters).toBeNull()
+    expect(water.confidence).toBe('NEXT_COUNT_MISSING')
+  })
+
+  it('leest een getelde nul wél als leeg', () => {
+    // Nul is een gemeten waarde: de teller heeft gekeken en er stond niets.
+    const rows = buildConsumptionRows({
+      countedBefore: new Map([[key('kiosk-101', 'water'), qu(4)]]),
+      delivered: new Map(),
+      countedAfter: new Map([[key('kiosk-101', 'water'), 0]]),
+    })
+
     expect(fromQuarterUnits(rows[0]!.products[0]!.consumedQuarters!)).toBe(4)
+    expect(rows[0]!.products[0]!.confidence).toBe('KNOWN')
+  })
+})
+
+describe('betrouwbaarheid van een regel', () => {
+  const before = new Map([[key('kiosk-101', 'water'), qu(4)]])
+
+  it('noemt een overgeslagen of dichte kiosk onbekend', () => {
+    const rows = buildConsumptionRows({
+      countedBefore: before,
+      delivered: new Map(),
+      countedAfter: new Map([[key('kiosk-102', 'water'), qu(1)]]),
+      countedKioskIdsAfter: new Set(['kiosk-102']),
+    })
+
+    const row = rows.find((r) => r.kioskId === 'kiosk-101')!
+    expect(row.products[0]!.confidence).toBe('KIOSK_SKIPPED')
+    expect(row.products[0]!.consumedQuarters).toBeNull()
+  })
+
+  it('noemt een product zonder actieve norm een assortimentswijziging', () => {
+    const rows = buildConsumptionRows({
+      countedBefore: before,
+      delivered: new Map(),
+      countedAfter: new Map([[key('kiosk-101', 'cola'), qu(1)]]),
+      countedKioskIdsAfter: new Set(['kiosk-101']),
+      activeStandardsAfter: new Set([key('kiosk-101', 'cola')]),
+    })
+
+    const water = rows[0]!.products.find((p) => p.productId === 'water')!
+    expect(water.confidence).toBe('ASSORTMENT_CHANGED')
+  })
+
+  it('noemt een geteld product dat gewoon niet ingevuld is onbekend', () => {
+    const rows = buildConsumptionRows({
+      countedBefore: before,
+      delivered: new Map(),
+      countedAfter: new Map([[key('kiosk-101', 'cola'), qu(1)]]),
+      countedKioskIdsAfter: new Set(['kiosk-101']),
+      activeStandardsAfter: new Set([key('kiosk-101', 'water'), key('kiosk-101', 'cola')]),
+    })
+
+    const water = rows[0]!.products.find((p) => p.productId === 'water')!
+    expect(water.confidence).toBe('NEXT_COUNT_MISSING')
+  })
+
+  it('markeert een negatief verbruik als voorraadverschil', () => {
+    const rows = buildConsumptionRows({
+      countedBefore: new Map([[key('kiosk-101', 'water'), qu(2)]]),
+      delivered: new Map([[key('kiosk-101', 'water'), 3]]),
+      countedAfter: new Map([[key('kiosk-101', 'water'), qu(9)]]),
+    })
+
+    expect(rows[0]!.products[0]!.confidence).toBe('IMPLAUSIBLE')
+    expect(rows[0]!.implausibleCount).toBe(1)
+    // Telt niet mee in het kiosk-totaal, maar verdwijnt ook niet.
+    expect(rows[0]!.totalConsumedQuarters).toBe(0)
+  })
+
+  it('houdt bij hoeveel regels bruikbaar zijn', () => {
+    const rows = buildConsumptionRows({
+      countedBefore: new Map([
+        [key('kiosk-101', 'water'), qu(4)],
+        [key('kiosk-101', 'cola'), qu(2)],
+        [key('kiosk-101', 'chips'), qu(1)],
+      ]),
+      delivered: new Map(),
+      countedAfter: new Map([[key('kiosk-101', 'water'), qu(1)]]),
+      countedKioskIdsAfter: new Set(['kiosk-101']),
+    })
+
+    expect(rows[0]!.knownCount).toBe(1)
+    expect(rows[0]!.unknownCount).toBe(2)
+  })
+
+  it('laat een onbekende regel niet meetellen in het producttotaal', () => {
+    const rows = buildConsumptionRows({
+      countedBefore: new Map([
+        [key('kiosk-101', 'water'), qu(4)],
+        [key('kiosk-102', 'water'), qu(6)],
+      ]),
+      delivered: new Map(),
+      countedAfter: new Map([[key('kiosk-101', 'water'), qu(1)]]),
+      countedKioskIdsAfter: new Set(['kiosk-101']),
+    })
+
+    const water = totalsByProduct(rows)[0]!
+    expect(fromQuarterUnits(water.consumedQuarters)).toBe(3)
+    expect(water.perKiosk).toHaveLength(1)
   })
 })
 
