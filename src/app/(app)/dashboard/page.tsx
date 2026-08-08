@@ -21,6 +21,7 @@ import {
 } from '@/services/countSessionService'
 import { getRestockOverview } from '@/services/restockPlanningService'
 import { getIncidents, isOpen } from '@/services/incidentService'
+import { getOperationalEvent, isOperational } from '@/domain/events/eventSelection'
 import { ROUND_STATUS_LABEL, RUNNING_STATUSES } from '@/lib/roundStatus'
 import { PERMISSIONS } from '@/lib/permissions'
 import { RestockRoundStatus } from '@/types'
@@ -52,8 +53,9 @@ export default function DashboardPage() {
 
   const load = useCallback(async () => {
     const events = await repositories.event().getEvents()
-    // Het eerstvolgende evenement is waar iedereen mee bezig is.
-    const event = events[0] ?? null
+    // Niet events[0]: die lijst staat oplopend op datum en begint dus bij het
+    // oudste evenement van het seizoen.
+    const event = getOperationalEvent(events)
 
     if (!event) {
       setData({
@@ -165,11 +167,13 @@ export default function DashboardPage() {
           <>
             {/* ── Actief evenement ─────────────────────────────────────── */}
             <section aria-labelledby="event-heading">
+              {/* "Actief" alleen als er ook echt geteld of gevuld wordt;
+                  anders is het gewoon wat eraan komt. */}
               <h3
                 id="event-heading"
                 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500"
               >
-                Actief evenement
+                {isOperational(event) ? 'Actief evenement' : 'Eerstvolgende evenement'}
               </h3>
               <Link href={`/events/${event.id}`} className="block">
                 <Card className="active:bg-gray-100">

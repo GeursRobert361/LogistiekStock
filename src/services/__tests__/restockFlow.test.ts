@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { FakeRestockRepository } from './fakeRestockRepository'
-import type { Kiosk, Product } from '@/types'
+import type { Event, Kiosk, Product } from '@/types'
 
 const fakeRestockRepo = new FakeRestockRepository()
 
@@ -46,6 +46,7 @@ vi.mock('@/repositories', () => ({
 const {
   createProductRound,
   createMixedPalletRound,
+  findEventWithOpenRestockWork,
   setLoadedQuantities,
   startPalletRound,
   cancelRound,
@@ -62,8 +63,16 @@ const {
 } = await import('../deliveryService')
 const { planRestock } = await import('@/domain/restocking/planRestock')
 const { unplannedPackages, openPackages } = await import('@/domain/restocking/buildRequirements')
-const { RestockRoundStatus, RestockRoundType, RoundType, ProductSize, InputStep, DeliveryReason } =
-  await import('@/types')
+const {
+  RestockRoundStatus,
+  RestockRoundType,
+  RoundType,
+  ProductSize,
+  InputStep,
+  DeliveryReason,
+  EventStatus,
+  EventType,
+} = await import('@/types')
 
 const EVENT_ID = 'event-1'
 const RING_ID = 'ring-1'
@@ -245,6 +254,48 @@ describe('productronde', () => {
     expect((await fakeRestockRepo.getRoundById(round.id))!.status).toBe(
       RestockRoundStatus.CANCELLED
     )
+  })
+})
+
+describe('evenement met openstaand vulwerk', () => {
+  function fakeEvent(id: string): Event {
+    return {
+      id,
+      name: id,
+      date: '2026-08-08',
+      eventType: EventType.VOETBAL,
+      status: EventStatus.READY_FOR_RESTOCK,
+      activeRingIds: [],
+      activeKioskIds: [],
+      assignedUserIds: [],
+      createdById: PLANNER,
+      createdAt: '',
+      updatedAt: '',
+    }
+  }
+
+  it('slaat een evenement zonder openstaand tekort over', async () => {
+    await seedRequirements('water', [5])
+
+    const chosen = await findEventWithOpenRestockWork([
+      fakeEvent('event-afgerond'),
+      fakeEvent(EVENT_ID),
+    ])
+
+    expect(chosen?.id).toBe(EVENT_ID)
+  })
+
+  it('slaat ook een evenement over waarvan alles al gereserveerd is', async () => {
+    await seedRequirements('water', [5])
+    await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+
+    expect(await findEventWithOpenRestockWork([fakeEvent(EVENT_ID)])).toBeNull()
   })
 })
 

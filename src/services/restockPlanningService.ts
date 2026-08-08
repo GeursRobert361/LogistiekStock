@@ -5,6 +5,7 @@ import { unplannedPackages, openPackages } from '@/domain/restocking/buildRequir
 import { planRoundStops, type PlannedStop } from '@/domain/restocking/planRoundStops'
 import { RestockRoundStatus, RestockRoundType, RouteDirection } from '@/types'
 import type {
+  Event,
   Kiosk,
   Product,
   RestockRequirement,
@@ -64,6 +65,30 @@ export async function getRestockOverview(
   }
 
   return { requirements, productRoundItems, mixedPalletItems, byProduct }
+}
+
+/**
+ * Het eerste evenement uit `candidates` waar nog vulwerk voor open staat.
+ *
+ * Het palletscherm begon standaard bij het oudste evenement uit de lijst — vaak
+ * een afgeronde wedstrijd zonder één openstaand tekort. Welk evenement er werk
+ * heeft is niet uit de status af te lezen, dus dat wordt hier nagevraagd. De
+ * kandidaten staan op volgorde van relevantie, dus in de praktijk is het de
+ * eerste.
+ */
+export async function findEventWithOpenRestockWork(
+  candidates: Event[],
+  limit = 5
+): Promise<Event | null> {
+  const restock = repositories.restock()
+
+  for (const event of candidates.slice(0, limit)) {
+    const requirements = await restock.getRequirements(event.id)
+    if (requirements.some((requirement) => unplannedPackages(requirement) > 0)) {
+      return event
+    }
+  }
+  return null
 }
 
 export interface CreateRoundParams {

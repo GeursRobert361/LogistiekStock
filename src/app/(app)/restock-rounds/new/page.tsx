@@ -9,7 +9,12 @@ import { EmptyState } from '@/components/shared/EmptyState'
 import { ListSkeleton } from '@/components/shared/LoadingSkeleton'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
-import { getRestockOverview, startPalletRound } from '@/services/restockPlanningService'
+import {
+  findEventWithOpenRestockWork,
+  getRestockOverview,
+  startPalletRound,
+} from '@/services/restockPlanningService'
+import { orderEventsByRelevance } from '@/domain/events/eventSelection'
 import { EventStatus } from '@/types'
 import type { Event, Kiosk, Product, Ring } from '@/types'
 
@@ -38,11 +43,17 @@ export default function PickPalletPage() {
   // Evenementen en ringen liggen vast zolang dit scherm openstaat.
   useEffect(() => {
     Promise.all([repositories.event().getEvents(), repositories.kiosk().getRings()])
-      .then(([eventList, ringList]) => {
-        const usable = eventList.filter((event) => event.status !== EventStatus.ARCHIVED)
+      .then(async ([eventList, ringList]) => {
+        const usable = orderEventsByRelevance(
+          eventList.filter((event) => event.status !== EventStatus.ARCHIVED)
+        )
         setEvents(usable)
         setRings(ringList)
-        setEventId((current) => current || (usable[0]?.id ?? ''))
+
+        // Wie een pallet komt pakken wil het evenement waar nog iets ligt, niet
+        // de wedstrijd van vorige maand die al helemaal gevuld is.
+        const withWork = await findEventWithOpenRestockWork(usable)
+        setEventId((current) => current || (withWork?.id ?? usable[0]?.id ?? ''))
       })
       .catch((loadError: unknown) => {
         console.error('[pallet] Evenementen laden mislukt.', loadError)
