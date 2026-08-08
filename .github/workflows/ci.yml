@@ -1,0 +1,80 @@
+name: CI
+
+# Elke push en elke pull request. Wat hier rood is, gaat niet naar de vloer.
+on:
+  push:
+    branches: ['**']
+  pull_request:
+
+# Een nieuwe push op dezelfde branch maakt de vorige run overbodig.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # De unit tests en de build draaien tegen de demo-implementaties; er is geen
+  # database nodig om te weten of de code klopt.
+  NEXT_PUBLIC_APP_MODE: demo
+
+jobs:
+  kwaliteit:
+    name: Typecheck, tests en build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Afhankelijkheden installeren
+        run: npm ci
+
+      - name: Typecheck
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm run test:run
+
+      - name: Build
+        run: npm run build
+
+  e2e:
+    name: End-to-end
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    # Alleen op pull requests: de suite bouwt de app en start hem op, en dat is
+    # te traag om achter elke push aan te hangen. Wat hierboven rood staat hoeft
+    # sowieso niet meer getest te worden.
+    if: github.event_name == 'pull_request'
+    needs: kwaliteit
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Afhankelijkheden installeren
+        run: npm ci
+
+      - name: Browser installeren
+        # Alleen Chromium: playwright.config draait één project, Mobile Chrome.
+        run: npx playwright install --with-deps chromium
+
+      - name: End-to-end tests
+        # De config bouwt en start de app zelf.
+        run: npm run test:e2e
+
+      - name: Rapport bewaren bij een mislukking
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report
+          path: playwright-report/
+          retention-days: 7

@@ -143,6 +143,21 @@ describe('vulrondes', () => {
     ).rejects.toThrow(/van iemand anders/)
   })
 
+  it('laat een vuller alleen de behoefte van zijn eigen ronde bijwerken', async () => {
+    // Aan het eind van een ronde geeft hij zijn reserveringen vrij; verder
+    // heeft hij hier niets te zoeken.
+    queryOne.mockResolvedValue(null)
+
+    await expect(
+      run('restock', 'updateRequirement', VULLER_A, ['behoefte-1', { reservedPackages: 0 }])
+    ).rejects.toThrow(/niet bij een ronde van jou/)
+
+    queryOne.mockResolvedValue({ id: 'reservering-1' })
+    await expect(
+      run('restock', 'updateRequirement', VULLER_A, ['behoefte-1', { reservedPackages: 0 }])
+    ).resolves.toBeUndefined()
+  })
+
   it('laat een vuller geen ronde op andermans naam maken', async () => {
     await expect(
       run('restock', 'createRound', VULLER_A, [{ createdById: VULLER_B.id }])

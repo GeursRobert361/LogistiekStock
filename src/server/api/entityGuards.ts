@@ -198,6 +198,29 @@ export const ENTITY_GUARDS: Record<string, EntityGuard> = {
       throw new ForbiddenError('Een vulronde maak je op je eigen naam.')
     }
   },
+  /**
+   * Een vuller komt hier alleen langs bij het vrijgeven van zijn eigen
+   * reserveringen, aan het eind van een ronde. Zonder deze controle zou hij
+   * elke behoefte van elk evenement op elke waarde kunnen zetten.
+   */
+  'restock.updateRequirement': async (user, args) => {
+    if (hasPermission(user.roles, 'PLAN_RESTOCK')) return
+
+    const requirementId = stringArg(args, 0)
+    if (!requirementId) return
+
+    const row = await queryOne<{ id: string }>(
+      `select s.id from stock_reservations s
+         join restock_rounds r on r.id = s.restock_round_id
+        where s.restock_requirement_id = $1
+          and (r.assigned_user_id = $2 or r.assigned_user_id is null)
+        limit 1`,
+      [requirementId, user.id]
+    )
+    if (!row) {
+      throw new ForbiddenError('Deze bijvulbehoefte hoort niet bij een ronde van jou.')
+    }
+  },
   'restock.updateRound': guardById((args) => stringArg(args, 0), assertMayRound),
   'restock.upsertRoundItem': guardById(
     (args) => fieldOf(args, 0, 'restockRoundId'),

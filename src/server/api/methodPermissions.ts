@@ -76,9 +76,12 @@ export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
 
   // ─── bijvullen ───────────────────────────────────────────────────────────
   'restock.getRequirements': 'AUTHENTICATED',
-  // Vullers boeken hun levering af op de behoefte, dus die hebben schrijfrecht.
-  'restock.upsertRequirement': 'EXECUTE_RESTOCK',
+  // Behoeften ontstaan uit een goedgekeurde telling; alleen wie mag goedkeuren
+  // schrijft ze integraal weg.
+  'restock.upsertRequirement': 'REVIEW_COUNTS',
   'restock.bulkUpsertRequirements': 'REVIEW_COUNTS',
+  // Een vuller raakt hier alleen aan bij het vrijgeven van zijn eigen
+  // reserveringen; welke behoefte dat mag zijn staat in entityGuards.
   'restock.updateRequirement': 'EXECUTE_RESTOCK',
   'restock.getRounds': 'AUTHENTICATED',
   'restock.getRoundById': 'AUTHENTICATED',
