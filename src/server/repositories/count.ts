@@ -1,6 +1,6 @@
 import type { ICountRepository } from '@/repositories/interfaces/ICountRepository'
 import { query, queryOne, queryRequired, buildUpdate, buildUpsert, transaction } from '@/server/db/pool'
-import { ACTIVE_SESSION_STATUSES } from '@/domain/counting/sessionStatus'
+import { ACTIVE_SESSION_STATUSES, blocksSessionWrite } from '@/domain/counting/sessionStatus'
 import { BusinessRuleError } from '@/server/api/errors'
 import {
   mapCountSession,
@@ -38,13 +38,25 @@ export const countRepository: ICountRepository = {
         `count-session:${data.eventId}:${data.ringId}`,
       ])
 
-      const conflicting = await client.query(
-        `select id from count_sessions
-          where event_id = $1 and ring_id = $2 and id <> $3 and status = any($4::text[])
-          limit 1`,
-        [data.eventId, data.ringId, data.id, [...ACTIVE_SESSION_STATUSES]]
-      )
-      if (conflicting.rows.length > 0) {
+      // Bestaat de ronde al, dan is dit een bijwerking en geen nieuwe. De
+      // outbox schrijft elke wijziging weg met deze zelfde aanroep; die
+      // tegenhouden zou een lopende telling van de server afsnijden.
+      const [existing, conflicting] = await Promise.all([
+        client.query('select 1 from count_sessions where id = $1', [data.id]),
+        client.query(
+          `select id from count_sessions
+            where event_id = $1 and ring_id = $2 and id <> $3 and status = any($4::text[])
+            limit 1`,
+          [data.eventId, data.ringId, data.id, [...ACTIVE_SESSION_STATUSES]]
+        ),
+      ])
+
+      if (
+        blocksSessionWrite({
+          isExisting: existing.rows.length > 0,
+          hasConflictingActiveSession: conflicting.rows.length > 0,
+        })
+      ) {
         throw new BusinessRuleError('Voor deze ring loopt al een telronde.')
       }
 

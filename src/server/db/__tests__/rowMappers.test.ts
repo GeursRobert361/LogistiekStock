@@ -9,8 +9,128 @@ import {
   mapCountSession,
   countSessionToRow,
   mapAgendaEntry,
+  mapKioskCount,
+  mapRound,
+  mapDelivery,
+  kioskCountToRow,
+  roundToRow,
+  roundStopToRow,
 } from '../rowMappers'
 import { InputStep, RoundType, ProductSize } from '@/types'
+
+/**
+ * Tijdstempels die leeg mógen zijn.
+ *
+ * node-postgres geeft een timestamptz terug als JS-Date. Ging die door
+ * `String()`, dan werd het "Fri Aug 07 2026 16:34:31 GMT+0000 (Coordinated
+ * Universal Time)" — leesbaar, maar geen ISO. De client bewaarde dat en
+ * schreef het later terug, waarna Postgres het weigerde met
+ * "invalid input syntax for type timestamp with time zone" en de telling
+ * eindeloos in de wachtrij bleef hangen.
+ */
+describe('optionele tijdstempels', () => {
+  const moment = new Date('2026-08-07T16:34:31.305Z')
+
+  it('geeft een kiosktelling terug in ISO, niet als datumtekst', () => {
+    const kioskCount = mapKioskCount({
+      id: 'kc-1',
+      count_session_id: 'sessie-1',
+      kiosk_id: 'kiosk-101',
+      started_at: moment,
+      completed_at: moment,
+      counter_id: 'teller-1',
+      status: 'IN_PROGRESS',
+      created_at: moment,
+      updated_at: moment,
+    })
+
+    expect(kioskCount.startedAt).toBe('2026-08-07T16:34:31.305Z')
+    expect(kioskCount.completedAt).toBe('2026-08-07T16:34:31.305Z')
+  })
+
+  it('doet hetzelfde voor de tijdstempels van een vulronde', () => {
+    const round = mapRound({
+      id: 'ronde-1',
+      event_id: 'event-1',
+      ring_id: 'ring-1',
+      name: 'Productronde Water',
+      round_type: 'PRODUCT_ROUND',
+      status: 'CLAIMED',
+      created_by_id: 'planner-1',
+      claimed_at: moment,
+      started_at: moment,
+      completed_at: moment,
+      created_at: moment,
+      updated_at: moment,
+    })
+
+    expect(round.claimedAt).toBe('2026-08-07T16:34:31.305Z')
+    expect(round.startedAt).toBe('2026-08-07T16:34:31.305Z')
+    expect(round.completedAt).toBe('2026-08-07T16:34:31.305Z')
+  })
+
+  it('doet hetzelfde voor het moment van afleveren', () => {
+    const delivery = mapDelivery({
+      id: 'levering-1',
+      restock_round_stop_id: 'halte-1',
+      product_id: 'water',
+      planned_packages: 6,
+      delivered_packages: 6,
+      not_delivered_packages: 0,
+      delivered_at: moment,
+      delivered_by_id: 'vuller-1',
+      created_at: moment,
+    })
+
+    expect(delivery.deliveredAt).toBe('2026-08-07T16:34:31.305Z')
+  })
+
+  it('maakt een datumtekst uit een oude cache alsnog ISO bij het wegschrijven', () => {
+    // Wie in de foute periode heeft geteld, heeft deze tekst in zijn
+    // offline-opslag staan. Die telling moet gewoon alsnog weg te schrijven
+    // zijn — anders blijft hij voorgoed in de wachtrij hangen.
+    const row = kioskCountToRow({
+      id: 'kc-1',
+      startedAt: 'Fri Aug 07 2026 16:34:31 GMT+0000 (Coordinated Universal Time)',
+    })
+
+    expect(row.started_at).toBe('2026-08-07T16:34:31.000Z')
+  })
+
+  it('laat een tijdstempel die al ISO is met rust', () => {
+    const row = kioskCountToRow({ id: 'kc-1', startedAt: '2026-08-07T16:34:31.305Z' })
+    expect(row.started_at).toBe('2026-08-07T16:34:31.305Z')
+  })
+
+  it('laat onleesbare tekst staan, zodat de database erover klaagt', () => {
+    // Stil aanpassen zou een echte fout verbergen.
+    const row = kioskCountToRow({ id: 'kc-1', startedAt: 'gisterochtend' })
+    expect(row.started_at).toBe('gisterochtend')
+  })
+
+  it('normaliseert ook de tijdstempels van een vulronde en een levering', () => {
+    const rommel = 'Fri Aug 07 2026 16:34:31 GMT+0000 (Coordinated Universal Time)'
+    expect(roundToRow({ claimedAt: rommel }).claimed_at).toBe('2026-08-07T16:34:31.000Z')
+    expect(roundStopToRow({ completedAt: rommel }).completed_at).toBe('2026-08-07T16:34:31.000Z')
+  })
+
+  it('laat een lege tijdstempel leeg', () => {
+    const kioskCount = mapKioskCount({
+      id: 'kc-1',
+      count_session_id: 'sessie-1',
+      kiosk_id: 'kiosk-101',
+      started_at: null,
+      completed_at: null,
+      counter_id: 'teller-1',
+      status: 'PENDING',
+      created_at: moment,
+      updated_at: moment,
+    })
+
+    expect(kioskCount.startedAt).toBeUndefined()
+    expect(kioskCount.completedAt).toBeUndefined()
+  })
+})
 
 /**
  * De mappers vertalen tussen databasekolommen en domeintypes.

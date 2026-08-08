@@ -23,6 +23,27 @@ export function isActiveSession(session: CountSession): boolean {
   return ACTIVE_SESSION_STATUSES.includes(session.status)
 }
 
+export interface SessionWriteContext {
+  /** Staat deze telronde al op de server? Dan is dit een bijwerking. */
+  isExisting: boolean
+  /** Loopt er al een ándere actieve ronde voor hetzelfde evenement en dezelfde ring? */
+  hasConflictingActiveSession: boolean
+}
+
+/**
+ * Mag deze telronde geweigerd worden omdat de ring al bezet is?
+ *
+ * Alleen bij een nieuwe ronde. Een ronde die al bestaat wordt bijgewerkt — de
+ * outbox schrijft elke wijziging weg met dezelfde upsert-aanroep als het
+ * aanmaken — en die tegenhouden zou de teller opsluiten: zijn ronde staat op de
+ * server, maar niets van wat hij daarna telt komt er nog bij. Dat is precies
+ * wat er gebeurt bij gegevens van vóór deze regel, waar twee actieve rondes
+ * voor dezelfde ring naast elkaar konden ontstaan.
+ */
+export function blocksSessionWrite(context: SessionWriteContext): boolean {
+  return !context.isExisting && context.hasConflictingActiveSession
+}
+
 /** De telronde die deze ring op dit moment bezet houdt, als die er is. */
 export function findActiveSessionForRing(
   sessions: CountSession[],

@@ -73,10 +73,41 @@ const dateStr = (value: unknown): string => {
   }
   return typeof value === 'string' ? value.slice(0, 10) : ''
 }
+/**
+ * Hetzelfde als `str`, maar leeg blijft leeg.
+ *
+ * Ook hier via `str` en niet via `String()`: de meeste optionele kolommen zijn
+ * tijdstempels, en `String(date)` maakt daar "Fri Aug 07 2026 16:34:31 GMT+0000
+ * (Coordinated Universal Time)" van. De client bewaart dat, schrijft het later
+ * terug, en dan weigert Postgres het — waarna de telling niet meer weg te
+ * schrijven is.
+ */
 const optStr = (value: unknown): string | undefined =>
-  value === null || value === undefined ? undefined : String(value)
+  value === null || value === undefined ? undefined : str(value)
 const num = (value: unknown): number => (typeof value === 'number' ? value : Number(value ?? 0))
 const bool = (value: unknown): boolean => value === true
+
+/**
+ * Waarde voor een timestamptz-kolom.
+ *
+ * Wat er binnenkomt hoort ISO te zijn, maar dat was het een tijd lang niet: de
+ * server gaf optionele tijdstempels terug als "Fri Aug 07 2026 16:34:31
+ * GMT+0000 (Coordinated Universal Time)", en die tekst staat nu in de
+ * offline-opslag van iedereen die in die periode heeft geteld. Bij het
+ * terugschrijven weigert Postgres hem, en dan blijft die telling voorgoed in de
+ * wachtrij staan.
+ *
+ * Alles wat als datum te lezen is gaat er daarom als ISO in. Onleesbare tekst
+ * laten we staan: dan hoort de database te klagen in plaats van dat wij er stil
+ * iets van maken.
+ */
+const toTimestamp = (value: unknown): unknown => {
+  if (value instanceof Date) return value.toISOString()
+  if (typeof value !== 'string' || value === '') return value
+
+  const parsed = new Date(value)
+  return Number.isNaN(parsed.getTime()) ? value : parsed.toISOString()
+}
 
 /**
  * Waarde voor een jsonb-kolom.
@@ -366,8 +397,8 @@ export function countSessionToRow(data: Partial<CountSession>): Row {
   // kiosk_route is jsonb: zelf serialiseren, anders maakt de driver er een
   // Postgres-array van en weigert de database het.
   if (data.kioskRoute !== undefined) row.kiosk_route = toJsonb(data.kioskRoute)
-  if (data.startedAt !== undefined) row.started_at = data.startedAt
-  if (data.completedAt !== undefined) row.completed_at = data.completedAt
+  if (data.startedAt !== undefined) row.started_at = toTimestamp(data.startedAt)
+  if (data.completedAt !== undefined) row.completed_at = toTimestamp(data.completedAt)
   if (data.status !== undefined) row.status = data.status
   if (data.syncStatus !== undefined) row.sync_status = data.syncStatus
   return row
@@ -394,8 +425,8 @@ export function kioskCountToRow(data: Partial<KioskCount>): Row {
   if (data.id !== undefined) row.id = data.id
   if (data.countSessionId !== undefined) row.count_session_id = data.countSessionId
   if (data.kioskId !== undefined) row.kiosk_id = data.kioskId
-  if (data.startedAt !== undefined) row.started_at = data.startedAt
-  if (data.completedAt !== undefined) row.completed_at = data.completedAt
+  if (data.startedAt !== undefined) row.started_at = toTimestamp(data.startedAt)
+  if (data.completedAt !== undefined) row.completed_at = toTimestamp(data.completedAt)
   if (data.counterId !== undefined) row.counter_id = data.counterId
   if (data.generalNotes !== undefined) row.general_notes = data.generalNotes
   if (data.status !== undefined) row.status = data.status
@@ -492,9 +523,9 @@ export function roundToRow(data: Partial<RestockRound>): Row {
   if (data.status !== undefined) row.status = data.status
   if (data.createdById !== undefined) row.created_by_id = data.createdById
   if (data.assignedUserId !== undefined) row.assigned_user_id = data.assignedUserId
-  if (data.claimedAt !== undefined) row.claimed_at = data.claimedAt
-  if (data.startedAt !== undefined) row.started_at = data.startedAt
-  if (data.completedAt !== undefined) row.completed_at = data.completedAt
+  if (data.claimedAt !== undefined) row.claimed_at = toTimestamp(data.claimedAt)
+  if (data.startedAt !== undefined) row.started_at = toTimestamp(data.startedAt)
+  if (data.completedAt !== undefined) row.completed_at = toTimestamp(data.completedAt)
   if (data.notes !== undefined) row.notes = data.notes
   return row
 }
@@ -541,7 +572,7 @@ export function roundStopToRow(data: Partial<RestockRoundStop>): Row {
   if (data.restockRoundId !== undefined) row.restock_round_id = data.restockRoundId
   if (data.kioskId !== undefined) row.kiosk_id = data.kioskId
   if (data.sortOrder !== undefined) row.sort_order = data.sortOrder
-  if (data.completedAt !== undefined) row.completed_at = data.completedAt
+  if (data.completedAt !== undefined) row.completed_at = toTimestamp(data.completedAt)
   if (data.notes !== undefined) row.notes = data.notes
   if (data.skipReason !== undefined) row.skip_reason = data.skipReason
   return row
@@ -594,7 +625,7 @@ export function deliveryToRow(data: RestockDelivery): Row {
     not_delivered_packages: data.notDeliveredPackages,
     reason: data.reason ?? null,
     reason_notes: data.reasonNotes ?? null,
-    delivered_at: data.deliveredAt ?? new Date().toISOString(),
+    delivered_at: toTimestamp(data.deliveredAt) ?? new Date().toISOString(),
     delivered_by_id: data.deliveredById,
   }
 }
@@ -648,10 +679,10 @@ export function incidentToRow(data: Partial<Incident>): Row {
   if (data.urgency !== undefined) row.urgency = data.urgency
   if (data.photoUrl !== undefined) row.photo_url = data.photoUrl
   if (data.reportedById !== undefined) row.reported_by_id = data.reportedById
-  if (data.reportedAt !== undefined) row.reported_at = data.reportedAt
+  if (data.reportedAt !== undefined) row.reported_at = toTimestamp(data.reportedAt)
   if (data.status !== undefined) row.status = data.status
   if (data.assignedToId !== undefined) row.assigned_to_id = data.assignedToId
   if (data.resolution !== undefined) row.resolution = data.resolution
-  if (data.resolvedAt !== undefined) row.resolved_at = data.resolvedAt
+  if (data.resolvedAt !== undefined) row.resolved_at = toTimestamp(data.resolvedAt)
   return row
 }

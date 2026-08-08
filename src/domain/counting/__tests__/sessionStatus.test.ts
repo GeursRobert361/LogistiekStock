@@ -3,6 +3,7 @@ import {
   canTransitionSession,
   assertSessionTransition,
   eventStatusForSession,
+  blocksSessionWrite,
 } from '../sessionStatus'
 import { CountSessionStatus, EventStatus } from '@/types'
 
@@ -47,6 +48,30 @@ describe('statusovergangen van een telronde', () => {
     expect(() =>
       assertSessionTransition(CountSessionStatus.APPROVED, CountSessionStatus.IN_PROGRESS)
     ).toThrow(/"Goedgekeurd" naar "Bezig"/)
+  })
+})
+
+describe('een bezette ring', () => {
+  it('weigert een nieuwe ronde naast een lopende', () => {
+    expect(blocksSessionWrite({ isExisting: false, hasConflictingActiveSession: true })).toBe(true)
+  })
+
+  it('laat een nieuwe ronde toe als de ring vrij is', () => {
+    expect(blocksSessionWrite({ isExisting: false, hasConflictingActiveSession: false })).toBe(
+      false
+    )
+  })
+
+  it('blijft een bestaande ronde bijwerken, ook naast een andere actieve ronde', () => {
+    // Zo ontstond de storing: de outbox schrijft elke wijziging weg met
+    // dezelfde upsert als het aanmaken. Ging die door de nieuwe-rondecontrole,
+    // dan kwam er van een telling die al liep niets meer op de server — en met
+    // gegevens van vóór deze regel staan er soms twee actieve rondes.
+    expect(blocksSessionWrite({ isExisting: true, hasConflictingActiveSession: true })).toBe(false)
+  })
+
+  it('laat een bestaande ronde sowieso met rust', () => {
+    expect(blocksSessionWrite({ isExisting: true, hasConflictingActiveSession: false })).toBe(false)
   })
 })
 
