@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getCurrentUser } from '@/server/auth/session'
 import { serverRepositories, type ServerResource } from '@/server/repositories'
 import { getMethodRule, CLIENT_ONLY_METHODS } from '@/server/api/methodPermissions'
+import { isBusinessRuleError } from '@/server/api/errors'
 import { hasPermission } from '@/lib/permissions'
 
 export const dynamic = 'force-dynamic'
@@ -72,6 +73,13 @@ export async function POST(request: Request) {
     )
     return NextResponse.json({ data: result ?? null })
   } catch (error) {
+    // Een geweigerde bedrijfsregel is geen storing: die melding hoort de
+    // gebruiker juist wél te zien, en met een 4xx stopt de outbox met opnieuw
+    // proberen.
+    if (isBusinessRuleError(error)) {
+      return NextResponse.json({ error: error.message }, { status: error.status })
+    }
+
     // De melding van de database gaat niet naar de client: die kan
     // tabelnamen en constraints prijsgeven.
     console.error(`[api] "${key}" mislukt.`, error)

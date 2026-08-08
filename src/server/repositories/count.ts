@@ -1,5 +1,7 @@
 import type { ICountRepository } from '@/repositories/interfaces/ICountRepository'
 import { query, queryOne, queryRequired, buildUpdate, buildUpsert, transaction } from '@/server/db/pool'
+import { ACTIVE_SESSION_STATUSES } from '@/domain/counting/sessionStatus'
+import { BusinessRuleError } from '@/server/api/errors'
 import {
   mapCountSession,
   mapKioskCount,
@@ -24,10 +26,33 @@ export const countRepository: ICountRepository = {
   },
 
   async createSession(data) {
-    // Upsert op id: een herhaalde poging vanuit de outbox mag geen tweede
-    // telronde opleveren.
-    const { text, params } = buildUpsert('count_sessions', countSessionToRow(data), ['id'])
-    return mapCountSession(await queryRequired(text, params))
+    return transaction(async (client) => {
+      // Serialiseert het aanmaken per (evenement, ring). Twee tellers die op
+      // hetzelfde moment op "starten" drukken komen hier achter elkaar langs,
+      // zodat de tweede de eerste ziet staan.
+      //
+      // Een advisory lock in plaats van een unieke index: bestaande databases
+      // kunnen al twee actieve rondes voor dezelfde ring bevatten, en zo'n
+      // index zou dan niet aan te maken zijn zonder die gegevens te verbouwen.
+      await client.query('select pg_advisory_xact_lock(hashtext($1))', [
+        `count-session:${data.eventId}:${data.ringId}`,
+      ])
+
+      const conflicting = await client.query(
+        `select id from count_sessions
+          where event_id = $1 and ring_id = $2 and id <> $3 and status = any($4::text[])
+          limit 1`,
+        [data.eventId, data.ringId, data.id, [...ACTIVE_SESSION_STATUSES]]
+      )
+      if (conflicting.rows.length > 0) {
+        throw new BusinessRuleError('Voor deze ring loopt al een telronde.')
+      }
+
+      // Upsert op id: een herhaalde poging vanuit de outbox mag geen tweede
+      // telronde opleveren.
+      const { text, params } = buildUpsert('count_sessions', countSessionToRow(data), ['id'])
+      return mapCountSession((await client.query(text, params)).rows[0] as Record<string, unknown>)
+    })
   },
 
   async updateSession(id, data) {

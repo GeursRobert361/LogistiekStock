@@ -2,6 +2,7 @@
 
 import { use, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { kioskLabel, kioskTitle } from '@/lib/kiosk'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card'
@@ -10,21 +11,24 @@ import { Select } from '@/components/ui/Select'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import { generateCircularKioskRoute } from '@/domain/routing/kioskRoute'
-import { createSession } from '@/services/countingService'
+import {
+  ActiveSessionExistsError,
+  createSession,
+  loadSessionsForEvent,
+} from '@/services/countingService'
+import { findActiveSessionForRing, SESSION_STATUS_LABEL } from '@/domain/counting/sessionStatus'
+import { getNextOpenKioskId, getSessionOverview } from '@/services/countSessionService'
 import { RouteDirection } from '@/types'
-import type { Ring, Kiosk } from '@/types'
+import type { CountSession, Ring, Kiosk } from '@/types'
 
-export default function CountStartPage({
-  params,
-}: {
-  params: Promise<{ eventId: string }>
-}) {
+export default function CountStartPage({ params }: { params: Promise<{ eventId: string }> }) {
   const { eventId } = use(params)
   const { profile } = useAuth()
   const router = useRouter()
 
   const [rings, setRings] = useState<Ring[]>([])
   const [kiosks, setKiosks] = useState<Array<Kiosk & { isOpenForEvent: boolean }>>([])
+  const [sessions, setSessions] = useState<CountSession[]>([])
   const [selectedRingId, setSelectedRingId] = useState('')
   const [startKioskId, setStartKioskId] = useState('')
   const [direction, setDirection] = useState<RouteDirection>(RouteDirection.ASCENDING)
@@ -35,12 +39,14 @@ export default function CountStartPage({
 
   useEffect(() => {
     async function load() {
-      const [r, k] = await Promise.all([
+      const [r, k, s] = await Promise.all([
         repositories.kiosk().getRings(),
         repositories.kiosk().getKiosksByEvent(eventId),
+        loadSessionsForEvent(eventId),
       ])
       setRings(r)
       setKiosks(k)
+      setSessions(s)
       if (r[0]) {
         setSelectedRingId(r[0].id)
       }
@@ -48,6 +54,33 @@ export default function CountStartPage({
     }
     load()
   }, [eventId])
+
+  // Voor een ring waar al geteld wordt hoort er geen tweede ronde bij te komen.
+  const runningSession = useMemo(
+    () => (selectedRingId ? findActiveSessionForRing(sessions, selectedRingId) : null),
+    [sessions, selectedRingId]
+  )
+
+  // Waar die lopende ronde gebleven is, zodat "verder" ook echt verder gaat.
+  const [resumeKioskId, setResumeKioskId] = useState<string | null>(null)
+  useEffect(() => {
+    if (!runningSession) {
+      setResumeKioskId(null)
+      return
+    }
+    let cancelled = false
+    const fallback = runningSession.kioskRoute[0] ?? null
+    getSessionOverview(runningSession)
+      .then((overview) => {
+        if (!cancelled) setResumeKioskId(getNextOpenKioskId(overview) ?? fallback)
+      })
+      .catch(() => {
+        if (!cancelled) setResumeKioskId(fallback)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [runningSession])
 
   const ringKiosks = useMemo(
     () =>
@@ -80,12 +113,10 @@ export default function CountStartPage({
       direction,
     })
     setPreviewRoute(
-      route
-        .slice(0, 5)
-        .map((k) => {
-          const kiosk = ringKiosks.find((rk) => rk.id === k.id)
-          return kioskLabel(kiosk)
-        })
+      route.slice(0, 5).map((k) => {
+        const kiosk = ringKiosks.find((rk) => rk.id === k.id)
+        return kioskLabel(kiosk)
+      })
     )
   }, [startKioskId, direction, ringKiosks])
 
@@ -120,7 +151,14 @@ export default function CountStartPage({
       }
     } catch (error) {
       console.error('[telling] Telronde starten mislukt.', error)
-      setStartError('De telronde kon niet worden gestart. Probeer het opnieuw.')
+      if (error instanceof ActiveSessionExistsError) {
+        // Iemand anders was net eerder. Het scherm ververst zichzelf en biedt
+        // die ronde aan in plaats van er een tweede naast te zetten.
+        setSessions(await loadSessionsForEvent(eventId))
+        setStartError('Voor deze ring is net een telronde gestart.')
+      } else {
+        setStartError('De telronde kon niet worden gestart. Probeer het opnieuw.')
+      }
     } finally {
       setIsStarting(false)
     }
@@ -151,73 +189,111 @@ export default function CountStartPage({
             options={rings.map((r) => ({ value: r.id, label: r.name }))}
           />
 
-          {/* Startkiosk */}
-          <Select
-            label="Startkiosk"
-            value={startKioskId}
-            onChange={(e) => setStartKioskId(e.target.value)}
-            options={ringKiosks.map((k) => ({
-              value: k.id,
-              label: kioskTitle(k),
-            }))}
-          />
-
-          {/* Richting */}
-          <fieldset>
-            <legend className="mb-2 text-sm font-medium text-gray-700">Looprichting</legend>
-            <div className="grid grid-cols-2 gap-2">
-              {[
-                { value: RouteDirection.ASCENDING, label: '↺ Linksom (oplopend)' },
-                { value: RouteDirection.DESCENDING, label: '↻ Rechtsom (aflopend)' },
-              ].map((opt) => (
-                <label
-                  key={opt.value}
-                  className={`flex cursor-pointer items-center justify-center rounded-xl border p-3 text-sm font-medium transition-colors ${
-                    direction === opt.value
-                      ? 'border-arena-red bg-red-50 text-arena-red'
-                      : 'border-gray-300 bg-white text-gray-700'
-                  }`}
-                >
-                  <input
-                    type="radio"
-                    name="direction"
-                    value={opt.value}
-                    checked={direction === opt.value}
-                    onChange={() => setDirection(opt.value)}
-                    className="sr-only"
-                  />
-                  {opt.label}
-                </label>
-              ))}
-            </div>
-          </fieldset>
-
-          {/* Route preview */}
-          {previewRoute.length > 0 && (
-            <Card>
-              <CardHeader>
-                <CardTitle>Route-voorbeeld</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600">
-                  {previewRoute.join(' → ')} → …
+          {runningSession && (
+            <Card className="border-arena-red">
+              <CardContent className="py-3">
+                <p className="font-semibold text-gray-900">Voor deze ring loopt al een telronde.</p>
+                <p className="mt-0.5 text-sm text-gray-600">
+                  Gestart op {new Date(runningSession.startedAt).toLocaleString('nl-NL')} ·{' '}
+                  {SESSION_STATUS_LABEL[runningSession.status]}
                 </p>
-                <p className="mt-1 text-xs text-gray-400">
-                  ({ringKiosks.length} kiosken totaal)
+                <p className="mt-2 text-sm text-gray-700">
+                  Twee rondes naast elkaar leveren twee tellingen op. Ga verder met deze, of kies
+                  hierboven een andere ring.
                 </p>
+                {resumeKioskId && (
+                  <Link
+                    href={`/events/${eventId}/count/${runningSession.id}/kiosk/${resumeKioskId}`}
+                    className="mt-3 block"
+                  >
+                    <Button className="w-full" size="lg">
+                      Verder met bestaande telronde →
+                    </Button>
+                  </Link>
+                )}
               </CardContent>
             </Card>
           )}
 
-          {startError && (
-            <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
-              {startError}
-            </p>
-          )}
+          {/* Bij een lopende ronde valt er niets te starten; alleen te
+              hervatten, of een andere ring te kiezen. */}
+          {!runningSession && (
+            <>
+              {/* Startkiosk */}
+              <Select
+                label="Startkiosk"
+                value={startKioskId}
+                onChange={(e) => setStartKioskId(e.target.value)}
+                options={ringKiosks.map((k) => ({
+                  value: k.id,
+                  label: kioskTitle(k),
+                }))}
+              />
 
-          <Button type="submit" size="lg" className="w-full" disabled={isStarting || !startKioskId}>
-            {isStarting ? 'Bezig…' : 'Telronde starten →'}
-          </Button>
+              {/* Richting */}
+              <fieldset>
+                <legend className="mb-2 text-sm font-medium text-gray-700">Looprichting</legend>
+                <div className="grid grid-cols-2 gap-2">
+                  {[
+                    { value: RouteDirection.ASCENDING, label: '↺ Linksom (oplopend)' },
+                    { value: RouteDirection.DESCENDING, label: '↻ Rechtsom (aflopend)' },
+                  ].map((opt) => (
+                    <label
+                      key={opt.value}
+                      className={`flex cursor-pointer items-center justify-center rounded-xl border p-3 text-sm font-medium transition-colors ${
+                        direction === opt.value
+                          ? 'border-arena-red bg-red-50 text-arena-red'
+                          : 'border-gray-300 bg-white text-gray-700'
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="direction"
+                        value={opt.value}
+                        checked={direction === opt.value}
+                        onChange={() => setDirection(opt.value)}
+                        className="sr-only"
+                      />
+                      {opt.label}
+                    </label>
+                  ))}
+                </div>
+              </fieldset>
+
+              {/* Route preview */}
+              {previewRoute.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Route-voorbeeld</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm text-gray-600">{previewRoute.join(' → ')} → …</p>
+                    <p className="mt-1 text-xs text-gray-400">
+                      ({ringKiosks.length} kiosken totaal)
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+
+              {startError && (
+                <p
+                  role="alert"
+                  className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
+                >
+                  {startError}
+                </p>
+              )}
+
+              <Button
+                type="submit"
+                size="lg"
+                className="w-full"
+                disabled={isStarting || !startKioskId}
+              >
+                {isStarting ? 'Bezig…' : 'Telronde starten →'}
+              </Button>
+            </>
+          )}
         </form>
       </div>
     </>

@@ -3,6 +3,7 @@ import { syncService } from './syncService'
 import { KeyedQueue } from '@/lib/keyedQueue'
 import { countEntryId, kioskCountId as deriveKioskCountId, newId } from '@/lib/ids'
 import { calculateRestockQuantity } from '@/domain/counting/calculateRestock'
+import { findActiveSessionForRing } from '@/domain/counting/sessionStatus'
 import { fromQuarterUnits } from '@/lib/quarterUnits'
 import { KioskCountStatus, CountSessionStatus, SyncStatus } from '@/types'
 import type { CountSession, KioskCount, CountEntry, KioskProductStandard } from '@/types'
@@ -112,9 +113,24 @@ export async function saveSession(session: CountSession): Promise<CountSession> 
   return updated
 }
 
+/** Er loopt al een telronde voor deze ring; een tweede hoort er niet naast. */
+export class ActiveSessionExistsError extends Error {
+  readonly code = 'ACTIVE_SESSION_EXISTS'
+
+  constructor(readonly session: CountSession) {
+    super('Voor deze ring loopt al een telronde.')
+    this.name = 'ActiveSessionExistsError'
+  }
+}
+
 export async function createSession(
   data: Omit<CountSession, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'syncStatus'>
 ): Promise<CountSession> {
+  // Verschillende ringen mogen prima naast elkaar geteld worden; dezelfde ring
+  // twee keer levert twee waarheden op.
+  const existing = findActiveSessionForRing(await loadSessionsForEvent(data.eventId), data.ringId)
+  if (existing) throw new ActiveSessionExistsError(existing)
+
   const now = new Date().toISOString()
   const session: CountSession = {
     ...data,

@@ -27,6 +27,9 @@ const {
   isResumable,
 } = await import('../countSessionService')
 const {
+  ActiveSessionExistsError,
+  createSession,
+  loadSessionsForEvent,
   saveCount,
   loadOrCreateKioskCount,
   loadKioskCounts,
@@ -81,9 +84,9 @@ async function clearDatabase() {
 }
 
 /** Telt één kiosk volledig af, inclusief telregel. */
-async function countKiosk(kioskId: string, restockNeeded = true) {
+async function countKiosk(kioskId: string, restockNeeded = true, sessionId = SESSION_ID) {
   const kioskCount = await loadOrCreateKioskCount({
-    sessionId: SESSION_ID,
+    sessionId,
     kioskId,
     counterId: USER_ID,
   })
@@ -393,6 +396,63 @@ describe('goedkeuren', () => {
     } finally {
       flushSpy.mockRestore()
     }
+  })
+})
+
+describe('één actieve telronde per ring', () => {
+  const shortRoute = ROUTE.slice(0, 2)
+
+  function startParams(ringId: string) {
+    return {
+      userId: USER_ID,
+      eventId: EVENT_ID,
+      ringId,
+      startKioskId: shortRoute[0]!,
+      direction: RouteDirection.ASCENDING,
+      kioskRoute: shortRoute,
+      startedAt: new Date().toISOString(),
+    }
+  }
+
+  it('weigert een tweede telronde voor dezelfde ring', async () => {
+    const first = await createSession(startParams('ring-1'))
+
+    await expect(createSession(startParams('ring-1'))).rejects.toThrow(ActiveSessionExistsError)
+    // De melding wijst naar de ronde die er al is, zodat de teller verder kan.
+    await expect(createSession(startParams('ring-1'))).rejects.toMatchObject({
+      code: 'ACTIVE_SESSION_EXISTS',
+      session: expect.objectContaining({ id: first.id }),
+    })
+  })
+
+  it('laat een andere ring wel parallel starten', async () => {
+    await createSession(startParams('ring-1'))
+    const second = await createSession(startParams('ring-2'))
+
+    expect(second.ringId).toBe('ring-2')
+    expect((await loadSessionsForEvent(EVENT_ID)).map((s) => s.ringId).sort()).toEqual([
+      'ring-1',
+      'ring-2',
+    ])
+  })
+
+  it('blokkeert ook op een gepauzeerde of ingediende ronde', async () => {
+    const session = await createSession(startParams('ring-1'))
+    await pauseSession(session)
+
+    await expect(createSession(startParams('ring-1'))).rejects.toThrow(ActiveSessionExistsError)
+  })
+
+  it('laat na goedkeuren wel een nieuwe ronde voor die ring toe', async () => {
+    const session = await createSession(startParams('ring-1'))
+    await countKiosk(shortRoute[0]!, true, session.id)
+    await countKiosk(shortRoute[1]!, true, session.id)
+    await flushPendingCountWrites()
+    await syncService.flush()
+    await approveSession(session)
+
+    // Opnieuw tellen mag; de vorige ronde is afgehandeld.
+    await expect(createSession(startParams('ring-1'))).resolves.toBeDefined()
   })
 })
 

@@ -1,4 +1,43 @@
 import { CountSessionStatus, EventStatus } from '@/types/enums'
+import type { CountSession } from '@/types/domain'
+
+/**
+ * Standen waarin een telronde de ring bezet houdt.
+ *
+ * Zolang een ronde hierin staat is hij nog niet afgehandeld, en hoort er voor
+ * dezelfde ring geen tweede naast te lopen: twee tellers die los van elkaar
+ * dezelfde kiosken aflopen leveren twee waarheden op, en welke de bijvullijst
+ * haalt is dan een kwestie van toeval.
+ *
+ * APPROVED staat er bewust niet bij: die ronde is klaar. Wil je opnieuw tellen,
+ * dan mag daar een nieuwe ronde voor komen.
+ */
+export const ACTIVE_SESSION_STATUSES: readonly CountSessionStatus[] = [
+  CountSessionStatus.IN_PROGRESS,
+  CountSessionStatus.PAUSED,
+  CountSessionStatus.REOPENED,
+  CountSessionStatus.SUBMITTED,
+]
+
+export function isActiveSession(session: CountSession): boolean {
+  return ACTIVE_SESSION_STATUSES.includes(session.status)
+}
+
+/** De telronde die deze ring op dit moment bezet houdt, als die er is. */
+export function findActiveSessionForRing(
+  sessions: CountSession[],
+  ringId: string,
+  options: { ignoreSessionId?: string } = {}
+): CountSession | null {
+  return (
+    sessions.find(
+      (session) =>
+        session.ringId === ringId &&
+        session.id !== options.ignoreSessionId &&
+        isActiveSession(session)
+    ) ?? null
+  )
+}
 
 /**
  * Statusovergangen van een telronde.
