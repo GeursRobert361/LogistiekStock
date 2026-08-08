@@ -30,41 +30,96 @@ const ACTIVE_ROUND_STATUSES: RestockRoundStatus[] = [
   RestockRoundStatus.IN_PROGRESS,
 ]
 
-export interface RestockOverview {
-  requirements: RestockRequirement[]
+export interface ProductDemand {
+  total: number
+  perKiosk: Array<{ kioskId: string; packages: number }>
+}
+
+export interface RingRestockOverview {
+  ringId: string
+  byProduct: Map<string, ProductDemand>
   productRoundItems: RestockPlanItem[]
   mixedPalletItems: RestockPlanItem[]
-  /** Behoeften per product, met kiosken en aantallen. */
-  byProduct: Map<string, { total: number; perKiosk: Array<{ kioskId: string; packages: number }> }>
+}
+
+export interface RestockOverview {
+  requirements: RestockRequirement[]
+  /**
+   * De vulplanning is per ring, niet per product.
+   *
+   * Een pallet rijdt door één ring. Water dat in beide ringen nodig is, is dus
+   * twee keer werk — één regel "Water 110" belooft iets dat in één ronde niet
+   * te doen is, en verzwijgt bovendien welke ring die 110 betreft.
+   */
+  byRing: Map<string, RingRestockOverview>
+  /**
+   * Hetzelfde, opgeteld over de ringen heen. Alleen voor overzichten die er
+   * bewust naar vragen — zoals "wat staat er in totaal open" op het dashboard.
+   * Nooit als basis voor een ronde.
+   */
+  byProduct: Map<string, ProductDemand>
+}
+
+function addDemand(
+  target: Map<string, ProductDemand>,
+  requirement: RestockRequirement,
+  packages: number
+): void {
+  const current = target.get(requirement.productId) ?? { total: 0, perKiosk: [] }
+  current.total += packages
+  current.perKiosk.push({ kioskId: requirement.kioskId, packages })
+  target.set(requirement.productId, current)
+}
+
+function sortPerKiosk(demands: Map<string, ProductDemand>): void {
+  for (const demand of demands.values()) {
+    demand.perKiosk.sort((a, b) => a.kioskId.localeCompare(b.kioskId))
+  }
 }
 
 export async function getRestockOverview(
   eventId: string,
   products: Map<string, Product>
 ): Promise<RestockOverview> {
-  const requirements = await repositories.restock().getRequirements(eventId)
-  const { productRoundItems, mixedPalletItems } = planRestock(requirements, products)
+  const [requirements, kiosks] = await Promise.all([
+    repositories.restock().getRequirements(eventId),
+    repositories.kiosk().getKiosks(),
+  ])
+  const ringOfKiosk = new Map(kiosks.map((kiosk: Kiosk) => [kiosk.id, kiosk.ringId]))
 
-  const byProduct = new Map<
-    string,
-    { total: number; perKiosk: Array<{ kioskId: string; packages: number }> }
-  >()
+  const byProduct = new Map<string, ProductDemand>()
+  const requirementsByRing = new Map<string, RestockRequirement[]>()
 
   for (const requirement of requirements) {
+    const ringId = ringOfKiosk.get(requirement.kioskId)
+    if (ringId !== undefined) {
+      const forRing = requirementsByRing.get(ringId) ?? []
+      forRing.push(requirement)
+      requirementsByRing.set(ringId, forRing)
+    }
+
     const remaining = unplannedPackages(requirement)
-    if (remaining <= 0) continue
+    if (remaining > 0) addDemand(byProduct, requirement, remaining)
+  }
+  sortPerKiosk(byProduct)
 
-    const current = byProduct.get(requirement.productId) ?? { total: 0, perKiosk: [] }
-    current.total += remaining
-    current.perKiosk.push({ kioskId: requirement.kioskId, packages: remaining })
-    byProduct.set(requirement.productId, current)
+  const byRing = new Map<string, RingRestockOverview>()
+  for (const [ringId, ringRequirements] of requirementsByRing) {
+    const perProduct = new Map<string, ProductDemand>()
+    for (const requirement of ringRequirements) {
+      const remaining = unplannedPackages(requirement)
+      if (remaining > 0) addDemand(perProduct, requirement, remaining)
+    }
+    if (perProduct.size === 0) continue
+    sortPerKiosk(perProduct)
+
+    // Het voorstel productronde/gemengde pallet kijkt alleen naar deze ring:
+    // de drempel voor een eigen ronde slaat op wat er op één pallet gaat.
+    const { productRoundItems, mixedPalletItems } = planRestock(ringRequirements, products)
+    byRing.set(ringId, { ringId, byProduct: perProduct, productRoundItems, mixedPalletItems })
   }
 
-  for (const entry of byProduct.values()) {
-    entry.perKiosk.sort((a, b) => a.kioskId.localeCompare(b.kioskId))
-  }
-
-  return { requirements, productRoundItems, mixedPalletItems, byProduct }
+  return { requirements, byRing, byProduct }
 }
 
 /**
@@ -138,9 +193,21 @@ export async function createRound(params: CreateRoundParams): Promise<RestockRou
   return result.round
 }
 
+/**
+ * Zet de ring achter de rondenaam.
+ *
+ * Een productronde is altijd event + ring + product. Staat hetzelfde product in
+ * beide ringen open, dan zijn dat twee rondes, en dan moet uit de naam blijken
+ * welke van de twee je voor je hebt.
+ */
+function withRing(name: string, ringName?: string): string {
+  return ringName ? `${name} — ${ringName}` : name
+}
+
 export async function createProductRound(params: {
   eventId: string
   ringId: string
+  ringName?: string
   productId: string
   productName: string
   createdById: string
@@ -150,7 +217,7 @@ export async function createProductRound(params: {
     ringId: params.ringId,
     productIds: [params.productId],
     createdById: params.createdById,
-    name: `Productronde ${params.productName}`,
+    name: withRing(`Productronde ${params.productName}`, params.ringName),
     roundType: RestockRoundType.PRODUCT_ROUND,
   })
 }
@@ -158,6 +225,7 @@ export async function createProductRound(params: {
 export async function createMixedPalletRound(params: {
   eventId: string
   ringId: string
+  ringName?: string
   productIds: string[]
   createdById: string
   sequenceNumber: number
@@ -167,7 +235,7 @@ export async function createMixedPalletRound(params: {
     ringId: params.ringId,
     productIds: params.productIds,
     createdById: params.createdById,
-    name: `Gemengde pallet #${params.sequenceNumber}`,
+    name: withRing(`Gemengde pallet #${params.sequenceNumber}`, params.ringName),
     roundType: RestockRoundType.MIXED_PALLET,
   })
 }
@@ -205,12 +273,13 @@ export interface PalletRoundResult {
 export async function startPalletRound(params: {
   eventId: string
   ringId: string
+  ringName?: string
   productIds: string[]
   productNames: Map<string, string>
   userId: string
   sequenceNumber: number
 }): Promise<PalletRoundResult> {
-  const { eventId, ringId, productIds, productNames, userId, sequenceNumber } = params
+  const { eventId, ringId, ringName, productIds, productNames, userId, sequenceNumber } = params
 
   // Eén product is een productronde, meer is een gemengde pallet. Dat scheelt
   // later zoeken: de naam zegt dan wat er op de pallet lag.
@@ -220,9 +289,12 @@ export async function startPalletRound(params: {
     ringId,
     productIds,
     createdById: userId,
-    name: single
-      ? `Productronde ${productNames.get(single) ?? single}`
-      : `Gemengde pallet #${sequenceNumber}`,
+    name: withRing(
+      single
+        ? `Productronde ${productNames.get(single) ?? single}`
+        : `Gemengde pallet #${sequenceNumber}`,
+      ringName
+    ),
     roundType: single ? RestockRoundType.PRODUCT_ROUND : RestockRoundType.MIXED_PALLET,
   })
 

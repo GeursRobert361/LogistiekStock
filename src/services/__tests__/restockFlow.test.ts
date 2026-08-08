@@ -4,16 +4,32 @@ import type { Event, Kiosk, Product } from '@/types'
 
 const fakeRestockRepo = new FakeRestockRepository()
 
-/** Ring met 6 kiosken, 101 t/m 106. */
-const KIOSKS: Kiosk[] = Array.from({ length: 6 }, (_, i) => ({
-  id: `kiosk-${101 + i}`,
-  ringId: 'ring-1',
-  number: 101 + i,
-  sortOrder: i + 1,
-  isActive: true,
-  createdAt: '',
-  updatedAt: '',
-}))
+/**
+ * Twee ringen: 101 t/m 106 in de eerste, 201 t/m 203 in de tweede.
+ *
+ * De tweede ring staat achteraan in de lijst, zodat `seedRequirements` met
+ * index 0–5 gewoon de eerste ring blijft vullen.
+ */
+const KIOSKS: Kiosk[] = [
+  ...Array.from({ length: 6 }, (_, i) => ({
+    id: `kiosk-${101 + i}`,
+    ringId: 'ring-1',
+    number: 101 + i,
+    sortOrder: i + 1,
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  })),
+  ...Array.from({ length: 3 }, (_, i) => ({
+    id: `kiosk-${201 + i}`,
+    ringId: 'ring-2',
+    number: 201 + i,
+    sortOrder: i + 1,
+    isActive: true,
+    createdAt: '',
+    updatedAt: '',
+  })),
+]
 
 /** Startkiosk voor vullen; per test aanpasbaar. */
 let restockStartKioskId: string | undefined
@@ -47,6 +63,7 @@ const {
   createProductRound,
   createMixedPalletRound,
   findEventWithOpenRestockWork,
+  getRestockOverview,
   setLoadedQuantities,
   startPalletRound,
   cancelRound,
@@ -254,6 +271,108 @@ describe('productronde', () => {
     expect((await fakeRestockRepo.getRoundById(round.id))!.status).toBe(
       RestockRoundStatus.CANCELLED
     )
+  })
+})
+
+describe('vulplanning per ring', () => {
+  const products = new Map<string, Product>([
+    ['water', product('water', { roundType: RoundType.PRODUCT_ROUND })],
+    ['servetten', product('servetten', { roundType: RoundType.MIXED_PALLET })],
+  ])
+
+  it('houdt hetzelfde product in twee ringen uit elkaar', async () => {
+    // Water: 60 in de eerste ring, 50 in de tweede. Eén regel "Water 110" zou
+    // een ronde beloven die niet bestaat.
+    await seedRequirements('water', [30, 30, 0, 0, 0, 0, 20, 30])
+
+    const overview = await getRestockOverview(EVENT_ID, products)
+
+    expect(overview.byRing.get('ring-1')!.byProduct.get('water')!.total).toBe(60)
+    expect(overview.byRing.get('ring-2')!.byProduct.get('water')!.total).toBe(50)
+    // Het opgetelde getal bestaat nog, maar alleen waar er bewust om gevraagd
+    // wordt.
+    expect(overview.byProduct.get('water')!.total).toBe(110)
+  })
+
+  it('noemt per ring alleen de kiosken van die ring', async () => {
+    await seedRequirements('water', [30, 0, 0, 0, 0, 0, 20])
+
+    const overview = await getRestockOverview(EVENT_ID, products)
+
+    expect(
+      overview.byRing.get('ring-1')!.byProduct.get('water')!.perKiosk.map((k) => k.kioskId)
+    ).toEqual(['kiosk-101'])
+    expect(
+      overview.byRing.get('ring-2')!.byProduct.get('water')!.perKiosk.map((k) => k.kioskId)
+    ).toEqual(['kiosk-201'])
+  })
+
+  it('laat een ring zonder openstaand werk weg', async () => {
+    await seedRequirements('water', [30])
+
+    const overview = await getRestockOverview(EVENT_ID, products)
+
+    expect([...overview.byRing.keys()]).toEqual(['ring-1'])
+  })
+
+  it('reserveert bij een ronde in de eerste ring niets uit de tweede', async () => {
+    await seedRequirements('water', [10, 0, 0, 0, 0, 0, 7])
+
+    await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      ringName: 'Eerste ring',
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+
+    const requirements = await fakeRestockRepo.getRequirements(EVENT_ID)
+    const firstRing = requirements.find((r) => r.kioskId === 'kiosk-101')!
+    const secondRing = requirements.find((r) => r.kioskId === 'kiosk-201')!
+
+    expect(firstRing.reservedPackages).toBe(10)
+    expect(secondRing.reservedPackages).toBe(0)
+    expect(unplannedPackages(secondRing)).toBe(7)
+  })
+
+  it('zet de ring in de naam van de ronde', async () => {
+    await seedRequirements('water', [10])
+
+    const round = await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      ringName: 'Eerste ring',
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+
+    expect(round.name).toBe('Productronde Water blauw — Eerste ring')
+  })
+
+  it('kan geen gemengde pallet maken met producten uit twee ringen', async () => {
+    // Servetten staan alleen in de tweede ring open. Een pallet voor de eerste
+    // ring mag daar niets van meenemen.
+    await seedRequirements('water', [10])
+    await seedRequirements('servetten', [0, 0, 0, 0, 0, 0, 5])
+
+    const round = await createMixedPalletRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      ringName: 'Eerste ring',
+      productIds: ['water', 'servetten'],
+      createdById: PLANNER,
+      sequenceNumber: 1,
+    })
+
+    const items = await fakeRestockRepo.getRoundItems(round.id)
+    expect(items.map((i) => i.productId)).toEqual(['water'])
+
+    const servetten = (await fakeRestockRepo.getRequirements(EVENT_ID)).find(
+      (r) => r.productId === 'servetten'
+    )!
+    expect(servetten.reservedPackages).toBe(0)
   })
 })
 

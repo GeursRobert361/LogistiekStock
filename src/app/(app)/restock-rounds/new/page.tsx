@@ -16,7 +16,7 @@ import {
 } from '@/services/restockPlanningService'
 import { orderEventsByRelevance } from '@/domain/events/eventSelection'
 import { EventStatus } from '@/types'
-import type { Event, Kiosk, Product, Ring } from '@/types'
+import type { Event, Product, Ring } from '@/types'
 
 /** Eén regel op het scherm: een product met wat er nog van open staat. */
 interface OpenProduct {
@@ -65,40 +65,26 @@ export default function PickPalletPage() {
   const loadOpenWork = useCallback(async (currentEventId: string) => {
     setIsLoading(true)
 
-    const [productList, kioskList, rounds] = await Promise.all([
+    const [productList, rounds] = await Promise.all([
       repositories.product().getProducts({ activeOnly: false }),
-      repositories.kiosk().getKiosks(),
       repositories.restock().getRounds(currentEventId),
     ])
     const products = new Map(productList.map((p) => [p.id, p]))
-    const ringOfKiosk = new Map(kioskList.map((k: Kiosk) => [k.id, k.ringId]))
 
+    // Een pallet rijdt door één ring; het overzicht is daarom per ring.
     const overview = await getRestockOverview(currentEventId, products)
 
-    // Een pallet rijdt door één ring, dus het openstaande werk wordt daar ook
-    // per ring geteld. Hetzelfde product in twee ringen zijn twee regels.
-    const perRing = new Map<string, Map<string, OpenProduct>>()
-    for (const [productId, entry] of overview.byProduct) {
-      const product = products.get(productId)
-      if (!product) continue
-
-      for (const perKiosk of entry.perKiosk) {
-        const kioskRingId = ringOfKiosk.get(perKiosk.kioskId)
-        if (!kioskRingId) continue
-
-        const forRing = perRing.get(kioskRingId) ?? new Map<string, OpenProduct>()
-        const row = forRing.get(productId) ?? { product, packages: 0, kioskCount: 0 }
-        row.packages += perKiosk.packages
-        row.kioskCount += 1
-        forRing.set(productId, row)
-        perRing.set(kioskRingId, forRing)
-      }
-    }
-
     const sorted = new Map(
-      [...perRing].map(([id, rows]) => [
-        id,
-        [...rows.values()].sort((a, b) => b.packages - a.packages),
+      [...overview.byRing].map(([ringId, ring]) => [
+        ringId,
+        [...ring.byProduct]
+          .map(([productId, demand]) => ({
+            product: products.get(productId),
+            packages: demand.total,
+            kioskCount: demand.perKiosk.length,
+          }))
+          .filter((row): row is OpenProduct => row.product !== undefined)
+          .sort((a, b) => b.packages - a.packages),
       ])
     )
 
@@ -145,6 +131,7 @@ export default function PickPalletPage() {
       const { round, firstStopId } = await startPalletRound({
         eventId,
         ringId,
+        ringName: rings.find((ring) => ring.id === ringId)?.name,
         productIds: selectedRows.map((row) => row.product.id),
         productNames: new Map(selectedRows.map((row) => [row.product.id, row.product.name])),
         userId: profile.id,

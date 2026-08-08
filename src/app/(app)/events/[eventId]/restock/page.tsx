@@ -17,9 +17,10 @@ import {
   getRestockOverview,
   isRoundActive,
   type RestockOverview,
+  type RingRestockOverview,
 } from '@/services/restockPlanningService'
 import { ROUND_STATUS_LABEL } from '@/lib/roundStatus'
-import type { Kiosk, Product, RestockRound } from '@/types'
+import type { Kiosk, Product, RestockRound, Ring } from '@/types'
 
 export default function RestockPlanningPage({
   params,
@@ -33,23 +34,27 @@ export default function RestockPlanningPage({
   const [overview, setOverview] = useState<RestockOverview | null>(null)
   const [products, setProducts] = useState<Map<string, Product>>(new Map())
   const [kiosks, setKiosks] = useState<Map<string, Kiosk>>(new Map())
+  const [rings, setRings] = useState<Map<string, Ring>>(new Map())
   const [rounds, setRounds] = useState<RestockRound[]>([])
-  const [expandedProductId, setExpandedProductId] = useState<string | null>(null)
-  const [selectedForPallet, setSelectedForPallet] = useState<Set<string>>(new Set())
+  const [expandedKey, setExpandedKey] = useState<string | null>(null)
+  /** Selectie voor een gemengde pallet, per ring apart bijgehouden. */
+  const [selectedByRing, setSelectedByRing] = useState<Map<string, Set<string>>>(new Map())
   const [isLoading, setIsLoading] = useState(true)
   const [isWorking, setIsWorking] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [productList, kioskList, roundList] = await Promise.all([
+    const [productList, kioskList, ringList, roundList] = await Promise.all([
       repositories.product().getProducts({ activeOnly: false }),
       repositories.kiosk().getKiosks(),
+      repositories.kiosk().getRings(),
       repositories.restock().getRounds(eventId),
     ])
 
     const productMap = new Map(productList.map((p) => [p.id, p]))
     setProducts(productMap)
     setKiosks(new Map(kioskList.map((k) => [k.id, k])))
+    setRings(new Map(ringList.map((r) => [r.id, r])))
     setRounds(roundList)
     setOverview(await getRestockOverview(eventId, productMap))
     setIsLoading(false)
@@ -63,25 +68,25 @@ export default function RestockPlanningPage({
     })
   }, [load])
 
-  /** Ring van een product bepalen we uit de kiosken waar vraag is. */
-  const ringForProduct = useCallback(
-    (productId: string): string | null => {
-      const perKiosk = overview?.byProduct.get(productId)?.perKiosk ?? []
-      for (const entry of perKiosk) {
-        const kiosk = kiosks.get(entry.kioskId)
-        if (kiosk) return kiosk.ringId
-      }
-      return null
-    },
-    [overview, kiosks]
-  )
-
   const activeRoundCount = useMemo(() => rounds.filter(isRoundActive).length, [rounds])
 
-  async function handleCreateProductRound(productId: string) {
+  /** Ringen met werk, in de volgorde waarin ze in het stadion liggen. */
+  const ringSections = useMemo(() => {
+    if (!overview) return []
+    return [...overview.byRing.values()].sort((a, b) => {
+      const left = rings.get(a.ringId)
+      const right = rings.get(b.ringId)
+      return (left?.sortOrder ?? 0) - (right?.sortOrder ?? 0)
+    })
+  }, [overview, rings])
+
+  function ringName(ringId: string): string {
+    return rings.get(ringId)?.name ?? 'Onbekende ring'
+  }
+
+  async function handleCreateProductRound(ringId: string, productId: string) {
     const product = products.get(productId)
-    const ringId = ringForProduct(productId)
-    if (!profile || !product || !ringId) return
+    if (!profile || !product) return
 
     setIsWorking(true)
     setError(null)
@@ -89,6 +94,7 @@ export default function RestockPlanningPage({
       const round = await createProductRound({
         eventId,
         ringId,
+        ringName: ringName(ringId),
         productId,
         productName: product.name,
         createdById: profile.id,
@@ -101,10 +107,11 @@ export default function RestockPlanningPage({
     }
   }
 
-  async function handleCreateMixedPallet() {
-    const productIds = [...selectedForPallet]
-    const ringId = productIds.map(ringForProduct).find((id): id is string => id !== null)
-    if (!profile || productIds.length === 0 || !ringId) return
+  async function handleCreateMixedPallet(ringId: string) {
+    // De selectie hoort bij één ring; producten uit een andere ring kunnen hier
+    // dus niet op terechtkomen. Een pallet rijdt door één ring.
+    const productIds = [...(selectedByRing.get(ringId) ?? [])]
+    if (!profile || productIds.length === 0) return
 
     setIsWorking(true)
     setError(null)
@@ -112,6 +119,7 @@ export default function RestockPlanningPage({
       const round = await createMixedPalletRound({
         eventId,
         ringId,
+        ringName: ringName(ringId),
         productIds,
         createdById: profile.id,
         sequenceNumber: rounds.length + 1,
@@ -124,14 +132,13 @@ export default function RestockPlanningPage({
     }
   }
 
-  function toggleForPallet(productId: string) {
-    setSelectedForPallet((previous) => {
-      const next = new Set(previous)
-      if (next.has(productId)) {
-        next.delete(productId)
-      } else {
-        next.add(productId)
-      }
+  function toggleForPallet(ringId: string, productId: string) {
+    setSelectedByRing((previous) => {
+      const next = new Map(previous)
+      const forRing = new Set(next.get(ringId) ?? [])
+      if (forRing.has(productId)) forRing.delete(productId)
+      else forRing.add(productId)
+      next.set(ringId, forRing)
       return next
     })
   }
@@ -145,13 +152,10 @@ export default function RestockPlanningPage({
     )
   }
 
-  const hasOpenWork =
-    (overview?.productRoundItems.length ?? 0) + (overview?.mixedPalletItems.length ?? 0) > 0
-
   return (
     <>
       <AppHeader title="Vulplanning" backHref={`/events/${eventId}`} />
-      <div className="space-y-4 p-4">
+      <div className="space-y-5 p-4">
         {error && (
           <p role="alert" className="rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800">
             {error}
@@ -170,8 +174,8 @@ export default function RestockPlanningPage({
               {rounds.map((round) => (
                 <Link key={round.id} href={`/restock-rounds/${round.id}`} className="block">
                   <Card className="active:bg-gray-100">
-                    <CardContent className="flex items-center justify-between py-3">
-                      <p className="font-medium text-gray-900">{round.name}</p>
+                    <CardContent className="flex items-center justify-between gap-2 py-3">
+                      <p className="min-w-0 truncate font-medium text-gray-900">{round.name}</p>
                       <Badge variant={round.status === 'COMPLETED' ? 'success' : 'info'}>
                         {ROUND_STATUS_LABEL[round.status]}
                       </Badge>
@@ -183,7 +187,7 @@ export default function RestockPlanningPage({
           </section>
         )}
 
-        {!hasOpenWork ? (
+        {ringSections.length === 0 ? (
           <EmptyState
             title="Niets meer te plannen"
             description={
@@ -194,149 +198,200 @@ export default function RestockPlanningPage({
             icon="✅"
           />
         ) : (
-          <>
-            {/* ── Productrondes ────────────────────────────────────────── */}
-            {overview!.productRoundItems.length > 0 && (
-              <section aria-labelledby="product-rounds-heading">
-                <h3
-                  id="product-rounds-heading"
-                  className="mb-1 text-sm font-semibold uppercase tracking-wide text-gray-500"
-                >
-                  Eigen ronde
-                </h3>
-                <p className="mb-2 text-xs text-gray-600">
-                  Grote aantallen die een hele pallet vullen.
-                </p>
-
-                <div className="space-y-2">
-                  {overview!.productRoundItems.map((item) => (
-                    <Card key={item.product.id}>
-                      <CardContent className="py-3">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            setExpandedProductId(
-                              expandedProductId === item.product.id ? null : item.product.id
-                            )
-                          }
-                          aria-expanded={expandedProductId === item.product.id}
-                          className="flex w-full items-start justify-between gap-2 text-left"
-                        >
-                          <div className="min-w-0">
-                            <p className="font-semibold text-gray-900">{item.product.name}</p>
-                            <p className="text-sm text-gray-600">
-                              Totaal: {item.totalRequiredPackages} {item.product.packagingUnit} ·{' '}
-                              {item.affectedKioskIds.length} kiosken
-                            </p>
-                            {item.ownRoundReason && (
-                              <p className="mt-0.5 text-xs text-gray-500">
-                                {OWN_ROUND_REASON_LABEL[item.ownRoundReason]}
-                              </p>
-                            )}
-                          </div>
-                          <span aria-hidden="true" className="text-gray-400">
-                            {expandedProductId === item.product.id ? '▲' : '▼'}
-                          </span>
-                        </button>
-
-                        {expandedProductId === item.product.id && (
-                          <ul className="mt-2 divide-y divide-gray-100 rounded-lg bg-gray-50">
-                            {(overview!.byProduct.get(item.product.id)?.perKiosk ?? []).map(
-                              (entry) => (
-                                <li
-                                  key={entry.kioskId}
-                                  className="flex justify-between px-3 py-1.5 text-sm"
-                                >
-                                  <span className="text-gray-700">
-                                    {kioskTitle(kiosks.get(entry.kioskId)) || entry.kioskId}
-                                  </span>
-                                  <span className="font-semibold text-gray-900">
-                                    {entry.packages}
-                                  </span>
-                                </li>
-                              )
-                            )}
-                          </ul>
-                        )}
-
-                        <Button
-                          size="md"
-                          className="mt-3 w-full"
-                          disabled={isWorking}
-                          onClick={() => void handleCreateProductRound(item.product.id)}
-                        >
-                          Productronde maken
-                        </Button>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
-              </section>
-            )}
-
-            {/* ── Gemengde pallet ──────────────────────────────────────── */}
-            {overview!.mixedPalletItems.length > 0 && (
-              <section aria-labelledby="mixed-heading">
-                <h3
-                  id="mixed-heading"
-                  className="mb-1 text-sm font-semibold uppercase tracking-wide text-gray-500"
-                >
-                  Gemengde pallet
-                </h3>
-                <p className="mb-2 text-xs text-gray-600">
-                  Kies de producten die samen op één pallet gaan.
-                </p>
-
-                <div className="space-y-1">
-                  {overview!.mixedPalletItems.map((item) => {
-                    const isSelected = selectedForPallet.has(item.product.id)
-                    return (
-                      <label
-                        key={item.product.id}
-                        className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 ${
-                          isSelected
-                            ? 'border-arena-red bg-red-50'
-                            : 'border-gray-200 bg-white'
-                        }`}
-                      >
-                        <input
-                          type="checkbox"
-                          checked={isSelected}
-                          onChange={() => toggleForPallet(item.product.id)}
-                          className="h-5 w-5 flex-shrink-0 accent-arena-red"
-                        />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate font-medium text-gray-900">
-                            {item.product.name}
-                          </span>
-                          <span className="block text-xs text-gray-600">
-                            {item.affectedKioskIds.length} kiosken
-                          </span>
-                        </span>
-                        <span className="whitespace-nowrap text-lg font-bold text-gray-900">
-                          {item.totalRequiredPackages}
-                        </span>
-                      </label>
-                    )
-                  })}
-                </div>
-
-                <Button
-                  size="lg"
-                  className="mt-3 w-full"
-                  disabled={isWorking || selectedForPallet.size === 0}
-                  onClick={() => void handleCreateMixedPallet()}
-                >
-                  {selectedForPallet.size === 0
-                    ? 'Selecteer producten voor een pallet'
-                    : `Pallet maken (${selectedForPallet.size} producten)`}
-                </Button>
-              </section>
-            )}
-          </>
+          ringSections.map((ring) => (
+            <RingSection
+              key={ring.ringId}
+              ring={ring}
+              name={ringName(ring.ringId)}
+              kiosks={kiosks}
+              expandedKey={expandedKey}
+              onToggleExpand={setExpandedKey}
+              selected={selectedByRing.get(ring.ringId) ?? new Set()}
+              onToggleSelect={(productId) => toggleForPallet(ring.ringId, productId)}
+              isWorking={isWorking}
+              onCreateProductRound={(productId) =>
+                void handleCreateProductRound(ring.ringId, productId)
+              }
+              onCreateMixedPallet={() => void handleCreateMixedPallet(ring.ringId)}
+            />
+          ))
         )}
       </div>
     </>
+  )
+}
+
+interface RingSectionProps {
+  ring: RingRestockOverview
+  name: string
+  kiosks: Map<string, Kiosk>
+  expandedKey: string | null
+  onToggleExpand: (key: string | null) => void
+  selected: Set<string>
+  onToggleSelect: (productId: string) => void
+  isWorking: boolean
+  onCreateProductRound: (productId: string) => void
+  onCreateMixedPallet: () => void
+}
+
+/**
+ * Alles van één ring bij elkaar.
+ *
+ * De ring staat boven de aantallen en niet ergens in een detailregel: met een
+ * pallet in de hand is dat het eerste wat je moet weten.
+ */
+function RingSection({
+  ring,
+  name,
+  kiosks,
+  expandedKey,
+  onToggleExpand,
+  selected,
+  onToggleSelect,
+  isWorking,
+  onCreateProductRound,
+  onCreateMixedPallet,
+}: RingSectionProps) {
+  const totalPackages = [...ring.byProduct.values()].reduce(
+    (sum, demand) => sum + demand.total,
+    0
+  )
+
+  return (
+    <section aria-labelledby={`ring-${ring.ringId}`} className="space-y-3">
+      <div className="border-b-2 border-arena-red pb-1">
+        <h2 id={`ring-${ring.ringId}`} className="text-lg font-bold text-gray-900">
+          {name}
+        </h2>
+        <p className="text-xs text-gray-600">
+          {ring.byProduct.size} {ring.byProduct.size === 1 ? 'product' : 'producten'} ·{' '}
+          {totalPackages} open
+        </p>
+      </div>
+
+      {ring.productRoundItems.length > 0 && (
+        <div>
+          <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Eigen ronde
+          </h3>
+          <p className="mb-2 text-xs text-gray-600">Grote aantallen die een hele pallet vullen.</p>
+
+          <div className="space-y-2">
+            {ring.productRoundItems.map((item) => {
+              const key = `${ring.ringId}:${item.product.id}`
+              const isExpanded = expandedKey === key
+              return (
+                <Card key={key}>
+                  <CardContent className="py-3">
+                    <button
+                      type="button"
+                      onClick={() => onToggleExpand(isExpanded ? null : key)}
+                      aria-expanded={isExpanded}
+                      className="flex w-full items-start justify-between gap-2 text-left"
+                    >
+                      <div className="min-w-0">
+                        <p className="font-semibold text-gray-900">{item.product.name}</p>
+                        <p className="text-sm text-gray-600">
+                          {item.totalRequiredPackages} {item.product.packagingUnit} ·{' '}
+                          {item.affectedKioskIds.length} kiosken · {name}
+                        </p>
+                        {item.ownRoundReason && (
+                          <p className="mt-0.5 text-xs text-gray-500">
+                            {OWN_ROUND_REASON_LABEL[item.ownRoundReason]}
+                          </p>
+                        )}
+                      </div>
+                      <span aria-hidden="true" className="text-gray-400">
+                        {isExpanded ? '▲' : '▼'}
+                      </span>
+                    </button>
+
+                    {isExpanded && (
+                      <ul className="mt-2 divide-y divide-gray-100 rounded-lg bg-gray-50">
+                        {(ring.byProduct.get(item.product.id)?.perKiosk ?? []).map((entry) => (
+                          <li
+                            key={entry.kioskId}
+                            className="flex justify-between px-3 py-1.5 text-sm"
+                          >
+                            <span className="text-gray-700">
+                              {kioskTitle(kiosks.get(entry.kioskId)) || entry.kioskId}
+                            </span>
+                            <span className="font-semibold text-gray-900">{entry.packages}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+
+                    <Button
+                      size="md"
+                      className="mt-3 w-full"
+                      disabled={isWorking}
+                      onClick={() => onCreateProductRound(item.product.id)}
+                    >
+                      Productronde maken
+                    </Button>
+                  </CardContent>
+                </Card>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {ring.mixedPalletItems.length > 0 && (
+        <div>
+          <h3 className="mb-1 text-sm font-semibold uppercase tracking-wide text-gray-500">
+            Gemengde pallet
+          </h3>
+          <p className="mb-2 text-xs text-gray-600">
+            Kies de producten die samen op één pallet gaan. Alles hier hoort bij {name}.
+          </p>
+
+          <div className="space-y-1">
+            {ring.mixedPalletItems.map((item) => {
+              const isSelected = selected.has(item.product.id)
+              return (
+                <label
+                  key={item.product.id}
+                  className={`flex min-h-14 cursor-pointer items-center gap-3 rounded-xl border px-3 py-2 ${
+                    isSelected ? 'border-arena-red bg-red-50' : 'border-gray-200 bg-white'
+                  }`}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => onToggleSelect(item.product.id)}
+                    className="h-5 w-5 flex-shrink-0 accent-arena-red"
+                  />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-gray-900">
+                      {item.product.name}
+                    </span>
+                    <span className="block text-xs text-gray-600">
+                      {item.affectedKioskIds.length} kiosken
+                    </span>
+                  </span>
+                  <span className="whitespace-nowrap text-lg font-bold text-gray-900">
+                    {item.totalRequiredPackages}
+                  </span>
+                </label>
+              )
+            })}
+          </div>
+
+          <Button
+            size="lg"
+            className="mt-3 w-full"
+            disabled={isWorking || selected.size === 0}
+            onClick={onCreateMixedPallet}
+          >
+            {selected.size === 0
+              ? 'Selecteer producten voor een pallet'
+              : `Pallet maken voor ${name} (${selected.size} producten)`}
+          </Button>
+        </div>
+      )}
+    </section>
   )
 }
 
