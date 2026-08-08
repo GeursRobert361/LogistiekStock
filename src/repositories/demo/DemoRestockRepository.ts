@@ -1,4 +1,8 @@
-import type { IRestockRepository } from '../interfaces/IRestockRepository'
+import type {
+  IRestockRepository,
+  ReserveRoundInput,
+  ReserveRoundResult,
+} from '../interfaces/IRestockRepository'
 import type {
   RestockRequirement,
   RestockRound,
@@ -183,6 +187,100 @@ export class DemoRestockRepository implements IRestockRepository {
   }
 
   // ─── Reserveringen ─────────────────────────────────────────────────────────
+
+  /**
+   * Demo-variant van de atomaire reservering.
+   *
+   * Zonder database geen transactie, maar ook geen tweede proces: de browser
+   * draait dit blok in één keer af zonder er tussenuit te gaan, dus het effect
+   * is hetzelfde. De rekenregel is identiek aan die op de server.
+   */
+  async reserveRoundAtomic({
+    round,
+    kioskIds,
+    productIds,
+  }: ReserveRoundInput): Promise<ReserveRoundResult> {
+    const kiosks = new Set(kioskIds)
+    const products = new Set(productIds)
+
+    const claimable = demoTables.restockRequirements
+      .filter(
+        (requirement) =>
+          requirement.eventId === round.eventId &&
+          kiosks.has(requirement.kioskId) &&
+          products.has(requirement.productId)
+      )
+      .map((requirement) => ({
+        requirement,
+        packages:
+          requirement.requiredPackages -
+          requirement.deliveredPackages -
+          requirement.reservedPackages,
+      }))
+      .filter((entry) => entry.packages > 0)
+
+    if (claimable.length === 0) return { ok: false, reason: 'NOTHING_AVAILABLE' }
+
+    const now = new Date().toISOString()
+    const existingRound = demoTables.restockRounds.getById(round.id)
+    const createdRound: RestockRound = {
+      ...round,
+      createdAt: existingRound?.createdAt ?? now,
+      updatedAt: now,
+    }
+    demoTables.restockRounds.put(createdRound)
+
+    const reservations: StockReservation[] = []
+    const proposedByProduct = new Map<string, number>()
+
+    for (const { requirement, packages } of claimable) {
+      const existing = demoTables.stockReservations.find(
+        (reservation) =>
+          reservation.restockRequirementId === requirement.id &&
+          reservation.restockRoundId === createdRound.id
+      )
+      const reservation: StockReservation = {
+        id: existing?.id ?? newId(),
+        restockRequirementId: requirement.id,
+        restockRoundId: createdRound.id,
+        reservedPackages: packages,
+        createdAt: existing?.createdAt ?? now,
+      }
+      demoTables.stockReservations.put(reservation)
+      reservations.push(reservation)
+
+      demoTables.restockRequirements.update(requirement.id, {
+        reservedPackages: requirement.reservedPackages + packages,
+        updatedAt: now,
+      })
+
+      proposedByProduct.set(
+        requirement.productId,
+        (proposedByProduct.get(requirement.productId) ?? 0) + packages
+      )
+    }
+
+    const items: RestockRoundItem[] = []
+    for (const [productId, proposed] of proposedByProduct) {
+      const existing = demoTables.restockRoundItems.find(
+        (item) => item.restockRoundId === createdRound.id && item.productId === productId
+      )
+      const item: RestockRoundItem = {
+        id: existing?.id ?? newId(),
+        restockRoundId: createdRound.id,
+        productId,
+        proposedPackages: proposed,
+        loadedPackages: proposed,
+        deliveredPackages: existing?.deliveredPackages ?? 0,
+        createdAt: existing?.createdAt ?? now,
+        updatedAt: now,
+      }
+      demoTables.restockRoundItems.put(item)
+      items.push(item)
+    }
+
+    return { ok: true, round: createdRound, items, reservations }
+  }
 
   async createReservation(
     data: Omit<StockReservation, 'id' | 'createdAt'>

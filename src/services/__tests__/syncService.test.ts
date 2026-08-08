@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { SyncService } from '../syncService'
 import { getOfflineDb, getRetryDelayMs, getDueOutboxEntries } from '@/lib/db/offlineDb'
 import { SyncStatus } from '@/types'
@@ -25,13 +25,33 @@ async function makeEverythingDue() {
   }
 }
 
+/**
+ * Alle services van deze test, zodat ze na afloop hun timers opruimen.
+ *
+ * Elke `enqueue` plant 400 ms later een flush in. Vuurt die pas tijdens een
+ * volgende test, dan verwerkt hij met de handlers van de vórige test de outbox
+ * die op dat moment van iemand anders is — en dan meet de test iets anders dan
+ * hij denkt.
+ */
+const services: SyncService[] = []
+
+function newSyncService(): SyncService {
+  const service = new SyncService()
+  services.push(service)
+  return service
+}
+
 beforeEach(async () => {
   await clearOutbox()
 })
 
+afterEach(() => {
+  for (const service of services.splice(0)) service.dispose()
+})
+
 describe('SyncService', () => {
   it('verwerkt een mutatie en ruimt de outbox op', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     const handler = vi.fn(async () => undefined)
     sync.registerHandler('countEntry', handler)
 
@@ -45,7 +65,7 @@ describe('SyncService', () => {
   })
 
   it('vervangt een openstaande mutatie in plaats van er een tweede bij te zetten', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     const seen: unknown[] = []
     sync.registerHandler('countEntry', async (payload) => {
       seen.push(payload)
@@ -64,7 +84,7 @@ describe('SyncService', () => {
 
 describe('blijven proberen bij een onbereikbare server', () => {
   it('geeft nooit op, hoe vaak het ook mislukt', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     let shouldFail = true
     sync.registerHandler('countEntry', async () => {
       if (shouldFail) throw new Error('Netwerkfout: server niet bereikbaar')
@@ -100,7 +120,7 @@ describe('blijven proberen bij een onbereikbare server', () => {
   })
 
   it('probeert niet opnieuw voordat de wachttijd om is', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     let calls = 0
     sync.registerHandler('countEntry', async () => {
       calls++
@@ -118,7 +138,7 @@ describe('blijven proberen bij een onbereikbare server', () => {
   })
 
   it('meldt de wijzigingen als bewaard, niet als verloren', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     sync.registerHandler('countEntry', async () => {
       throw new Error('Netwerkfout')
     })
@@ -137,7 +157,7 @@ describe('blijven proberen bij een onbereikbare server', () => {
 
 describe('weigering door de server', () => {
   it('stopt met proberen bij een fout die zichzelf niet oplost', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     let calls = 0
     sync.registerHandler('countEntry', async () => {
       calls++
@@ -155,7 +175,7 @@ describe('weigering door de server', () => {
   })
 
   it('blijft wel proberen bij een verlopen sessie', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     let calls = 0
     sync.registerHandler('countEntry', async () => {
       calls++
@@ -173,7 +193,7 @@ describe('weigering door de server', () => {
   })
 
   it('blijft proberen bij een serverfout', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     let calls = 0
     sync.registerHandler('countEntry', async () => {
       calls++
@@ -190,7 +210,7 @@ describe('weigering door de server', () => {
   })
 
   it('zet een geweigerde mutatie terug in de wachtrij met retryNow', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     let shouldReject = true
     sync.registerHandler('countEntry', async () => {
       if (shouldReject) throw new HttpError('Geen toegang.', 403)
@@ -208,7 +228,7 @@ describe('weigering door de server', () => {
   })
 
   it('geeft een nieuwe waarde een schone kans na een weigering', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     let shouldReject = true
     sync.registerHandler('countEntry', async () => {
       if (shouldReject) throw new HttpError('Ongeldig verzoek.', 400)
@@ -228,7 +248,7 @@ describe('weigering door de server', () => {
   })
 
   it('laat een mutatie zonder handler niet stil verdwijnen', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
 
     await sync.enqueue('incident', 'incident-1', 'create', {})
@@ -240,7 +260,7 @@ describe('weigering door de server', () => {
   })
 
   it('meldt abonnees de actuele stand', async () => {
-    const sync = new SyncService()
+    const sync = newSyncService()
     sync.registerHandler('countEntry', async () => undefined)
     const seen: number[] = []
     const unsubscribe = sync.subscribe((snapshot) => seen.push(snapshot.pendingCount))

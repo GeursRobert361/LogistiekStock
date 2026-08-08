@@ -138,6 +138,21 @@ export class SyncService {
     await this.flush()
   }
 
+  /**
+   * Stopt de klok en een eventueel geplande poging.
+   *
+   * Zonder dit blijft een gedebouncede flush na 400 ms alsnog vuren. In de app
+   * is dat ongevaarlijk — er is één service — maar het houdt wel een timer in
+   * leven, en in tests grijpt zo'n late flush in de outbox van de volgende test.
+   */
+  dispose(): void {
+    if (this.debounceTimer) {
+      clearTimeout(this.debounceTimer)
+      this.debounceTimer = null
+    }
+    this.stopTicking()
+  }
+
   private scheduleFlush(): void {
     if (this.debounceTimer) clearTimeout(this.debounceTimer)
     this.debounceTimer = setTimeout(() => {

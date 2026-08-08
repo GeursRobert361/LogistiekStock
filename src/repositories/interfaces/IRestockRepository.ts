@@ -8,6 +8,24 @@ import type {
   StockReservation,
 } from '@/types'
 
+export interface ReserveRoundInput {
+  /** De ronde die wordt aangemaakt zodra er iets te reserveren blijkt. */
+  round: Omit<RestockRound, 'createdAt' | 'updatedAt'>
+  /** Kiosken van de ring waar deze ronde doorheen rijdt. */
+  kioskIds: string[]
+  productIds: string[]
+}
+
+export type ReserveRoundResult =
+  | {
+      ok: true
+      round: RestockRound
+      items: RestockRoundItem[]
+      reservations: StockReservation[]
+    }
+  /** Alles was al gereserveerd of geleverd tegen de tijd dat we de rijen hadden. */
+  | { ok: false; reason: 'NOTHING_AVAILABLE' }
+
 export interface IRestockRepository {
   // ─── Behoeften (bijvullijst) ───────────────────────────────────────────────
   getRequirements(eventId: string): Promise<RestockRequirement[]>
@@ -50,6 +68,17 @@ export interface IRestockRepository {
   getDeliveriesForRound(roundId: string): Promise<RestockDelivery[]>
 
   // ─── Reserveringen ─────────────────────────────────────────────────────────
+  /**
+   * Maakt een vulronde en reserveert de bijbehorende voorraad in één keer.
+   *
+   * Het vrije aantal (nodig − geleverd − gereserveerd) wordt hierbinnen
+   * opnieuw berekend, met de behoefterijen vergrendeld. Twee vullers die op
+   * hetzelfde moment dezelfde 10 pakken willen pakken, krijgen daardoor samen
+   * niet meer dan 10: de tweede ziet wat de eerste net heeft vastgelegd.
+   *
+   * Lukt er niets meer, dan wordt er ook geen ronde aangemaakt.
+   */
+  reserveRoundAtomic(input: ReserveRoundInput): Promise<ReserveRoundResult>
   createReservation(data: Omit<StockReservation, 'id' | 'createdAt'>): Promise<StockReservation>
   getReservationsForRound(roundId: string): Promise<StockReservation[]>
   getReservationsForEvent(eventId: string): Promise<StockReservation[]>

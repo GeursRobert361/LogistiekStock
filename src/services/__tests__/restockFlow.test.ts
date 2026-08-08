@@ -248,6 +248,98 @@ describe('productronde', () => {
   })
 })
 
+describe('gelijktijdig reserveren', () => {
+  /** Twee gebruikers die op hetzelfde moment dezelfde ronde willen maken. */
+  function raceForWater() {
+    return Promise.allSettled([
+      createProductRound({
+        eventId: EVENT_ID,
+        ringId: RING_ID,
+        productId: 'water',
+        productName: 'Water blauw',
+        createdById: PLANNER,
+      }),
+      createProductRound({
+        eventId: EVENT_ID,
+        ringId: RING_ID,
+        productId: 'water',
+        productName: 'Water blauw',
+        createdById: VULLER,
+      }),
+    ])
+  }
+
+  it('reserveert dezelfde tien pakken niet twee keer', async () => {
+    await seedRequirements('water', [10])
+
+    await raceForWater()
+
+    const requirement = (await fakeRestockRepo.getRequirements(EVENT_ID))[0]!
+    expect(requirement.reservedPackages).toBe(10)
+    expect(requirement.reservedPackages + requirement.deliveredPackages).toBeLessThanOrEqual(
+      requirement.requiredPackages
+    )
+
+    const totalReserved = fakeRestockRepo.reservations.reduce(
+      (sum, reservation) => sum + reservation.reservedPackages,
+      0
+    )
+    expect(totalReserved).toBe(10)
+  })
+
+  it('laat maar één van de twee rondes slagen', async () => {
+    await seedRequirements('water', [10])
+
+    const outcomes = (await raceForWater()).map((result) => result.status)
+
+    expect(outcomes.filter((status) => status === 'fulfilled')).toHaveLength(1)
+    expect(outcomes.filter((status) => status === 'rejected')).toHaveLength(1)
+    expect(fakeRestockRepo.rounds).toHaveLength(1)
+  })
+
+  it('maakt geen lege ronde aan als er niets meer vrij is', async () => {
+    await seedRequirements('water', [5])
+    await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+
+    await expect(
+      createProductRound({
+        eventId: EVENT_ID,
+        ringId: RING_ID,
+        productId: 'water',
+        productName: 'Water blauw',
+        createdById: VULLER,
+      })
+    ).rejects.toThrow('niets meer te plannen')
+
+    // Geen weesronde zonder inhoud.
+    expect(fakeRestockRepo.rounds).toHaveLength(1)
+  })
+
+  it('reserveert alleen wat er na een eerdere levering nog over is', async () => {
+    await seedRequirements('water', [10])
+    const requirement = (await fakeRestockRepo.getRequirements(EVENT_ID))[0]!
+    await fakeRestockRepo.updateRequirement(requirement.id, { deliveredPackages: 4 })
+
+    await createProductRound({
+      eventId: EVENT_ID,
+      ringId: RING_ID,
+      productId: 'water',
+      productName: 'Water blauw',
+      createdById: PLANNER,
+    })
+
+    const after = (await fakeRestockRepo.getRequirements(EVENT_ID))[0]!
+    expect(after.reservedPackages).toBe(6)
+    expect(after.reservedPackages + after.deliveredPackages).toBe(after.requiredPackages)
+  })
+})
+
 describe('gemengde pallet', () => {
   it('bevat alleen de geselecteerde producten', async () => {
     await seedRequirements('patatbakjes', [12])

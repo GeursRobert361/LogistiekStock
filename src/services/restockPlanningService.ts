@@ -78,10 +78,11 @@ export interface CreateRoundParams {
 /**
  * Maakt een vulronde met gereserveerde voorraad.
  *
- * Reserveren en het aanmaken van de ronde horen bij elkaar: mislukt het
- * reserveren, dan wordt de ronde weer opgeruimd zodat er geen halve planning
- * achterblijft. (Demo-modus kent geen transacties; in productie doet de
- * unique-constraint op (behoefte, ronde) het zware werk.)
+ * Het reserveren gebeurt server-side in één transactie. Dat is geen detail:
+ * eerst hier uitrekenen wat er vrij is en dat daarna wegschrijven, betekent dat
+ * twee vullers die tegelijk bij de pallet staan allebei dezelfde tien pakken
+ * kunnen opeisen. Wat er werkelijk vrij is wordt daarom pas bepaald met de
+ * behoefterijen vergrendeld.
  */
 export async function createRound(params: CreateRoundParams): Promise<RestockRound> {
   const { eventId, ringId, productIds, createdById, name, roundType } = params
@@ -89,68 +90,27 @@ export async function createRound(params: CreateRoundParams): Promise<RestockRou
     throw new Error('Kies minstens één product voor deze ronde.')
   }
 
-  const restock = repositories.restock()
-  const kiosksInRing = new Set((await repositories.kiosk().getKiosks(ringId)).map((k) => k.id))
+  const kioskIds = (await repositories.kiosk().getKiosks(ringId)).map((k: Kiosk) => k.id)
 
-  const requirements = (await restock.getRequirements(eventId)).filter(
-    (requirement) =>
-      productIds.includes(requirement.productId) &&
-      kiosksInRing.has(requirement.kioskId) &&
-      unplannedPackages(requirement) > 0
-  )
+  const result = await repositories.restock().reserveRoundAtomic({
+    round: {
+      id: newId(),
+      eventId,
+      ringId,
+      name,
+      roundType,
+      status: RestockRoundStatus.PICKING,
+      createdById,
+    },
+    kioskIds,
+    productIds,
+  })
 
-  if (requirements.length === 0) {
+  if (!result.ok) {
     throw new Error('Er is voor deze producten niets meer te plannen in deze ring.')
   }
 
-  const round = await restock.createRound({
-    id: newId(),
-    eventId,
-    ringId,
-    name,
-    roundType,
-    status: RestockRoundStatus.PICKING,
-    createdById,
-  })
-
-  try {
-    const proposedByProduct = new Map<string, number>()
-
-    for (const requirement of requirements) {
-      const packages = unplannedPackages(requirement)
-      await restock.createReservation({
-        restockRequirementId: requirement.id,
-        restockRoundId: round.id,
-        reservedPackages: packages,
-      })
-      await restock.updateRequirement(requirement.id, {
-        reservedPackages: requirement.reservedPackages + packages,
-      })
-      proposedByProduct.set(
-        requirement.productId,
-        (proposedByProduct.get(requirement.productId) ?? 0) + packages
-      )
-    }
-
-    for (const [productId, proposed] of proposedByProduct) {
-      await restock.upsertRoundItem({
-        restockRoundId: round.id,
-        productId,
-        proposedPackages: proposed,
-        // Standaard laden we het voorgestelde aantal; de vuller past aan.
-        loadedPackages: proposed,
-        deliveredPackages: 0,
-      })
-    }
-
-    return round
-  } catch (error) {
-    console.error('[vulplanning] Ronde aanmaken mislukt; reserveringen worden vrijgegeven.', error)
-    await cancelRound(round.id).catch((cleanupError: unknown) => {
-      console.error('[vulplanning] Opruimen na een mislukte ronde is ook mislukt.', cleanupError)
-    })
-    throw error
-  }
+  return result.round
 }
 
 export async function createProductRound(params: {

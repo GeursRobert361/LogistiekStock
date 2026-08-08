@@ -227,6 +227,106 @@ export const restockRepository: IRestockRepository = {
 
   // ─── Reserveringen ─────────────────────────────────────────────────────────
 
+  async reserveRoundAtomic({ round, kioskIds, productIds }) {
+    if (kioskIds.length === 0 || productIds.length === 0) {
+      return { ok: false, reason: 'NOTHING_AVAILABLE' }
+    }
+
+    return transaction(async (client) => {
+      // `for update` houdt de behoefterijen vast tot deze transactie klaar is.
+      // De vaste volgorde op id voorkomt dat twee gelijktijdige rondes elkaar
+      // halverwege klemzetten.
+      const locked = await client.query(
+        `select * from restock_requirements
+          where event_id = $1
+            and kiosk_id = any($2::uuid[])
+            and product_id = any($3::uuid[])
+          order by id
+          for update`,
+        [round.eventId, kioskIds, productIds]
+      )
+
+      const claimable = locked.rows
+        .map((row) => mapRequirement(row as Record<string, unknown>))
+        .map((requirement) => ({
+          requirement,
+          // Opnieuw berekend mét het slot in de hand; wat de client eerder las
+          // kan intussen door een andere ronde zijn opgeëist.
+          packages:
+            requirement.requiredPackages -
+            requirement.deliveredPackages -
+            requirement.reservedPackages,
+        }))
+        .filter((entry) => entry.packages > 0)
+
+      if (claimable.length === 0) {
+        return { ok: false, reason: 'NOTHING_AVAILABLE' as const }
+      }
+
+      const roundStatement = buildUpsert('restock_rounds', roundToRow(round), ['id'])
+      const createdRound = mapRound(
+        (await client.query(roundStatement.text, roundStatement.params))
+          .rows[0] as Record<string, unknown>
+      )
+
+      const reservations = []
+      const proposedByProduct = new Map<string, number>()
+
+      for (const { requirement, packages } of claimable) {
+        const reservation = buildUpsert(
+          'stock_reservations',
+          reservationToRow({
+            restockRequirementId: requirement.id,
+            restockRoundId: createdRound.id,
+            reservedPackages: packages,
+          }),
+          ['restock_requirement_id', 'restock_round_id']
+        )
+        reservations.push(
+          mapReservation(
+            (await client.query(reservation.text, reservation.params))
+              .rows[0] as Record<string, unknown>
+          )
+        )
+
+        // Relatief bijtellen, niet een eerder gelezen totaal terugschrijven.
+        await client.query(
+          'update restock_requirements set reserved_packages = reserved_packages + $2 where id = $1',
+          [requirement.id, packages]
+        )
+
+        proposedByProduct.set(
+          requirement.productId,
+          (proposedByProduct.get(requirement.productId) ?? 0) + packages
+        )
+      }
+
+      const items = []
+      for (const [productId, proposed] of proposedByProduct) {
+        const statement = buildUpsert(
+          'restock_round_items',
+          roundItemToRow({
+            restockRoundId: createdRound.id,
+            productId,
+            proposedPackages: proposed,
+            // Standaard laden we het voorgestelde aantal; de vuller past aan.
+            loadedPackages: proposed,
+            deliveredPackages: 0,
+          }),
+          ['restock_round_id', 'product_id']
+        )
+        items.push(
+          mapRoundItem(
+            (await client.query(statement.text, statement.params))
+              .rows[0] as Record<string, unknown>
+          )
+        )
+      }
+
+      return { ok: true as const, round: createdRound, items, reservations }
+    })
+  },
+
   async createReservation(data) {
     const { text, params } = buildUpsert('stock_reservations', reservationToRow(data), [
       'restock_requirement_id',

@@ -1,4 +1,8 @@
-import type { IRestockRepository } from '@/repositories/interfaces/IRestockRepository'
+import type {
+  IRestockRepository,
+  ReserveRoundInput,
+  ReserveRoundResult,
+} from '@/repositories/interfaces/IRestockRepository'
 import type {
   RestockRequirement,
   RestockRound,
@@ -28,6 +32,7 @@ export class FakeRestockRepository implements IRestockRepository {
     this.stopItems = []
     this.deliveries = []
     this.reservations = []
+    this.reservationLock = Promise.resolve()
   }
 
   async getRequirements(eventId: string): Promise<RestockRequirement[]> {
@@ -192,6 +197,82 @@ export class FakeRestockRepository implements IRestockRepository {
   async getDeliveriesForRound(roundId: string): Promise<RestockDelivery[]> {
     const stopIds = new Set(this.stops.filter((s) => s.restockRoundId === roundId).map((s) => s.id))
     return this.deliveries.filter((d) => stopIds.has(d.restockRoundStopId))
+  }
+
+  /**
+   * Bootst `select ... for update` na: aanroepen worden achter elkaar
+   * afgehandeld, zodat de tweede het resultaat van de eerste ziet. Zonder die
+   * serialisatie zou een test over gelijktijdig reserveren niets bewijzen.
+   */
+  private reservationLock: Promise<unknown> = Promise.resolve()
+
+  async reserveRoundAtomic(input: ReserveRoundInput): Promise<ReserveRoundResult> {
+    const next = this.reservationLock.then(() => this.reserveExclusively(input))
+    this.reservationLock = next.catch(() => undefined)
+    return next
+  }
+
+  private async reserveExclusively({
+    round,
+    kioskIds,
+    productIds,
+  }: ReserveRoundInput): Promise<ReserveRoundResult> {
+    const kiosks = new Set(kioskIds)
+    const products = new Set(productIds)
+
+    const claimable = this.requirements
+      .filter(
+        (requirement) =>
+          requirement.eventId === round.eventId &&
+          kiosks.has(requirement.kioskId) &&
+          products.has(requirement.productId)
+      )
+      .map((requirement) => ({
+        requirement,
+        packages:
+          requirement.requiredPackages -
+          requirement.deliveredPackages -
+          requirement.reservedPackages,
+      }))
+      .filter((entry) => entry.packages > 0)
+
+    if (claimable.length === 0) return { ok: false, reason: 'NOTHING_AVAILABLE' }
+
+    const createdRound = await this.createRound(round)
+    const reservations: StockReservation[] = []
+    const proposedByProduct = new Map<string, number>()
+
+    for (const { requirement, packages } of claimable) {
+      reservations.push(
+        await this.createReservation({
+          restockRequirementId: requirement.id,
+          restockRoundId: createdRound.id,
+          reservedPackages: packages,
+        })
+      )
+      await this.updateRequirement(requirement.id, {
+        reservedPackages: requirement.reservedPackages + packages,
+      })
+      proposedByProduct.set(
+        requirement.productId,
+        (proposedByProduct.get(requirement.productId) ?? 0) + packages
+      )
+    }
+
+    const items: RestockRoundItem[] = []
+    for (const [productId, proposed] of proposedByProduct) {
+      items.push(
+        await this.upsertRoundItem({
+          restockRoundId: createdRound.id,
+          productId,
+          proposedPackages: proposed,
+          loadedPackages: proposed,
+          deliveredPackages: 0,
+        })
+      )
+    }
+
+    return { ok: true, round: createdRound, items, reservations }
   }
 
   async createReservation(
