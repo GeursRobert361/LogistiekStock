@@ -1,10 +1,9 @@
 /**
  * Drukt SQL af die de getelde normen in een bestaande database zet.
  *
- * `npm run seed` kan dit ook, maar niet op de server: de container bevat
- * alleen de standalone build (geen scripts/, geen tsx) en de db-container
- * heeft geen poort naar buiten. En seeden doet meer dan nodig — het zet ook
- * normen terug die iemand in Beheer met de hand heeft aangepast.
+ * `npm run seed` kan dit ook — ook op de server, via de wegwerpcontainer uit de
+ * README — maar het doet meer dan hier nodig is: het zet álle normen terug naar
+ * de seed, inclusief wat iemand in Beheer met de hand heeft aangepast.
  *
  * Dit script raakt alleen de combinaties kiosk/product aan die daadwerkelijk
  * geteld zijn. Alles wat niet geteld is blijft staan zoals het staat.

@@ -212,10 +212,31 @@ umask 077
 
 cp nginx/stock.niettegeloven.com.conf /etc/nginx/sites-available/stock.niettegeloven.com
 ln -s /etc/nginx/sites-available/stock.niettegeloven.com /etc/nginx/sites-enabled/
+# Moet mee: de vhost gebruikt een limit_req_zone, en die hoort in het
+# http-blok. Zonder dit bestand start nginx niet.
+cp nginx/logistiek-limits.conf /etc/nginx/conf.d/
 nginx -t && systemctl reload nginx
 certbot --nginx -d stock.niettegeloven.com
 
 docker compose up -d --build
+```
+
+### Backups
+
+De database staat in een Docker-volume; zonder dump is er geen kopie. Het script
+draait dagelijks om 04:00 en bewaart 30 dagen:
+
+```bash
+install -m 755 scripts/backup.sh /opt/backups/backup.sh
+( crontab -l 2>/dev/null; \
+  echo "0 4 * * * /opt/backups/backup.sh >> /var/log/logistiek-backup.log 2>&1" ) | crontab -
+```
+
+Terugzetten, en dat is het enige wat een backup bewijst:
+
+```bash
+gunzip -c /opt/backups/logistiek-JJJJMMDD-UUMMSS.sql.gz \
+  | docker compose exec -T db psql -U logistiek -d logistiek
 ```
 
 ### Updates deployen
