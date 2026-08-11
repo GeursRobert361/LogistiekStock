@@ -7,6 +7,8 @@ import {
   demoStandards,
   demoEvent,
   demoAgenda,
+  demoProfiles,
+  DEMO_PASSWORDS,
 } from '@/lib/seed/demoData'
 import type {
   AgendaEntry,
@@ -27,7 +29,19 @@ import type {
   RestockDelivery,
   StockReservation,
   Incident,
+  Profile,
 } from '@/types'
+
+/**
+ * Wachtwoorden in demo-modus staan als leesbare tekst in de browser. Dat mag:
+ * demo-data is openbaar en er staat niets echts in. In productie gaat dit via
+ * bcrypt op de server, waar de browser er niet bij kan.
+ */
+interface DemoPassword {
+  /** Het e-mailadres; DemoTable werkt op een veld dat `id` heet. */
+  id: string
+  password: string
+}
 
 /**
  * Alle demo-tabellen op één plek, zodat repositories dezelfde data delen
@@ -52,6 +66,10 @@ export const demoTables = {
   restockDeliveries: new DemoTable<RestockDelivery>('restockDeliveries', () => []),
   stockReservations: new DemoTable<StockReservation>('stockReservations', () => []),
   incidents: new DemoTable<Incident>('incidents', () => []),
+  profiles: new DemoTable<Profile>('profiles', () => [...demoProfiles]),
+  passwords: new DemoTable<DemoPassword>('passwords', () =>
+    Object.entries(DEMO_PASSWORDS).map(([email, password]) => ({ id: email, password }))
+  ),
 } as const
 
 /** Zet alle demo-data terug naar de seed. */

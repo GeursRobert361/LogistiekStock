@@ -275,3 +275,48 @@ describe('behoefte, evenement, norm en storing', () => {
     ])
   })
 })
+
+describe('gebruikersbeheer', () => {
+  it('laat een volledig nieuw account door', () => {
+    expect(
+      checkArguments('auth', 'createProfile', [
+        {
+          email: 'jan@arena.nl',
+          displayName: 'Jan',
+          password: 'abcd-efgh-ijkl',
+          roles: ['TELLER'],
+        },
+      ]).ok
+    ).toBe(true)
+  })
+
+  it('weigert een account zonder rollen', () => {
+    expect(
+      checkArguments('auth', 'createProfile', [
+        { email: 'jan@arena.nl', displayName: 'Jan', password: 'abcd-efgh-ijkl', roles: [] },
+      ]).ok
+    ).toBe(false)
+  })
+
+  it('weigert een te kort wachtwoord', () => {
+    expect(
+      checkArguments('auth', 'createProfile', [
+        { email: 'jan@arena.nl', displayName: 'Jan', password: 'kort', roles: ['TELLER'] },
+      ]).ok
+    ).toBe(false)
+  })
+
+  it('weigert een onbekende rol', () => {
+    expect(
+      checkArguments('auth', 'createProfile', [
+        { email: 'jan@arena.nl', displayName: 'Jan', password: 'abcd-efgh-ijkl', roles: ['BAAS'] },
+      ]).ok
+    ).toBe(false)
+  })
+
+  it('verwacht een boolean bij setActive', () => {
+    expect(
+      checkArguments('auth', 'setActive', ['3f2504e0-4f89-11d3-9a0c-0305e82c3301', 'nee']).ok
+    ).toBe(false)
+  })
+})

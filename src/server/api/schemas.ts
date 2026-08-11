@@ -12,6 +12,7 @@ import {
   RestockRoundStatus,
   RestockRoundType,
   RouteDirection,
+  UserRole,
 } from '@/types'
 
 /**
@@ -170,7 +171,31 @@ const incident = z.object({
  * De sleutel is dezelfde als in de rechtentabel, zodat beide naast elkaar te
  * lezen zijn.
  */
+const userRole = enumOf(UserRole)
+/** Ondergrens ook op de server: het formulier is niet de enige ingang. */
+const password = z.string().min(8)
+
 export const ARGUMENT_SCHEMAS: Record<string, z.ZodTypeAny> = {
+  // Gebruikers
+  'auth.createProfile': z.tuple([
+    z.object({
+      email: z.string().min(1),
+      displayName: z.string().min(1),
+      password,
+      roles: z.array(userRole).min(1),
+    }),
+  ]),
+  'auth.updateProfile': z.tuple([
+    uuid,
+    z.object({
+      email: z.string().min(1).optional(),
+      displayName: z.string().min(1).optional(),
+      roles: z.array(userRole).min(1).optional(),
+    }),
+  ]),
+  'auth.setPassword': z.tuple([uuid, password]),
+  'auth.setActive': z.tuple([uuid, z.boolean()]),
+
   // Tellen
   'count.createSession': z.tuple([countSession]),
   'count.updateSession': z.tuple([uuid, countSession.partial()]),

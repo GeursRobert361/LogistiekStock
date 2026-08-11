@@ -19,6 +19,11 @@ export type MethodRule = Permission | 'AUTHENTICATED'
 export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
   // ─── auth ────────────────────────────────────────────────────────────────
   'auth.listProfiles': 'MANAGE_MASTER_DATA',
+  // Gebruikersbeheer is beheerderswerk: MANAGE_MASTER_DATA is ADMIN-only.
+  'auth.createProfile': 'MANAGE_MASTER_DATA',
+  'auth.updateProfile': 'MANAGE_MASTER_DATA',
+  'auth.setPassword': 'MANAGE_MASTER_DATA',
+  'auth.setActive': 'MANAGE_MASTER_DATA',
 
   // ─── kiosk & ring ────────────────────────────────────────────────────────
   'kiosk.getRings': 'AUTHENTICATED',

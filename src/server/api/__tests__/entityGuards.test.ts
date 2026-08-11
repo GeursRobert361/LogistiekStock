@@ -219,3 +219,22 @@ describe('storingen', () => {
     ).resolves.toBeUndefined()
   })
 })
+
+describe('auth.setActive', () => {
+  const ADMIN_A = { id: 'admin-a', roles: [UserRole.ADMIN] }
+  const ADMIN_B = { id: 'admin-b', roles: [UserRole.ADMIN] }
+
+  it('laat een beheerder zijn eigen account niet deactiveren', async () => {
+    await expect(run('auth', 'setActive', ADMIN_A, [ADMIN_A.id, false])).rejects.toThrow(
+      /eigen account/i
+    )
+  })
+
+  it('laat een beheerder iemand anders wel deactiveren', async () => {
+    await expect(run('auth', 'setActive', ADMIN_A, [ADMIN_B.id, false])).resolves.toBeUndefined()
+  })
+
+  it('laat je jezelf wel heractiveren', async () => {
+    await expect(run('auth', 'setActive', ADMIN_A, [ADMIN_A.id, true])).resolves.toBeUndefined()
+  })
+})

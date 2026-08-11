@@ -154,6 +154,21 @@ function guardById(
 // ─── De tabel ────────────────────────────────────────────────────────────────
 
 export const ENTITY_GUARDS: Record<string, EntityGuard> = {
+  // ─── Gebruikers ────────────────────────────────────────────────────────────
+  // Je eigen account op non-actief zetten sluit je buiten je eigen beheer. De
+  // regel staat hier en niet in de repository, want alleen hier is bekend wie
+  // er werkelijk is ingelogd -- in de repository zou dat uit de argumenten van
+  // de client moeten komen, en die zijn te vervalsen.
+  'auth.setActive': async (user, args) => {
+    const target = stringArg(args, 0)
+    const isActive = args[1]
+    if (isActive === false && target === user.id) {
+      throw new ForbiddenError(
+        'Je kunt je eigen account niet deactiveren. Gebruik uitloggen als je wilt afsluiten.'
+      )
+    }
+  },
+
   // ─── Tellen ────────────────────────────────────────────────────────────────
   'count.createSession': async (user, args) => {
     const owner = fieldOf(args, 0, 'userId')
