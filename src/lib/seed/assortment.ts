@@ -12,7 +12,9 @@
  *      staat er geen gekoelde drank, en hoeft die daar dus ook niet geteld of
  *      gevuld te worden.
  *
- * De aantallen zijn fictief maar in de orde van grootte van de echte lijsten.
+ * De aantallen zijn richtaantallen in de orde van grootte van de echte lijsten,
+ * behalve waar ze geteld zijn: de koeling van de tweede ring staat sinds de
+ * telronde van 11 augustus 2026 op echte normen. Zie COUNTED_DRINK_STANDARDS.
  */
 
 /** Kiosken met een grote drankkoeling. Opgegeven door de vloer. */
@@ -76,6 +78,118 @@ function vary(base: number, kioskNumber: number, spread = 0): number {
   return Math.max(1, base + offset)
 }
 
+/**
+ * De getelde normen van de tweede ring — telronde 11 augustus 2026.
+ *
+ * Echte aantallen van de vloer, geen schatting. Negen kiosken, en alleen de
+ * koeling: de rest van de lijst (bekers, chips, koffie, verpakkingen) is nog
+ * niet geteld en houdt voorlopig de richtaantallen uit assortmentForKiosk.
+ *
+ * Een product dat hier niet staat valt terug op dat richtaantal. De telronde
+ * was niet compleet, dus "nog niet geteld" mag geen "hoort hier niet" worden —
+ * een norm op 0 haalt het product bij die kiosk weg, en dat is niet wat een
+ * ontbrekende regel betekent. Waar de telling zelf een vraagteken had, staat
+ * dat erbij: die aantallen zijn overgenomen maar nog niet bevestigd.
+ */
+const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
+  401: {
+    'chaudfontaine-blauw': 25,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 25,
+    'heineken-00': 12,
+    radler: 8,
+    'stelz-icetea': 30, // geteld als "30 (? buffer)"
+    'bacardi-cola': 30, // geteld als "30???"
+  },
+  403: {
+    'chaudfontaine-blauw': 25,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 15,
+    'heineken-00': 10,
+    radler: 8,
+    'stelz-icetea': 20,
+    'bacardi-cola': 25,
+    redbull: 8,
+  },
+  407: {
+    'chaudfontaine-blauw': 20,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 21,
+    'heineken-00': 7,
+    radler: 7,
+    'stelz-icetea': 29, // geteld als "29 (? buffer)"
+    'bacardi-cola': 15,
+    'bacardi-lemon': 12,
+    'jack-daniels': 12,
+  },
+  410: {
+    'chaudfontaine-blauw': 25,
+    'chaudfontaine-rood': 8,
+    'fuze-tea': 21,
+    'heineken-00': 10,
+    radler: 7,
+    'stelz-icetea': 25,
+    'bacardi-cola': 30,
+    'bacardi-lemon': 10,
+    // Stond op de lijst zonder aantal. De buren zitten op 8 tot 10; 10 dus,
+    // tot de telling van morgen het echte getal geeft.
+    redbull: 10,
+  },
+  416: {
+    'chaudfontaine-blauw': 25,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 20,
+    'heineken-00': 10,
+    radler: 10,
+    'stelz-icetea': 24,
+    'bacardi-cola': 30, // geteld als "30 (?)"
+    'bacardi-lemon': 8,
+    'jack-daniels': 6,
+  },
+  419: {
+    'chaudfontaine-blauw': 20,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 20,
+    'heineken-00': 10,
+    radler: 7,
+    'stelz-icetea': 15,
+    'bacardi-cola': 30,
+    'bacardi-lemon': 8,
+    redbull: 10,
+  },
+  420: {
+    'chaudfontaine-blauw': 25,
+    'chaudfontaine-rood': 8,
+    'fuze-tea': 25, // geteld als "25 (?)"
+    'heineken-00': 15,
+    radler: 10,
+    'stelz-icetea': 25,
+    'bacardi-cola': 20,
+    'bacardi-lemon': 12,
+    redbull: 10,
+    'jack-daniels': 8,
+  },
+  423: {
+    'chaudfontaine-blauw': 20,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 20,
+    'heineken-00': 15, // geteld als "15 (?)"
+    'stelz-icetea': 15,
+    'bacardi-cola': 25,
+  },
+  426: {
+    'chaudfontaine-blauw': 25,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 28,
+    'heineken-00': 15, // geteld als "15 (?)"
+    radler: 10,
+    'stelz-icetea': 15,
+    'bacardi-cola': 30,
+    'bacardi-lemon': 10,
+    redbull: 10,
+  },
+}
+
 /** De norm voor één kiosk: welke producten, en hoeveel ervan. */
 export function assortmentForKiosk(kioskNumber: number): AssortmentItem[] {
   const items: AssortmentItem[] = []
@@ -129,16 +243,21 @@ export function assortmentForKiosk(kioskNumber: number): AssortmentItem[] {
   // Hier zitten de echte volumes: water, Fuze Tea en de mixjes lopen op een
   // wedstrijd hard. De rest van de lijst haalt die aantallen bij lange na niet.
   if (KIOSKS_WITH_DRINKS_FRIDGE.has(kioskNumber)) {
-    add('chaudfontaine-blauw', vary(14, kioskNumber, 5))
-    add('chaudfontaine-rood', vary(6, kioskNumber, 2))
-    add('fuze-tea', vary(18, kioskNumber, 4))
-    add('heineken-00', vary(9, kioskNumber, 3))
-    add('radler', vary(4, kioskNumber, 1))
-    add('bacardi-lemon', vary(4, kioskNumber, 1))
-    add('stelz-icetea', vary(10, kioskNumber, 3))
-    add('jack-daniels', vary(2, kioskNumber, 1))
-    add('redbull', vary(3, kioskNumber, 1))
-    add('bacardi-cola', vary(9, kioskNumber, 2))
+    const counted = COUNTED_DRINK_STANDARDS[kioskNumber]
+    /** Het getelde aantal als die kiosk geteld is, anders het richtaantal. */
+    const drink = (productId: string, estimate: number) =>
+      add(productId, counted?.[productId] ?? estimate)
+
+    drink('chaudfontaine-blauw', vary(14, kioskNumber, 5))
+    drink('chaudfontaine-rood', vary(6, kioskNumber, 2))
+    drink('fuze-tea', vary(18, kioskNumber, 4))
+    drink('heineken-00', vary(9, kioskNumber, 3))
+    drink('radler', vary(4, kioskNumber, 1))
+    drink('bacardi-lemon', vary(4, kioskNumber, 1))
+    drink('stelz-icetea', vary(10, kioskNumber, 3))
+    drink('jack-daniels', vary(2, kioskNumber, 1))
+    drink('redbull', vary(3, kioskNumber, 1))
+    drink('bacardi-cola', vary(9, kioskNumber, 2))
   }
 
   if (KIOSKS_WITH_SWEETS.has(kioskNumber)) {
