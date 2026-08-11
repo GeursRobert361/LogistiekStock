@@ -11,6 +11,8 @@ import { Select } from '@/components/ui/Select'
 import { EmptyState } from '@/components/shared/EmptyState'
 import { ConfirmDialog } from '@/components/ui/Dialog'
 import { KioskReviewDetail } from '@/components/counting/KioskReviewDetail'
+import { LeftoverSignals } from '@/components/counting/LeftoverSignals'
+import type { LeftoverSource } from '@/domain/analytics/leftover'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import { loadEntryList, loadSessionsForEvent } from '@/services/countingService'
@@ -63,6 +65,7 @@ export default function CountReviewPage({
   const [kiosks, setKiosks] = useState<Kiosk[]>([])
   const [rings, setRings] = useState<Ring[]>([])
   const [isLoading, setIsLoading] = useState(true)
+  const [hasPreviousEvent, setHasPreviousEvent] = useState(false)
 
   const [openKioskId, setOpenKioskId] = useState<string | null>(null)
   const [totalsFilter, setTotalsFilter] = useState<TotalsFilter>('all')
@@ -85,14 +88,17 @@ export default function CountReviewPage({
       console.warn('[review] Wegschrijven vóór het overzicht mislukt.', flushError)
     })
 
-    const [sessions, productList, categoryList, kioskList, ringList] = await Promise.all([
+    const [sessions, productList, categoryList, kioskList, ringList, event] = await Promise.all([
       loadSessionsForEvent(eventId),
       repositories.product().getProducts({ activeOnly: false }),
       repositories.product().getCategories(),
       repositories.kiosk().getKiosks(),
       repositories.kiosk().getRings(),
+      repositories.event().getEventById(eventId),
     ])
 
+    // Zonder voorganger zegt een restant niets: er stond nog nooit iets.
+    setHasPreviousEvent(Boolean(event?.previousEventId))
     setProducts(productList)
     setCategories(categoryList)
     setKiosks(kioskList)
@@ -140,6 +146,32 @@ export default function CountReviewPage({
     () => [...new Set(overviews.map((o) => o.session.ringId))],
     [overviews]
   )
+
+  /**
+   * De telling houdt de norm vast zoals die gold op het moment van tellen, dus
+   * daar wordt tegen geoordeeld en niet tegen de norm van vandaag. Een regel
+   * die er is, is geteld: ontbrekende producten leveren simpelweg geen regel op.
+   */
+  const leftoverSources = useMemo<LeftoverSource[]>(() => {
+    const sources: LeftoverSource[] = []
+
+    for (const overview of overviews) {
+      for (const kiosk of overview.kiosks) {
+        if (!kiosk.kioskCount) continue
+        for (const entry of entriesByKioskCount.get(kiosk.kioskCount.id) ?? []) {
+          sources.push({
+            kioskId: kiosk.kioskCount.kioskId,
+            productId: entry.productId,
+            targetQuantityQuarters: entry.targetQuantityQuarters,
+            countedQuantityQuarters: entry.countedQuantityQuarters,
+            isStandardActive: true,
+          })
+        }
+      }
+    }
+
+    return sources
+  }, [overviews, entriesByKioskCount])
 
   const visibleTotals = useMemo(() => {
     const kioskIdsInRing =
@@ -276,6 +308,16 @@ export default function CountReviewPage({
             {error}
           </p>
         )}
+
+        {/* ── Normen die te laag lijken ─────────────────────────────────── */}
+        {/* Boven de bijvullijst: het gaat over wat er de vórige keer misging,
+            en dat wil je gezien hebben voordat je deze telling goedkeurt. */}
+        <LeftoverSignals
+          sources={leftoverSources}
+          hasPreviousEvent={hasPreviousEvent}
+          productById={productById}
+          kioskById={kioskById}
+        />
 
         {/* ── Totaal bijvullen ─────────────────────────────────────────── */}
         <section aria-labelledby="totals-heading">
