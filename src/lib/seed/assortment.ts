@@ -91,7 +91,7 @@ function vary(base: number, kioskNumber: number, spread = 0): number {
  * ontbrekende regel betekent. Waar de telling zelf een vraagteken had, staat
  * dat erbij: die aantallen zijn overgenomen maar nog niet bevestigd.
  */
-const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
+export const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
   401: {
     'chaudfontaine-blauw': 25,
     'chaudfontaine-rood': 6,
