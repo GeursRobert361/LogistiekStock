@@ -14,11 +14,16 @@ import {
   eventStatusForSession,
 } from '@/domain/counting/sessionStatus'
 import {
+  assertMayDiscardSession,
+  assertMayResetKiosk,
+  type DiscardSummary,
+} from '@/domain/counting/reset'
+import {
   reconcileRestockRequirements,
   isRequirementInUse,
 } from '@/domain/restocking/reconcileRequirements'
 import type { RequirementDraft } from '@/domain/restocking/buildRequirements'
-import { getLocalEntries } from '@/lib/db/offlineDb'
+import { getLocalEntries, forgetSessionLocally, forgetKioskCountLocally } from '@/lib/db/offlineDb'
 import { getPendingOutboxEntries } from '@/lib/db/offlineDb'
 
 /** Status van één kiosk binnen een telronde. */
@@ -426,4 +431,92 @@ async function loadEntriesForApproval(kioskCountId: string): Promise<CountEntry[
     console.warn('[telling] Telregels niet van de server te laden; lokale versie gebruikt.', error)
   }
   return getLocalEntries(kioskCountId)
+}
+
+// ─── Weggooien ───────────────────────────────────────────────────────────────
+
+/**
+ * Telt op wat er in een ronde zit, zodat de waarschuwing een getal kan noemen
+ * in plaats van "weet je het zeker?".
+ */
+export async function summariseSessionForDiscard(
+  session: CountSession
+): Promise<DiscardSummary> {
+  const kioskCounts = await loadKioskCounts(session.id)
+  const entries = await repositories.count().getEntriesForSession(session.id)
+
+  return {
+    kioskCount: kioskCounts.filter((kc) => kc.status !== KioskCountStatus.PENDING).length,
+    entryCount: entries.length,
+  }
+}
+
+/**
+ * Bijvulbehoeften die aan deze kiosken hangen op nul zetten.
+ *
+ * Ze hangen aan het evenement en niet aan de telronde, dus ze blijven staan
+ * wanneer de ronde verdwijnt — een tekort dat nergens meer op slaat. Wat al
+ * gereserveerd of geleverd is blijft onaangeroerd en levert een fout op: die
+ * voorraad ligt fysiek vast, en stil weggooien zou een vulronde laten wijzen
+ * naar iets dat niet meer bestaat.
+ */
+async function clearRequirementsForKiosks(
+  eventId: string,
+  kioskIds: string[]
+): Promise<number> {
+  if (kioskIds.length === 0) return 0
+
+  const restock = repositories.restock()
+  const betrokken = (await restock.getRequirements(eventId)).filter(
+    (requirement) =>
+      kioskIds.includes(requirement.kioskId) && requirement.requiredPackages > 0
+  )
+
+  const inUse = betrokken.filter(isRequirementInUse)
+  if (inUse.length > 0) throw new RequirementInUseError(inUse)
+
+  if (betrokken.length > 0) {
+    await restock.bulkUpsertRequirements(
+      betrokken.map((requirement) => ({
+        eventId: requirement.eventId,
+        kioskId: requirement.kioskId,
+        productId: requirement.productId,
+        requiredPackages: 0,
+        reservedPackages: 0,
+        deliveredPackages: 0,
+      }))
+    )
+  }
+
+  return betrokken.length
+}
+
+/** Gooit een telronde weg met alles eraan. Niet terug te draaien. */
+export async function discardSession(session: CountSession): Promise<void> {
+  assertMayDiscardSession(session)
+
+  const kioskCounts = await loadKioskCounts(session.id)
+  await clearRequirementsForKiosks(
+    session.eventId,
+    kioskCounts.map((kc) => kc.kioskId)
+  )
+
+  await repositories.count().deleteSession(session.id)
+  await forgetSessionLocally(session.id)
+}
+
+/**
+ * Haalt het telwerk van één kiosk uit een lopende ronde, zodat hij opnieuw
+ * geteld kan worden.
+ */
+export async function resetKioskCount(params: {
+  session: CountSession
+  kioskCount: KioskCount
+}): Promise<void> {
+  const { session, kioskCount } = params
+  assertMayResetKiosk(session)
+
+  await clearRequirementsForKiosks(session.eventId, [kioskCount.kioskId])
+  await repositories.count().deleteKioskCount(kioskCount.id)
+  await forgetKioskCountLocally(kioskCount.id)
 }

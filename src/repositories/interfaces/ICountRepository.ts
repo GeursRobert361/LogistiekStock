@@ -22,4 +22,18 @@ export interface ICountRepository {
   bulkUpsertCountEntries(entries: Array<Omit<CountEntry, 'lastModifiedAt'>>): Promise<void>
   /** Verwijdert een telregel — gebruikt wanneer een telling wordt teruggezet naar "nog niet geteld". */
   deleteCountEntry(kioskCountId: string, productId: string): Promise<void>
+
+  /**
+   * Gooit een telronde weg, met de kiosktellingen en telregels eraan.
+   *
+   * Alleen voor een ronde die nog niet is goedgekeurd; de controle daarop
+   * staat op de server. Voor een correctie op afgerond werk is er REOPENED.
+   */
+  deleteSession(id: string): Promise<void>
+
+  /**
+   * Haalt het telwerk van één kiosk uit een ronde, zodat die kiosk opnieuw
+   * geteld kan worden. De rest van de ronde blijft staan.
+   */
+  deleteKioskCount(kioskCountId: string): Promise<void>
 }

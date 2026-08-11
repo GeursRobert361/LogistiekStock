@@ -25,6 +25,9 @@ const {
   getNextOpenKioskId,
   pauseSession,
   isResumable,
+  summariseSessionForDiscard,
+  discardSession,
+  resetKioskCount,
 } = await import('../countSessionService')
 const {
   ActiveSessionExistsError,
@@ -613,5 +616,114 @@ describe('heropenen van een goedgekeurde kiosk', () => {
     expect(result.session.status).toBe(CountSessionStatus.IN_PROGRESS)
     expect(result.kioskCount.status).toBe(KioskCountStatus.IN_PROGRESS)
     expect(result.clearedRequirements).toBe(0)
+  })
+})
+
+describe('een telronde weggooien', () => {
+  it('telt op wat er verdwijnt', async () => {
+    await saveCountSessionLocally(makeSession())
+    await countKiosk(ROUTE[0]!)
+    await countKiosk(ROUTE[1]!)
+    await flushPendingCountWrites()
+    await syncService.flush()
+
+    const summary = await summariseSessionForDiscard(makeSession())
+
+    expect(summary.kioskCount).toBe(2)
+    expect(summary.entryCount).toBe(2)
+  })
+
+  it('verwijdert de ronde met kiosktellingen en telregels', async () => {
+    await saveCountSessionLocally(makeSession())
+    await countKiosk(ROUTE[0]!)
+    await flushPendingCountWrites()
+    await syncService.flush()
+
+    expect(await fakeCountRepo.getKioskCountsForSession(SESSION_ID)).toHaveLength(1)
+
+    await discardSession(makeSession())
+
+    expect(await fakeCountRepo.getKioskCountsForSession(SESSION_ID)).toHaveLength(0)
+    expect(await fakeCountRepo.getEntriesForSession(SESSION_ID)).toHaveLength(0)
+  })
+
+  it('laat niets van de ronde achter op het apparaat zelf', async () => {
+    await saveCountSessionLocally(makeSession())
+    await countKiosk(ROUTE[0]!)
+    await flushPendingCountWrites()
+    await syncService.flush()
+
+    await discardSession(makeSession())
+
+    const db = getOfflineDb()
+    expect(await db.countSessions.get(SESSION_ID)).toBeUndefined()
+    expect(await db.kioskCounts.toArray()).toHaveLength(0)
+    expect(await db.countEntries.toArray()).toHaveLength(0)
+    // Anders staat er werk in de wachtrij voor iets dat niet meer bestaat.
+    expect(await db.outbox.toArray()).toHaveLength(0)
+  })
+
+  it('weigert een goedgekeurde ronde en wijst naar heropenen', async () => {
+    await saveCountSessionLocally(makeSession({ status: CountSessionStatus.APPROVED }))
+
+    await expect(
+      discardSession(makeSession({ status: CountSessionStatus.APPROVED }))
+    ).rejects.toThrow(/heropen/i)
+  })
+
+  it('stopt wanneer er al voorraad is gereserveerd', async () => {
+    // Route van één kiosk, anders is de ronde niet goed te keuren.
+    const korteRoute = ROUTE.slice(0, 1)
+    await saveCountSessionLocally(makeSession({ kioskRoute: korteRoute }))
+    await countKiosk(korteRoute[0]!)
+    await flushPendingCountWrites()
+    await syncService.flush()
+    await approveSession(
+      makeSession({ kioskRoute: korteRoute, status: CountSessionStatus.SUBMITTED })
+    )
+
+    // Een vulronde heeft deze behoefte opgepakt: fysiek vastgelegde voorraad
+    // mag niet verdwijnen zonder dat iemand die vulronde annuleert.
+    const [requirement] = await fakeRestockRepo.getRequirements(EVENT_ID)
+    await fakeRestockRepo.bulkUpsertRequirements([
+      { ...requirement!, reservedPackages: 5 },
+    ])
+
+    await expect(discardSession(makeSession({ kioskRoute: korteRoute }))).rejects.toThrow(
+      RequirementInUseError
+    )
+    // En dan is er ook niets weggegooid: de telling staat er nog gewoon.
+    expect(await fakeCountRepo.getKioskCountsForSession(SESSION_ID)).toHaveLength(1)
+    expect(await fakeCountRepo.getEntriesForSession(SESSION_ID)).toHaveLength(1)
+  })
+})
+
+describe('één kiosk opnieuw tellen', () => {
+  it('haalt alleen die kiosk weg', async () => {
+    await saveCountSessionLocally(makeSession())
+    const eerste = await countKiosk(ROUTE[0]!)
+    await countKiosk(ROUTE[1]!)
+    await flushPendingCountWrites()
+    await syncService.flush()
+
+    await resetKioskCount({ session: makeSession(), kioskCount: eerste })
+
+    const overgebleven = await fakeCountRepo.getKioskCountsForSession(SESSION_ID)
+    expect(overgebleven).toHaveLength(1)
+    expect(overgebleven[0]!.kioskId).toBe(ROUTE[1])
+    expect(await fakeCountRepo.getEntriesForSession(SESSION_ID)).toHaveLength(1)
+  })
+
+  it('weigert in een goedgekeurde ronde', async () => {
+    await saveCountSessionLocally(makeSession())
+    const kioskCount = await countKiosk(ROUTE[0]!)
+    await flushPendingCountWrites()
+
+    await expect(
+      resetKioskCount({
+        session: makeSession({ status: CountSessionStatus.APPROVED }),
+        kioskCount,
+      })
+    ).rejects.toThrow(/heropen/i)
   })
 })

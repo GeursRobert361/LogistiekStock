@@ -128,6 +128,40 @@ export async function deleteLocalEntry(kioskCountId: string, productId: string):
   await getOfflineDb().countEntries.delete(countEntryId(kioskCountId, productId))
 }
 
+/**
+ * Vergeet een kiosktelling die van de server is verdwenen.
+ *
+ * Zonder dit blijft het apparaat de oude telling tonen en blijft er werk in de
+ * wachtrij staan voor iets dat niet meer bestaat. Voor andere apparaten doet de
+ * server dit werk: die weigert een regel voor een verdwenen kiosktelling.
+ */
+export async function forgetKioskCountLocally(kioskCountId: string): Promise<void> {
+  const db = getOfflineDb()
+
+  // Telregels staan in de outbox onder hun eigen id, niet onder dat van de
+  // kiosktelling. Ze moeten dus eerst opgezocht worden -- na het verwijderen
+  // is niet meer te achterhalen welke regels het waren, en dan blijft er werk
+  // in de wachtrij staan voor iets dat niet meer bestaat.
+  const entries = await db.countEntries.where('kioskCountId').equals(kioskCountId).toArray()
+  const ids = [kioskCountId, ...entries.map((entry) => entry.id)]
+
+  await db.outbox.where('entityId').anyOf(ids).delete()
+  await db.countEntries.where('kioskCountId').equals(kioskCountId).delete()
+  await db.kioskCounts.delete(kioskCountId)
+}
+
+/** Vergeet een hele telronde, inclusief wat er nog voor in de wachtrij stond. */
+export async function forgetSessionLocally(sessionId: string): Promise<void> {
+  const db = getOfflineDb()
+
+  for (const kioskCount of await db.kioskCounts.where('countSessionId').equals(sessionId).toArray()) {
+    await forgetKioskCountLocally(kioskCount.id)
+  }
+
+  await db.countSessions.delete(sessionId)
+  await db.outbox.where('entityId').equals(sessionId).delete()
+}
+
 // ─── Outbox ───────────────────────────────────────────────────────────────────
 
 /**

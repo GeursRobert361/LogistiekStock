@@ -98,4 +98,23 @@ export class DemoCountRepository implements ICountRepository {
   async deleteCountEntry(kioskCountId: string, productId: string): Promise<void> {
     demoTables.countEntries.remove(countEntryId(kioskCountId, productId))
   }
+
+  /**
+   * In productie ruimt de database de onderliggende rijen op via cascade; hier
+   * moet dat met de hand, en in dezelfde volgorde: eerst de regels, dan de
+   * kiosktellingen, dan de ronde. Andersom laat het weesrijen achter.
+   */
+  async deleteSession(id: string): Promise<void> {
+    for (const kioskCount of demoTables.kioskCounts.filter((kc) => kc.countSessionId === id)) {
+      await this.deleteKioskCount(kioskCount.id)
+    }
+    demoTables.countSessions.remove(id)
+  }
+
+  async deleteKioskCount(kioskCountId: string): Promise<void> {
+    for (const entry of demoTables.countEntries.filter((e) => e.kioskCountId === kioskCountId)) {
+      demoTables.countEntries.remove(entry.id)
+    }
+    demoTables.kioskCounts.remove(kioskCountId)
+  }
 }

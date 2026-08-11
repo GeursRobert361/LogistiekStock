@@ -204,6 +204,8 @@ export const ARGUMENT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'count.upsertCountEntry': z.tuple([countEntry]),
   'count.bulkUpsertCountEntries': z.tuple([z.array(countEntry)]),
   'count.deleteCountEntry': z.tuple([uuid, uuid]),
+  'count.deleteSession': z.tuple([uuid]),
+  'count.deleteKioskCount': z.tuple([uuid]),
 
   // Bijvullen
   'restock.createRound': z.tuple([restockRound]),

@@ -92,6 +92,25 @@ async function assertMaySessionOfKioskCount(user: ActingUser, kioskCountId: stri
   if (sessionId) await assertMaySession(user, sessionId)
 }
 
+/**
+ * Een goedgekeurde ronde is niet weg te gooien — ook niet door een beheerder.
+ *
+ * Anders dan bij wijzigen is de rol hier niet de vraag: aan een goedgekeurde
+ * ronde hangen bijvulrondes en verbruikscijfers, en die zou je stilzwijgend
+ * ongeldig maken. Voor een correctie bestaat REOPENED, en die laat de
+ * geschiedenis heel.
+ */
+async function assertSessionNotApproved(sessionId: string): Promise<void> {
+  const session = await findSession(sessionId)
+  if (!session) return
+
+  if (session.status === CountSessionStatus.APPROVED) {
+    throw new ForbiddenError(
+      'Deze telronde is al goedgekeurd. Heropen hem als er iets gecorrigeerd moet worden.'
+    )
+  }
+}
+
 // ─── Vulrondes ───────────────────────────────────────────────────────────────
 
 /**
@@ -194,6 +213,16 @@ export const ENTITY_GUARDS: Record<string, EntityGuard> = {
     (args) => stringArg(args, 0),
     assertMaySessionOfKioskCount
   ),
+  'count.deleteSession': async (_user, args) => {
+    const sessionId = stringArg(args, 0)
+    if (sessionId) await assertSessionNotApproved(sessionId)
+  },
+  'count.deleteKioskCount': async (_user, args) => {
+    const kioskCountId = stringArg(args, 0)
+    if (!kioskCountId) return
+    const sessionId = await findSessionOfKioskCount(kioskCountId)
+    if (sessionId) await assertSessionNotApproved(sessionId)
+  },
 
   // ─── Vullen ────────────────────────────────────────────────────────────────
   'restock.createRound': async (user, args) => {

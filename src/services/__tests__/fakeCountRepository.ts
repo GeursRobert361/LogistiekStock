@@ -119,6 +119,23 @@ export class FakeCountRepository implements ICountRepository {
     )
   }
 
+  async deleteSession(id: string): Promise<void> {
+    this.guard()
+    const kioskCountIds = this.kioskCounts
+      .filter((kc) => kc.countSessionId === id)
+      .map((kc) => kc.id)
+
+    this.entries = this.entries.filter((e) => !kioskCountIds.includes(e.kioskCountId))
+    this.kioskCounts = this.kioskCounts.filter((kc) => kc.countSessionId !== id)
+    this.sessions = this.sessions.filter((s) => s.id !== id)
+  }
+
+  async deleteKioskCount(kioskCountId: string): Promise<void> {
+    this.guard()
+    this.entries = this.entries.filter((e) => e.kioskCountId !== kioskCountId)
+    this.kioskCounts = this.kioskCounts.filter((kc) => kc.id !== kioskCountId)
+  }
+
   reset(): void {
     this.sessions = []
     this.kioskCounts = []

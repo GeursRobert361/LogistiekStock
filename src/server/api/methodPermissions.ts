@@ -78,6 +78,10 @@ export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
   'count.upsertCountEntry': 'COUNT',
   'count.bulkUpsertCountEntries': 'COUNT',
   'count.deleteCountEntry': 'COUNT',
+  // Weggooien is geen tellerswerk: dezelfde groep die tellingen nakijkt en
+  // goedkeurt, mag ze ook weggooien.
+  'count.deleteSession': 'REVIEW_COUNTS',
+  'count.deleteKioskCount': 'REVIEW_COUNTS',
 
   // ─── bijvullen ───────────────────────────────────────────────────────────
   'restock.getRequirements': 'AUTHENTICATED',

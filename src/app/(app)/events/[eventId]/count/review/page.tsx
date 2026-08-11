@@ -22,6 +22,9 @@ import {
   prepareSessionForApproval,
   reopenApprovedKiosk,
   getSessionOverview,
+  summariseSessionForDiscard,
+  discardSession,
+  resetKioskCount,
   RequirementInUseError,
   ROUTE_STATUS_LABEL,
   type SessionOverview,
@@ -29,6 +32,7 @@ import {
 } from '@/services/countSessionService'
 import { aggregateRestockTotals } from '@/domain/restocking/aggregateTotals'
 import { SESSION_STATUS_LABEL } from '@/domain/counting/sessionStatus'
+import { describeDiscard, mayDiscardSession } from '@/domain/counting/reset'
 import { CountSessionStatus, UserRole } from '@/types'
 import type { CountEntry, Kiosk, KioskCount, Product, ProductCategory, Ring } from '@/types'
 
@@ -74,6 +78,16 @@ export default function CountReviewPage({
   const [approvingSessionId, setApprovingSessionId] = useState<string | null>(null)
   const [approvalBlockers, setApprovalBlockers] = useState<string[]>([])
   const [isApproving, setIsApproving] = useState(false)
+  const [discarding, setDiscarding] = useState<{
+    session: SessionOverview['session']
+    beschrijving: string
+  } | null>(null)
+  const [resetting, setResetting] = useState<{
+    session: SessionOverview['session']
+    kioskCount: KioskCount
+    naam: string
+  } | null>(null)
+  const [isDiscarding, setIsDiscarding] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -200,6 +214,56 @@ export default function CountReviewPage({
         return true
       })
   }, [totals, categoryFilter, ringFilter, totalsFilter, kiosks, productById])
+
+  /**
+   * Eerst legen, dan tellen: wat nog in de outbox stond hoort mee te tellen in
+   * de waarschuwing. Anders noemt hij een lager aantal dan er straks verdwijnt.
+   */
+  async function openDiscardDialog(session: SessionOverview['session']) {
+    setError(null)
+    try {
+      await syncService.flush()
+      const summary = await summariseSessionForDiscard(session)
+      setDiscarding({ session, beschrijving: describeDiscard(summary) })
+    } catch (dialogError) {
+      console.error('[review] Samenvatting voor weggooien mislukt.', dialogError)
+      setError('De telronde kon niet worden gelezen.')
+    }
+  }
+
+  async function bevestigWeggooien() {
+    if (!discarding) return
+    setIsDiscarding(true)
+    setError(null)
+    try {
+      await discardSession(discarding.session)
+      setDiscarding(null)
+      setMessage('De telronde is weggegooid.')
+      await load()
+    } catch (discardError) {
+      setError(
+        discardError instanceof Error ? discardError.message : 'Weggooien is mislukt.'
+      )
+    } finally {
+      setIsDiscarding(false)
+    }
+  }
+
+  async function bevestigKioskReset() {
+    if (!resetting) return
+    setIsDiscarding(true)
+    setError(null)
+    try {
+      await resetKioskCount({ session: resetting.session, kioskCount: resetting.kioskCount })
+      setResetting(null)
+      setMessage(`${resetting.naam} kan opnieuw geteld worden.`)
+      await load()
+    } catch (resetError) {
+      setError(resetError instanceof Error ? resetError.message : 'Resetten is mislukt.')
+    } finally {
+      setIsDiscarding(false)
+    }
+  }
 
   async function openApproveDialog(sessionId: string) {
     const overview = overviews.find((o) => o.session.id === sessionId)
@@ -426,6 +490,20 @@ export default function CountReviewPage({
               </Badge>
             </div>
 
+            {/* Weggooien mag alleen wie ook goedkeurt, en alleen zolang de
+                ronde niet is goedgekeurd -- daarna is er REOPENED. */}
+            {canApprove && mayDiscardSession(overview.session) && (
+              <div className="mb-2 flex justify-end">
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => openDiscardDialog(overview.session)}
+                >
+                  Ronde weggooien
+                </Button>
+              </div>
+            )}
+
             <Card className="mb-2">
               <CardContent className="py-3">
                 <p className="mb-2 text-center text-sm font-semibold text-gray-900">
@@ -478,6 +556,27 @@ export default function CountReviewPage({
                             void handleReopen(overview.session, kioskCount)
                           }}
                         />
+
+                        {/* Het gewone geval: één kiosk verkeerd geteld. De
+                            andere vierentwintig hoeven dan niet opnieuw. */}
+                        {canApprove &&
+                          routeKiosk.kioskCount &&
+                          mayDiscardSession(overview.session) && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="mt-2"
+                              onClick={() =>
+                                setResetting({
+                                  session: overview.session,
+                                  kioskCount: routeKiosk.kioskCount!,
+                                  naam: kiosk ? kioskTitle(kiosk) : routeKiosk.kioskId,
+                                })
+                              }
+                            >
+                              Deze kiosk opnieuw tellen
+                            </Button>
+                          )}
                       </div>
                     )}
                   </div>
@@ -526,6 +625,33 @@ export default function CountReviewPage({
         message={approvalBlockers.join(' ')}
         confirmLabel="Begrepen"
         cancelLabel="Sluiten"
+      />
+
+      {/* Geen "weet je het zeker?" maar een telling: wie leest dat er 58
+          telregels verdwijnen weet of hij de goede ronde te pakken heeft. */}
+      <ConfirmDialog
+        open={discarding !== null}
+        onClose={() => setDiscarding(null)}
+        onConfirm={() => void bevestigWeggooien()}
+        isLoading={isDiscarding}
+        isDestructive
+        title="Telronde weggooien?"
+        message={discarding?.beschrijving ?? ''}
+        confirmLabel="Weggooien"
+      />
+
+      <ConfirmDialog
+        open={resetting !== null}
+        onClose={() => setResetting(null)}
+        onConfirm={() => void bevestigKioskReset()}
+        isLoading={isDiscarding}
+        isDestructive
+        title={resetting ? `${resetting.naam} opnieuw tellen?` : ''}
+        message={
+          'De telling van deze kiosk verdwijnt en hij komt terug op "nog niet geteld". ' +
+          'De rest van de ronde blijft staan. Dit is niet terug te draaien.'
+        }
+        confirmLabel="Opnieuw tellen"
       />
     </>
   )

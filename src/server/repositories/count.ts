@@ -1,7 +1,7 @@
 import type { ICountRepository } from '@/repositories/interfaces/ICountRepository'
 import { query, queryOne, queryRequired, buildUpdate, buildUpsert, transaction } from '@/server/db/pool'
 import { ACTIVE_SESSION_STATUSES, blocksSessionWrite } from '@/domain/counting/sessionStatus'
-import { BusinessRuleError } from '@/server/api/errors'
+import { BusinessRuleError, ValidationError } from '@/server/api/errors'
 import {
   mapCountSession,
   mapKioskCount,
@@ -10,6 +10,26 @@ import {
   kioskCountToRow,
   countEntryToRow,
 } from '@/server/db/rowMappers'
+
+/**
+ * Weigert werk dat hoort bij een telronde die is weggegooid.
+ *
+ * Een telefoon die offline stond kan nog regels in de wachtrij hebben staan
+ * voor een ronde die inmiddels verdwenen is. Zonder deze controle loopt zo'n
+ * regel stuk op een sleutelfout — een 500 — en dat leest de outbox als een
+ * storing: hij blijft het eeuwig opnieuw proberen. Erger nog, als de rij wél
+ * doorkwam zou de ronde half herrijzen zonder dat iemand hem geteld heeft.
+ *
+ * Een 400 stopt de poging definitief en laat de rest van de wachtrij door.
+ */
+async function assertParentExists(
+  table: 'count_sessions' | 'kiosk_counts',
+  id: string,
+  melding: string
+): Promise<void> {
+  const row = await queryOne<{ id: string }>(`select id from ${table} where id = $1`, [id])
+  if (!row) throw new ValidationError(melding)
+}
 
 export const countRepository: ICountRepository = {
   async getSessions(eventId) {
@@ -85,6 +105,12 @@ export const countRepository: ICountRepository = {
   },
 
   async upsertKioskCount(data) {
+    await assertParentExists(
+      'count_sessions',
+      data.countSessionId,
+      'Deze telronde bestaat niet meer.'
+    )
+
     const { text, params } = buildUpsert('kiosk_counts', kioskCountToRow(data), [
       'count_session_id',
       'kiosk_id',
@@ -108,6 +134,12 @@ export const countRepository: ICountRepository = {
   },
 
   async upsertCountEntry(data) {
+    await assertParentExists(
+      'kiosk_counts',
+      data.kioskCountId,
+      'Deze kiosktelling bestaat niet meer.'
+    )
+
     const { text, params } = buildUpsert('count_entries', countEntryToRow(data), [
       'kiosk_count_id',
       'product_id',
@@ -117,6 +149,13 @@ export const countRepository: ICountRepository = {
 
   async bulkUpsertCountEntries(entries) {
     if (entries.length === 0) return
+
+    // Eén controle per kiosktelling, niet per regel: een lijst van vijftien
+    // producten hoort dezelfde ouder te hebben.
+    for (const kioskCountId of new Set(entries.map((entry) => entry.kioskCountId))) {
+      await assertParentExists('kiosk_counts', kioskCountId, 'Deze kiosktelling bestaat niet meer.')
+    }
+
     await transaction(async (client) => {
       for (const entry of entries) {
         const { text, params } = buildUpsert('count_entries', countEntryToRow(entry), [
@@ -133,5 +172,17 @@ export const countRepository: ICountRepository = {
       kioskCountId,
       productId,
     ])
+  },
+
+  // Kiosktellingen en telregels hangen met on delete cascade aan de ronde, dus
+  // één regel volstaat. De bijvulbehoeften niet: die hangen aan het evenement
+  // en worden door de service opgeruimd, waar ook bekend is welke er al
+  // gereserveerd zijn.
+  async deleteSession(id) {
+    await query('delete from count_sessions where id = $1', [id])
+  },
+
+  async deleteKioskCount(kioskCountId) {
+    await query('delete from kiosk_counts where id = $1', [kioskCountId])
   },
 }
