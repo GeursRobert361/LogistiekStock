@@ -88,8 +88,14 @@ function vary(base: number, kioskNumber: number, spread = 0): number {
  * Een product dat hier niet staat valt terug op dat richtaantal. De telronde
  * was niet compleet, dus "nog niet geteld" mag geen "hoort hier niet" worden —
  * een norm op 0 haalt het product bij die kiosk weg, en dat is niet wat een
- * ontbrekende regel betekent. Waar de telling zelf een vraagteken had, staat
- * dat erbij: die aantallen zijn overgenomen maar nog niet bevestigd.
+ * ontbrekende regel betekent.
+ *
+ * Een norm gemarkeerd met "nog uitproberen" is bewust gekozen maar nog niet
+ * bewezen: staat er straks veel van over, dan is hij te hoog. Dat blijkt uit de
+ * eerstvolgende telling — die laat naast de norm zien wat er nog staat. Te laag
+ * is lastiger te zien: een kiosk die halverwege leegloopt telt net zo goed op
+ * nul als een kiosk die precies genoeg had. Daar is de bijvulling tijdens het
+ * evenement het signaal, niet de telling.
  */
 export const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
   401: {
@@ -98,8 +104,8 @@ export const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
     'fuze-tea': 25,
     'heineken-00': 12,
     radler: 8,
-    'stelz-icetea': 30, // geteld als "30 (? buffer)"
-    'bacardi-cola': 30, // geteld als "30???"
+    'stelz-icetea': 30, // nog uitproberen; als buffer bedoeld
+    'bacardi-cola': 30, // nog uitproberen; hier was de twijfel het grootst
   },
   403: {
     'chaudfontaine-blauw': 25,
@@ -117,7 +123,7 @@ export const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
     'fuze-tea': 21,
     'heineken-00': 7,
     radler: 7,
-    'stelz-icetea': 29, // geteld als "29 (? buffer)"
+    'stelz-icetea': 29, // nog uitproberen; als buffer bedoeld
     'bacardi-cola': 15,
     'bacardi-lemon': 12,
     'jack-daniels': 12,
@@ -142,7 +148,7 @@ export const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
     'heineken-00': 10,
     radler: 10,
     'stelz-icetea': 24,
-    'bacardi-cola': 30, // geteld als "30 (?)"
+    'bacardi-cola': 30, // nog uitproberen
     'bacardi-lemon': 8,
     'jack-daniels': 6,
   },
@@ -160,7 +166,7 @@ export const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
   420: {
     'chaudfontaine-blauw': 25,
     'chaudfontaine-rood': 8,
-    'fuze-tea': 25, // geteld als "25 (?)"
+    'fuze-tea': 25, // nog uitproberen
     'heineken-00': 15,
     radler: 10,
     'stelz-icetea': 25,
@@ -173,7 +179,7 @@ export const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
     'chaudfontaine-blauw': 20,
     'chaudfontaine-rood': 6,
     'fuze-tea': 20,
-    'heineken-00': 15, // geteld als "15 (?)"
+    'heineken-00': 15, // nog uitproberen
     'stelz-icetea': 15,
     'bacardi-cola': 25,
   },
@@ -181,7 +187,7 @@ export const COUNTED_DRINK_STANDARDS: Record<number, Record<string, number>> = {
     'chaudfontaine-blauw': 25,
     'chaudfontaine-rood': 6,
     'fuze-tea': 28,
-    'heineken-00': 15, // geteld als "15 (?)"
+    'heineken-00': 15, // nog uitproberen
     radler: 10,
     'stelz-icetea': 15,
     'bacardi-cola': 30,
