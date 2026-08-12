@@ -353,21 +353,11 @@ const MANUAL_CUP_OVERRIDES: Record<string, Record<string, number>> = {
 }
 
 /**
- * Opmerkingen die bij de bekerlijst genoteerd stonden.
- *
- * Ze zeggen waar een deel van de norm fysiek ligt, niet dat er iets bij moet.
- * 401 blijft dus 5 en wordt geen 7. Puur toelichting; geen enkele berekening
- * kijkt hiernaar, en daarom is er ook geen databasekolom voor.
+ * Bij de bekerlijst stonden ook drie opmerkingen over waar de bekers liggen —
+ * "1 doos achter in kiosk". Die zeggen niets over de norm (401 blijft 5 en
+ * wordt geen 7) en horen op het scherm van de vuller; ze staan daarom in
+ * `src/lib/storageNotes.ts`.
  */
-export const cupStorageNotes: ReadonlyArray<{
-  kioskKey: string
-  productId: string
-  note: string
-}> = [
-  { kioskKey: 'kiosk-401', productId: 'bierbeker-05', note: '2 dozen achter in de kiosk' },
-  { kioskKey: 'kiosk-410', productId: 'bierbeker-05', note: '1 doos achter in de kiosk' },
-  { kioskKey: 'kiosk-426', productId: 'bierbeker-05', note: '1 doos achter in de kiosk' },
-]
 
 /**
  * Legt een handmatige lijst op de papieren basis.

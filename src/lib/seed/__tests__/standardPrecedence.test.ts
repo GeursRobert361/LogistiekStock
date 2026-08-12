@@ -5,10 +5,10 @@ import {
   unconfirmedStandards,
   paperDrinksFor,
   latestOverridesFor,
-  cupStorageNotes,
   PAPER_DRINK_PRODUCT_IDS,
   CUP_PRODUCT_IDS,
 } from '../secondRingStandards'
+import { storageNotes } from '@/lib/storageNotes'
 import { demoKiosks, demoStandards } from '../demoData'
 
 /**
@@ -209,11 +209,7 @@ describe('definitieve bekermatrix', () => {
   it('telt de opslagnotities niet bij de norm op', () => {
     // "2 doos achter in kiosk" zegt waar de bekers liggen, niet dat er twee bij
     // moeten. 401 blijft dus 5 en wordt geen 7.
-    expect(cupStorageNotes.map((n) => n.kioskKey)).toEqual([
-      'kiosk-401',
-      'kiosk-410',
-      'kiosk-426',
-    ])
+    expect(storageNotes.map((n) => n.kioskNumber)).toEqual([401, 410, 426])
     expect(norm('kiosk-401', 'bierbeker-05')).toBe(5)
     expect(norm('kiosk-410', 'bierbeker-05')).toBe(4)
     expect(norm('kiosk-426', 'bierbeker-05')).toBe(5)

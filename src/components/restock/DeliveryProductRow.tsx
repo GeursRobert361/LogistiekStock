@@ -12,6 +12,8 @@ import type { StopProductPlan } from '@/services/deliveryService'
 interface DeliveryProductRowProps {
   product: Product | undefined
   plan: StopProductPlan
+  /** Waar de voorraad van dit product bij deze kiosk ligt, als dat afwijkt. */
+  storageNote?: string
   onSubmit: (params: {
     productId: string
     plannedPackages: number
@@ -27,7 +29,12 @@ interface DeliveryProductRowProps {
  * De snelweg is "Alles geleverd" — dat is verreweg het meest voorkomende
  * geval. Wijkt het af, dan verschijnt pas dan het redenveld.
  */
-export function DeliveryProductRow({ product, plan, onSubmit }: DeliveryProductRowProps) {
+export function DeliveryProductRow({
+  product,
+  plan,
+  storageNote,
+  onSubmit,
+}: DeliveryProductRowProps) {
   const [delivered, setDelivered] = useState(String(plan.plannedPackages))
   const [reason, setReason] = useState<DeliveryReason | ''>('')
   const [reasonNotes, setReasonNotes] = useState('')
@@ -87,6 +94,17 @@ export function DeliveryProductRow({ product, plan, onSubmit }: DeliveryProductR
     <div className={cn('rounded-xl border p-3', 'border-gray-200 bg-white')}>
       <div className="mb-2">
         <p className="font-semibold text-gray-900">{product?.name ?? plan.productId}</p>
+
+        {/* Waar de voorraad ligt. Staat hier en niet bovenaan de kiosk, omdat
+            het pas iets betekent op het moment dat je dit product in handen
+            hebt. Verdwijnt zodra de regel bevestigd is: dan is het geen
+            aanwijzing meer maar ruis. */}
+        {storageNote && (
+          <p className="mt-1 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2 py-1.5 text-sm font-medium text-amber-900">
+            <span aria-hidden="true">📦</span>
+            <span>{storageNote}</span>
+          </p>
+        )}
 
         {/* Het aantal dat eruit moet, op afstand leesbaar met een pallet in de
             hand. De norm eronder is de controle achteraf: klopt wat er staat? */}

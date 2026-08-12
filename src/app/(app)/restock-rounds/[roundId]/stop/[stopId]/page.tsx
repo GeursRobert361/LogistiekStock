@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react'
 import { kioskLabel } from '@/lib/kiosk'
+import { storageNoteFor } from '@/lib/storageNotes'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
@@ -151,6 +152,7 @@ export default function RestockStopPage({
             key={item.productId}
             product={products.get(item.productId)}
             plan={item}
+            storageNote={storageNoteFor(kiosk, products.get(item.productId))}
             onSubmit={handleDelivery}
           />
         ))}
