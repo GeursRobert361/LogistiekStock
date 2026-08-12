@@ -1,0 +1,208 @@
+import { DrinkStorageType } from '@/types'
+
+/**
+ * Wat er moet gebeuren om de database gelijk te trekken met de authoritative
+ * tweede-ringstamdata.
+ *
+ * Puur: er gaat niets in of uit behalve gegevens. Dat is met opzet — dit is de
+ * berekening die bepaalt wat er in productie verandert, en die wil je kunnen
+ * testen zonder database, en identiek kunnen tonen in een dry-run en uitvoeren
+ * in een transactie. Twee keer dezelfde logica los opschrijven is precies hoe
+ * een dry-run gaat liegen over wat er echt gebeurt.
+ */
+
+export interface DesiredKiosk {
+  kioskKey: string
+  number: number
+  label?: string
+  drinkStorageType: DrinkStorageType
+}
+
+export interface CurrentKiosk {
+  number: number
+  label: string | null
+  drinkStorageType: DrinkStorageType
+}
+
+export interface DesiredStandard {
+  kioskKey: string
+  productId: string
+  /** Norm in kwarteenheden. */
+  targetQuantityQuarters: number
+}
+
+export interface CurrentStandard {
+  kioskKey: string
+  productId: string
+  targetQuantityQuarters: number
+  isActive: boolean
+}
+
+export interface KioskChange {
+  kioskKey: string
+  number: number
+  kind: 'nieuw' | 'gewijzigd'
+  /** Leesbare beschrijving van wat er verandert. */
+  details: string[]
+}
+
+export interface StandardChange {
+  kioskKey: string
+  productId: string
+  kind: 'nieuw' | 'gewijzigd' | 'uitgeschakeld'
+  from?: number
+  to?: number
+}
+
+export interface SyncPlan {
+  kiosks: KioskChange[]
+  standards: StandardChange[]
+  isEmpty: boolean
+}
+
+function compositeKey(kioskKey: string, productId: string): string {
+  return `${kioskKey}:${productId}`
+}
+
+export function planKioskChanges(
+  desired: DesiredKiosk[],
+  current: Map<number, CurrentKiosk>
+): KioskChange[] {
+  const changes: KioskChange[] = []
+
+  for (const kiosk of desired) {
+    const existing = current.get(kiosk.number)
+    if (!existing) {
+      changes.push({
+        kioskKey: kiosk.kioskKey,
+        number: kiosk.number,
+        kind: 'nieuw',
+        details: [`wordt toegevoegd als ${kiosk.label ?? kiosk.number}`],
+      })
+      continue
+    }
+
+    const details: string[] = []
+    if ((existing.label ?? undefined) !== kiosk.label) {
+      details.push(`opschrift ${existing.label ?? '(geen)'} → ${kiosk.label ?? '(geen)'}`)
+    }
+    if (existing.drinkStorageType !== kiosk.drinkStorageType) {
+      details.push(`drankopslag ${existing.drinkStorageType} → ${kiosk.drinkStorageType}`)
+    }
+
+    if (details.length > 0) {
+      changes.push({ kioskKey: kiosk.kioskKey, number: kiosk.number, kind: 'gewijzigd', details })
+    }
+  }
+
+  return changes
+}
+
+/**
+ * Verouderde normen worden alleen binnen de authoritative kiosken
+ * uitgeschakeld. Wat daarbuiten staat is niet van deze config, en daar blijft
+ * de sync vanaf — ook als het er raar uitziet.
+ */
+export function planStandardChanges(
+  desired: DesiredStandard[],
+  current: CurrentStandard[]
+): StandardChange[] {
+  const desiredByKey = new Map(desired.map((s) => [compositeKey(s.kioskKey, s.productId), s]))
+  const currentByKey = new Map(current.map((s) => [compositeKey(s.kioskKey, s.productId), s]))
+
+  const changes: StandardChange[] = []
+
+  for (const standard of desired) {
+    const key = compositeKey(standard.kioskKey, standard.productId)
+    const existing = currentByKey.get(key)
+
+    if (!existing || !existing.isActive) {
+      changes.push({
+        kioskKey: standard.kioskKey,
+        productId: standard.productId,
+        kind: 'nieuw',
+        to: standard.targetQuantityQuarters,
+      })
+      continue
+    }
+
+    if (existing.targetQuantityQuarters !== standard.targetQuantityQuarters) {
+      changes.push({
+        kioskKey: standard.kioskKey,
+        productId: standard.productId,
+        kind: 'gewijzigd',
+        from: existing.targetQuantityQuarters,
+        to: standard.targetQuantityQuarters,
+      })
+    }
+  }
+
+  for (const standard of current) {
+    if (!standard.isActive) continue
+    const key = compositeKey(standard.kioskKey, standard.productId)
+    if (desiredByKey.has(key)) continue
+
+    changes.push({
+      kioskKey: standard.kioskKey,
+      productId: standard.productId,
+      kind: 'uitgeschakeld',
+      from: standard.targetQuantityQuarters,
+    })
+  }
+
+  return changes.sort(
+    (a, b) => a.kioskKey.localeCompare(b.kioskKey) || a.productId.localeCompare(b.productId)
+  )
+}
+
+export function buildSyncPlan(params: {
+  desiredKiosks: DesiredKiosk[]
+  currentKiosks: Map<number, CurrentKiosk>
+  desiredStandards: DesiredStandard[]
+  currentStandards: CurrentStandard[]
+}): SyncPlan {
+  const kiosks = planKioskChanges(params.desiredKiosks, params.currentKiosks)
+  const standards = planStandardChanges(params.desiredStandards, params.currentStandards)
+
+  return { kiosks, standards, isEmpty: kiosks.length === 0 && standards.length === 0 }
+}
+
+/** De verwachte dranknormen na de sync, om achteraf te controleren. */
+export const EXPECTED_DRINK_MATRIX: Record<string, number[]> = {
+  'kiosk-401': [25, 6, 25, 12, 8, 30, 10, 6, 6, 30],
+  'kiosk-403': [25, 6, 15, 10, 8, 20, 8, 5, 8, 25],
+  'kiosk-407': [20, 6, 21, 7, 7, 29, 12, 12, 10, 15],
+  'kiosk-410': [25, 8, 21, 10, 7, 25, 10, 6, 6, 30],
+  'kiosk-416': [25, 6, 20, 10, 10, 24, 8, 6, 6, 30],
+  'kiosk-419': [20, 6, 20, 10, 7, 15, 8, 5, 10, 30],
+  'kiosk-420': [25, 8, 25, 15, 10, 25, 12, 8, 10, 20],
+  'kiosk-423': [20, 6, 20, 15, 5, 15, 10, 5, 6, 25],
+  'kiosk-426': [25, 6, 28, 15, 10, 15, 10, 6, 10, 30],
+}
+
+/** De opslagtypes die na de sync moeten gelden. */
+export const EXPECTED_STORAGE_TYPES: Record<string, DrinkStorageType> = {
+  'kiosk-401': DrinkStorageType.LARGE_COOLER,
+  'kiosk-403': DrinkStorageType.LARGE_COOLER,
+  'kiosk-407': DrinkStorageType.LARGE_COOLER,
+  'kiosk-410': DrinkStorageType.LARGE_COOLER,
+  'kiosk-416': DrinkStorageType.LARGE_COOLER,
+  'kiosk-419': DrinkStorageType.LARGE_COOLER,
+  'kiosk-420': DrinkStorageType.LARGE_COOLER,
+  'kiosk-423': DrinkStorageType.LARGE_COOLER,
+  'kiosk-426': DrinkStorageType.LARGE_COOLER,
+  'kiosk-402': DrinkStorageType.SATELLITE,
+  'kiosk-404': DrinkStorageType.SATELLITE,
+  'kiosk-406': DrinkStorageType.SATELLITE,
+  'kiosk-406-nieuw': DrinkStorageType.SATELLITE,
+  'kiosk-409': DrinkStorageType.SATELLITE,
+  'kiosk-412': DrinkStorageType.SATELLITE,
+  'kiosk-414': DrinkStorageType.SATELLITE,
+  'kiosk-417': DrinkStorageType.SATELLITE,
+  'kiosk-424': DrinkStorageType.SATELLITE,
+  'kiosk-427': DrinkStorageType.SATELLITE,
+  'kiosk-429': DrinkStorageType.SATELLITE,
+  'kiosk-ziggo-platform': DrinkStorageType.SATELLITE,
+  'kiosk-420-bar': DrinkStorageType.SMALL_BAR,
+  'kiosk-422': DrinkStorageType.NONE,
+}

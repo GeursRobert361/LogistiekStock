@@ -241,10 +241,54 @@ gunzip -c /opt/backups/logistiek-JJJJMMDD-UUMMSS.sql.gz \
 
 ### Updates deployen
 
+Een deploy brengt **alleen code** naar productie. Schema en stamdata volgen niet
+vanzelf mee — dat is met opzet, want anders zou elke deploy wijzigingen
+terugzetten die iemand bewust in Beheer heeft gemaakt. Drie soorten wijziging,
+drie handelingen:
+
+| Wijziging | Wat je doet |
+| --- | --- |
+| Alleen code | herbouwen |
+| Nieuwe migratie | herbouwen, daarna migraties draaien |
+| Stamdata (normen, kiosken, catalogus) | herbouwen, daarna de gerichte sync |
+
+**Alleen code:**
+
 ```bash
 git push
 ssh root@5.181.134.106 "cd /opt/logistiek-stock && git pull && docker compose up -d --build"
 ```
+
+**Stamdata van de tweede ring bijwerken.** Draai `npm run seed` hier níet voor:
+die synchroniseert veel meer dan deze set en zet daarbij handmatige wijzigingen
+terug. Gebruik de gerichte sync, die standaard alleen laat zien wat hij zou doen:
+
+```bash
+# 1. Controleer dat er een verse backup is
+ssh root@5.181.134.106 "/opt/backups/backup.sh"
+
+# 2. Code bijwerken
+ssh root@5.181.134.106 "cd /opt/logistiek-stock && git pull && docker compose up -d --build"
+
+# 3. Migraties, als er nieuwe bij zitten (zie hieronder)
+
+# 4. Proefdraai: leest alleen, wijzigt niets
+#    (zelfde wegwerpcontainer als bij migraties, met het sync-script)
+npx tsx scripts/syncSecondRingMasterData.ts
+
+# 5. Lees de uitvoer na. Klopt het aantal gewijzigde en uitgeschakelde normen?
+
+# 6. Pas dan uitvoeren, in één transactie
+npx tsx scripts/syncSecondRingMasterData.ts --apply
+```
+
+Stap 6 controleert zichzelf achteraf: hij leest de database opnieuw en vergelijkt
+de drankmatrix en de opslagtypes met de stamdata. Klopt er iets niet, dan eindigt
+het script met een foutcode.
+
+De sync raakt uitsluitend de locaties waarvoor een echte lijst is aangeleverd.
+Eerste ring, evenementen, tellingen, bijvulbehoeften, leveringen, gebruikers en
+agenda blijven ongemoeid.
 
 ### Migraties en seeds op de server
 
@@ -262,8 +306,16 @@ docker run --rm -v /opt/logistiek-stock:/app -w /app \
   '
 ```
 
-Vervang het laatste script door `scripts/seedDb.ts` of `scripts/seedTestCount.ts`
-voor de stamdata en de testtelling.
+Vervang het laatste script door wat je nodig hebt:
+
+- `scripts/syncSecondRingMasterData.ts` — de tweede-ringstamdata bijwerken.
+  Standaard een proefdraai; pas met `--apply` voert hij iets uit. **Dit is wat
+  je in productie wilt** wanneer normen of kiosken zijn gewijzigd.
+- `scripts/seedTestCount.ts` — een testtelling klaarzetten.
+- `scripts/seedDb.ts` — de volledige stamdata. Bedoeld voor een lege database.
+  Op een draaiende productiedatabase is dit te grof: hij raakt ook de eerste
+  ring, de agenda en alle normen, en zet daarmee handmatige wijzigingen terug.
+  Draai hem daar alleen bewust, nooit als vast onderdeel van een deploy.
 
 ---
 

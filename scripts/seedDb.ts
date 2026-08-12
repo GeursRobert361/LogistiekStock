@@ -25,6 +25,7 @@ import {
   DEMO_PASSWORDS,
 } from '../src/lib/seed/demoData'
 import { authoritativeKioskKeys } from '../src/lib/seed/secondRingStandards'
+import { resolveProductIds } from './lib/resolveSeedIds'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 loadEnvFile(root)
@@ -229,9 +230,11 @@ async function seedProducts(): Promise<void> {
     })),
     { hasSoftDelete: true }
   )
-  for (const product of demoProducts) {
-    const id = idByName.get(product.name)
-    if (id) productIds.set(product.id, id)
+  // Dezelfde koppeling als de tweede-ringsync gebruikt: één regel voor het
+  // omgaan met verwijderde naamgenoten, zodat de twee scripts niet elk hun
+  // eigen antwoord geven op dezelfde vraag.
+  for (const [seedId, dbId] of await resolveProductIds(client)) {
+    productIds.set(seedId, dbId)
   }
 
   // Producten die niet meer in de catalogus staan gaan uit, niet weg: er
