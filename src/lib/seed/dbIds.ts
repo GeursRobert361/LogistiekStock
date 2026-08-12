@@ -1,5 +1,4 @@
-import type { Client } from 'pg'
-import { demoProducts } from '../../src/lib/seed/catalogue'
+import { demoProducts } from './catalogue'
 
 /**
  * Koppelt de sleutels uit de seed aan de UUID's van de database.
@@ -10,15 +9,22 @@ import { demoProducts } from '../../src/lib/seed/catalogue'
  * met een `deleted_at`, en een latere seed zet er een nieuwe naast. Dan zijn er
  * twee rijen met dezelfde naam.
  *
- * Gedeeld tussen `seedDb` en `syncSecondRingMasterData`, zodat die twee niet
- * elk hun eigen antwoord op dezelfde vraag geven.
+ * Gedeeld tussen `seedDb` en de tweede-ringsync, zodat die twee niet elk hun
+ * eigen antwoord op dezelfde vraag geven.
  */
 
-export interface ResolvedIds {
-  /** Seed-id → database-UUID. */
-  productIds: Map<string, string>
-  /** Seed-id → database-UUID. */
-  kioskIds: Map<string, string>
+/**
+ * Het stukje `pg.Client` dat deze code gebruikt.
+ *
+ * Zo klein gehouden omdat het de sync testbaar maakt zonder database: een
+ * neptclient hoeft alleen `query` te hebben. De echte `Client` past er vanzelf
+ * in.
+ */
+export interface SqlClient {
+  query<T extends Record<string, unknown> = Record<string, unknown>>(
+    text: string,
+    values?: unknown[]
+  ): Promise<{ rows: T[]; rowCount?: number | null }>
 }
 
 /**
@@ -27,7 +33,7 @@ export interface ResolvedIds {
  * `order by (deleted_at is null)` zet false (verwijderd) eerst en true
  * (levend) achteraan, zodat de levende rij de eerdere in de map overschrijft.
  */
-export async function resolveProductIds(client: Client): Promise<Map<string, string>> {
+export async function resolveProductIds(client: SqlClient): Promise<Map<string, string>> {
   const { rows } = await client.query<{ id: string; name: string }>(
     'select id, name from products order by (deleted_at is null)'
   )
@@ -44,7 +50,7 @@ export async function resolveProductIds(client: Client): Promise<Map<string, str
 
 /** Kiosken zijn uniek op ring plus nummer; die koppeling is eenduidig. */
 export async function resolveKioskIds(
-  client: Client,
+  client: SqlClient,
   kiosks: Array<{ id: string; number: number }>
 ): Promise<Map<string, string>> {
   const { rows } = await client.query<{ id: string; number: number }>(
@@ -67,7 +73,7 @@ export async function resolveKioskIds(
  * Half synchroniseren op een verouderd schema levert een half bijgewerkte
  * database op, en dat is lastiger terug te draaien dan helemaal niet beginnen.
  */
-export async function assertSchemaReady(client: Client): Promise<void> {
+export async function assertSchemaReady(client: SqlClient): Promise<void> {
   const required: Array<[string, string]> = [
     ['kiosks', 'drink_storage_type'],
     ['kiosks', 'drink_source_kiosk_id'],
@@ -86,8 +92,6 @@ export async function assertSchemaReady(client: Client): Promise<void> {
     .filter((key) => !present.has(key))
 
   if (missing.length > 0) {
-    throw new Error(
-      `Het schema mist ${missing.join(', ')}. Voer eerst npm run db:migrate uit.`
-    )
+    throw new Error(`Het schema mist ${missing.join(', ')}. Voer eerst npm run db:migrate uit.`)
   }
 }

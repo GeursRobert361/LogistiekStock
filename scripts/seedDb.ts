@@ -25,7 +25,7 @@ import {
   DEMO_PASSWORDS,
 } from '../src/lib/seed/demoData'
 import { authoritativeKioskKeys } from '../src/lib/seed/secondRingStandards'
-import { resolveProductIds } from './lib/resolveSeedIds'
+import { resolveProductIds } from '../src/lib/seed/dbIds'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 loadEnvFile(root)
