@@ -49,24 +49,138 @@ export interface KioskStandardConfig {
  */
 
 /**
- * De dranknormen zoals ze op de papieren bestellijst staan.
+ * De dranknormen zoals ze op de papieren bestellijst staan — compleet.
  *
- * Alleen wat we werkelijk van papier weten. Voor de meeste dranken bij een
- * grote koeling heeft de notitie een nieuwere waarde en is de papieren waarde
- * niet overgeleverd; die staan hier dus niet. Wat hier ontbreekt én niet in de
- * notitie staat, krijgt geen norm.
+ * Alle tien de drankproducten per grote koeling, ook waar de latere notitie ze
+ * toch overschrijft. Dat is niet overbodig: hier staat wat de kiosk volgens de
+ * bestellijst hoort te hebben, en dat blijft de basis als een notitiewaarde ooit
+ * vervalt. Eerder stonden hier alleen de gaten die de notitie openliet, en dan
+ * lijkt een half ingevulde bron op de hele waarheid.
  */
 const PAPER_DRINKS: Record<string, Record<string, number>> = {
-  'kiosk-401': { 'bacardi-lemon': 10, 'jack-daniels': 6, redbull: 6 },
-  'kiosk-403': { 'bacardi-lemon': 8, 'jack-daniels': 5 },
-  'kiosk-407': { redbull: 10 },
-  'kiosk-410': { 'jack-daniels': 6, redbull: 6 },
-  'kiosk-416': { redbull: 6 },
-  'kiosk-419': { 'jack-daniels': 5 },
-  'kiosk-420': {},
-  'kiosk-423': { radler: 5, 'bacardi-lemon': 10, 'jack-daniels': 5, redbull: 6 },
-  'kiosk-426': { 'jack-daniels': 6 },
+  'kiosk-401': {
+    'chaudfontaine-blauw': 15,
+    'chaudfontaine-rood': 5,
+    'fuze-tea': 15,
+    'heineken-00': 12,
+    radler: 5,
+    'stelz-icetea': 10,
+    'bacardi-lemon': 10,
+    'jack-daniels': 6,
+    redbull: 6,
+    'bacardi-cola': 12,
+  },
+  'kiosk-403': {
+    'chaudfontaine-blauw': 15,
+    'chaudfontaine-rood': 4,
+    'fuze-tea': 15,
+    'heineken-00': 10,
+    radler: 5,
+    'stelz-icetea': 10,
+    'bacardi-lemon': 8,
+    'jack-daniels': 5,
+    redbull: 6,
+    'bacardi-cola': 10,
+  },
+  'kiosk-407': {
+    'chaudfontaine-blauw': 15,
+    'chaudfontaine-rood': 4,
+    'fuze-tea': 10,
+    'heineken-00': 10,
+    radler: 5,
+    'stelz-icetea': 10,
+    'bacardi-lemon': 8,
+    'jack-daniels': 5,
+    redbull: 10,
+    'bacardi-cola': 10,
+  },
+  'kiosk-410': {
+    'chaudfontaine-blauw': 15,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 15,
+    'heineken-00': 10,
+    radler: 5,
+    'stelz-icetea': 10,
+    'bacardi-lemon': 10,
+    'jack-daniels': 6,
+    redbull: 6,
+    'bacardi-cola': 12,
+  },
+  'kiosk-416': {
+    'chaudfontaine-blauw': 15,
+    'chaudfontaine-rood': 5,
+    'fuze-tea': 15,
+    'heineken-00': 10,
+    radler: 5,
+    'stelz-icetea': 10,
+    'bacardi-lemon': 10,
+    'jack-daniels': 6,
+    redbull: 6,
+    'bacardi-cola': 10,
+  },
+  'kiosk-419': {
+    'chaudfontaine-blauw': 15,
+    'chaudfontaine-rood': 4,
+    'fuze-tea': 10,
+    'heineken-00': 10,
+    radler: 5,
+    'stelz-icetea': 10,
+    'bacardi-lemon': 8,
+    'jack-daniels': 5,
+    redbull: 6,
+    'bacardi-cola': 10,
+  },
+  'kiosk-420': {
+    'chaudfontaine-blauw': 25,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 15,
+    'heineken-00': 15,
+    radler: 10,
+    'stelz-icetea': 15,
+    'bacardi-lemon': 10,
+    'jack-daniels': 8,
+    redbull: 10,
+    'bacardi-cola': 15,
+  },
+  'kiosk-423': {
+    'chaudfontaine-blauw': 15,
+    'chaudfontaine-rood': 4,
+    'fuze-tea': 10,
+    'heineken-00': 10,
+    radler: 5,
+    'stelz-icetea': 10,
+    'bacardi-lemon': 10,
+    'jack-daniels': 5,
+    redbull: 6,
+    'bacardi-cola': 10,
+  },
+  'kiosk-426': {
+    'chaudfontaine-blauw': 15,
+    'chaudfontaine-rood': 6,
+    'fuze-tea': 15,
+    'heineken-00': 10,
+    radler: 5,
+    'stelz-icetea': 10,
+    'bacardi-lemon': 10,
+    'jack-daniels': 6,
+    redbull: 10,
+    'bacardi-cola': 10,
+  },
 }
+
+/** De tien drankproducten die op elke papieren bestellijst staan. */
+export const PAPER_DRINK_PRODUCT_IDS = [
+  'chaudfontaine-blauw',
+  'chaudfontaine-rood',
+  'fuze-tea',
+  'heineken-00',
+  'radler',
+  'stelz-icetea',
+  'bacardi-lemon',
+  'jack-daniels',
+  'redbull',
+  'bacardi-cola',
+] as const
 
 /**
  * De handmatige dranknotitie van 12 augustus 2026.
@@ -184,6 +298,11 @@ export function mergeStandards(
   override: Record<string, number> = {}
 ): Record<string, number> {
   return { ...base, ...override }
+}
+
+/** De papieren dranknormen van één locatie, zonder de latere notitie. */
+export function paperDrinksFor(kioskKey: string): Record<string, number> {
+  return { ...(PAPER_DRINKS[kioskKey] ?? {}) }
 }
 
 /** De definitieve dranknormen van één grote koeling. */

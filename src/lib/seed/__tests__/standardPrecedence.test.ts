@@ -1,5 +1,11 @@
 import { describe, it, expect } from 'vitest'
-import { mergeStandards, secondRingStandards, unconfirmedStandards } from '../secondRingStandards'
+import {
+  mergeStandards,
+  secondRingStandards,
+  unconfirmedStandards,
+  paperDrinksFor,
+  PAPER_DRINK_PRODUCT_IDS,
+} from '../secondRingStandards'
 import { demoKiosks, demoStandards } from '../demoData'
 
 /**
@@ -181,5 +187,60 @@ describe('elke grote koeling voert alle tien de dranken', () => {
     for (const productId of PRODUCT_VOLGORDE) {
       expect(norm(kioskKey, productId), `${kioskKey} ${productId}`).toBeGreaterThan(0)
     }
+  })
+})
+
+describe('de papieren basis is compleet', () => {
+  const GROTE_KOELINGEN = [
+    'kiosk-401',
+    'kiosk-403',
+    'kiosk-407',
+    'kiosk-410',
+    'kiosk-416',
+    'kiosk-419',
+    'kiosk-420',
+    'kiosk-423',
+    'kiosk-426',
+  ]
+
+  it.each(GROTE_KOELINGEN)('%s heeft alle tien de papieren dranknormen', (kioskKey) => {
+    // De papieren lijst is de basis, ook waar de notitie hem overschrijft.
+    // Alleen de gaten bewaren maakt van een halve bron een schijnbaar hele.
+    const papier = paperDrinksFor(kioskKey)
+    expect(Object.keys(papier).sort()).toEqual([...PAPER_DRINK_PRODUCT_IDS].sort())
+
+    for (const productId of PAPER_DRINK_PRODUCT_IDS) {
+      expect(papier[productId], `${kioskKey} ${productId}`).toBeGreaterThan(0)
+    }
+  })
+})
+
+describe('er is nog maar één bron voor de echte normen', () => {
+  it('heeft geen tweede dataset in assortment.ts', async () => {
+    const assortment = await import('../assortment')
+    expect('COUNTED_DRINK_STANDARDS' in assortment).toBe(false)
+  })
+
+  it('gebruikt voor een authoritative kiosk de expliciete config', () => {
+    // 401 Water Blauw is 25 volgens de config; assortmentForKiosk zou een
+    // richtaantal rond de 14 geven.
+    expect(norm('kiosk-401', 'chaudfontaine-blauw')).toBe(25)
+  })
+
+  it('gebruikt voor een kiosk zonder lijst nog het richtaantal', async () => {
+    const { assortmentForKiosk } = await import('../assortment')
+    // 405 heeft geen aangeleverde lijst; die valt terug op de afleiding.
+    const richtaantallen = assortmentForKiosk(405)
+    expect(richtaantallen.length).toBeGreaterThan(0)
+
+    const uitStamdata = demoStandards.filter((s) => s.kioskId === 'kiosk-405')
+    expect(uitStamdata).toHaveLength(richtaantallen.length)
+  })
+
+  it('laat de eerste ring ongewijzigd', async () => {
+    const { assortmentForKiosk } = await import('../assortment')
+    const kiosk110 = assortmentForKiosk(110)
+    const uitStamdata = demoStandards.filter((s) => s.kioskId === 'kiosk-110')
+    expect(uitStamdata).toHaveLength(kiosk110.length)
   })
 })
