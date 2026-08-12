@@ -55,10 +55,23 @@ async function checkSchema(): Promise<void> {
 /** Voegt toe of werkt bij op naam; geeft naam → id terug. */
 async function upsertByName(
   table: string,
-  rows: Array<Record<string, unknown>>
+  rows: Array<Record<string, unknown>>,
+  options: { hasSoftDelete?: boolean } = {}
 ): Promise<Map<string, string>> {
+  /*
+   * Eén naam kan meer dan één rij hebben: een product dat in Beheer is
+   * verwijderd blijft bestaan met een deleted_at, en een latere seed zet er een
+   * nieuwe naast. De levende rij is dan degene met de normen en de tellingen.
+   *
+   * Zonder expliciete volgorde bepaalt het toeval welke rij deze functie
+   * oppakt, en met de verkeerde keuze belanden de normen aan het verwijderde
+   * product terwijl het echte los komt te staan. Levende rijen daarom
+   * achteraan, zodat ze de eerdere in de map overschrijven.
+   */
   const existing = await client.query<{ id: string; name: string }>(
-    `select id, name from ${table}`
+    options.hasSoftDelete
+      ? `select id, name from ${table} order by (deleted_at is null)`
+      : `select id, name from ${table}`
   )
   const idByName = new Map(existing.rows.map((row) => [row.name, row.id]))
 
@@ -213,7 +226,8 @@ async function seedProducts(): Promise<void> {
       priority: product.priority,
       refrigerated: product.refrigerated,
       supplied_from_large_cooler_for_satellite: product.suppliedFromLargeCoolerForSatellite,
-    }))
+    })),
+    { hasSoftDelete: true }
   )
   for (const product of demoProducts) {
     const id = idByName.get(product.name)
