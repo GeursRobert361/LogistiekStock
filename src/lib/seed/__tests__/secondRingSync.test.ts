@@ -315,15 +315,48 @@ describe('verificatie achteraf', () => {
 
   it('ziet een verkeerde norm', async () => {
     const state = syncedState()
-    // 410 Red Bull hoort op 6 te staan. Zet hem op de 10 die er ooit ten
-    // onrechte stond, overgenomen van een vergelijkbare kiosk.
+    // 410 Red Bull hoort volgens de nieuwste stocklijst op 9 te staan. Zet hem
+    // op de 10 die eerder van een vergelijkbare kiosk was overgenomen.
     const key = `${kioskDbId(410)}|${productDbId('redbull')}`
     state.standards.get(key)!.targetQuantityQuarters = 40
 
     const problemen = await verifySecondRing(fakeClient(state))
 
     expect(problemen).toHaveLength(1)
-    expect(problemen[0]).toMatch(/kiosk-410 redbull: 10 ≠ 6/)
+    expect(problemen[0]).toMatch(/kiosk-410 redbull: 10 ≠ 9/)
+  })
+
+  it('ziet een verkeerde bekernorm', async () => {
+    const state = syncedState()
+    const key = `${kioskDbId(423)}|${productDbId('bierbeker-04')}`
+    state.standards.get(key)!.targetQuantityQuarters = 12
+
+    const problemen = await verifySecondRing(fakeClient(state))
+
+    expect(problemen).toEqual(['kiosk-423 bierbeker-04: 3 ≠ 4'])
+  })
+
+  it('ziet een beker die actief bleef terwijl de lijst nul zegt', async () => {
+    // Precies het geval dat de expliciete nul moet voorkomen: 420 hoort geen
+    // 0,5 meer te voeren, maar de rij staat er nog — desnoods op nul.
+    const state = syncedState()
+    const key = `${kioskDbId(420)}|${productDbId('bierbeker-05')}`
+    state.standards.set(key, {
+      id: `s-${key}`,
+      kioskId: kioskDbId(420),
+      productId: productDbId('bierbeker-05'),
+      targetQuantityQuarters: 0,
+      isActive: true,
+    })
+
+    const problemen = await verifySecondRing(fakeClient(state))
+
+    expect(problemen).toEqual(['kiosk-420 bierbeker-05: 0, hoort geen actieve norm te zijn'])
+  })
+
+  it('vindt het goed dat een nul-beker helemaal ontbreekt', async () => {
+    // 412, 414, 427 en 429 hebben geen 0,3 en 420 geen 0,5; dat is de bedoeling.
+    expect(await verifySecondRing(fakeClient(syncedState()))).toEqual([])
   })
 
   it('ziet een norm die helemaal ontbreekt', async () => {
@@ -366,6 +399,23 @@ describe('scope', () => {
       expect(eersteRing.has(row.kioskId)).toBe(false)
     }
     expect(client.state.kiosks.has(110)).toBe(false)
+  })
+
+  it('raakt tellingen, bijvulbehoeften en gebruikers niet aan', async () => {
+    // De nepdatabase kent alleen de tabellen die de sync hoort te gebruiken en
+    // klapt op de rest; deze test maakt die grens expliciet.
+    const client = fakeClient(emptyState())
+    await runSecondRingSync(client, { apply: true })
+
+    const beschreven = client.queries
+      .filter((q) => /^(insert into|update|delete from) /.test(q))
+      .map((q) => q.replace(/^(insert into|update|delete from) /, '').split(' ')[0]!)
+
+    expect([...new Set(beschreven)].sort()).toEqual([
+      'kiosk_product_standards',
+      'kiosks',
+      'products',
+    ])
   })
 
   it('laat een bestaande norm buiten de authoritative kiosken met rust', async () => {

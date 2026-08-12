@@ -169,15 +169,50 @@ export function buildSyncPlan(params: {
 
 /** De verwachte dranknormen na de sync, om achteraf te controleren. */
 export const EXPECTED_DRINK_MATRIX: Record<string, number[]> = {
-  'kiosk-401': [25, 6, 25, 12, 8, 30, 10, 6, 6, 30],
-  'kiosk-403': [25, 6, 15, 10, 8, 20, 8, 5, 8, 25],
-  'kiosk-407': [20, 6, 21, 7, 7, 29, 12, 12, 10, 15],
-  'kiosk-410': [25, 8, 21, 10, 7, 25, 10, 6, 6, 30],
-  'kiosk-416': [25, 6, 20, 10, 10, 24, 8, 6, 6, 30],
-  'kiosk-419': [20, 6, 20, 10, 7, 15, 8, 5, 10, 30],
+  'kiosk-401': [25, 6, 25, 12, 8, 30, 10, 6, 8, 30],
+  'kiosk-403': [25, 6, 15, 10, 8, 20, 10, 6, 8, 25],
+  'kiosk-407': [20, 6, 21, 7, 7, 29, 10, 8, 8, 15],
+  'kiosk-410': [25, 8, 21, 10, 7, 25, 10, 8, 9, 30],
+  'kiosk-416': [25, 6, 20, 10, 10, 24, 10, 6, 10, 30],
+  'kiosk-419': [20, 6, 20, 10, 7, 15, 10, 6, 10, 30],
   'kiosk-420': [25, 8, 25, 15, 10, 25, 12, 8, 10, 20],
-  'kiosk-423': [20, 6, 20, 15, 5, 15, 10, 5, 6, 25],
-  'kiosk-426': [25, 6, 28, 15, 10, 15, 10, 6, 10, 30],
+  'kiosk-423': [20, 6, 20, 15, 8, 15, 9, 6, 9, 25],
+  'kiosk-426': [25, 6, 28, 15, 10, 15, 10, 8, 8, 30],
+}
+
+/**
+ * De verwachte bekernormen na de sync, in de volgorde 0,5 / 0,4 / 0,3.
+ *
+ * `null` betekent: dit formaat hoort bij die locatie géén actieve norm te
+ * hebben. Dat is een uitkomst om te controleren, niet om over te slaan — een
+ * beker die na de sync nog actief op nul staat is precies het geval dat de
+ * handmatige lijst wilde uitsluiten.
+ *
+ * 422 en Ziggo Platform staan niet op de bekerlijst en worden hier dus ook niet
+ * gecontroleerd.
+ */
+export const EXPECTED_CUP_MATRIX: Record<string, Array<number | null>> = {
+  'kiosk-401': [5, 4, 2],
+  'kiosk-402': [1, 1, 1],
+  'kiosk-403': [3, 3, 1],
+  'kiosk-404': [2, 2, 1],
+  'kiosk-406': [1, 2, 1],
+  'kiosk-406-nieuw': [2, 2, 1],
+  'kiosk-407': [4, 3, 2],
+  'kiosk-409': [1, 1, 1],
+  'kiosk-410': [4, 4, 2],
+  'kiosk-412': [3, 3, null],
+  'kiosk-414': [3, 3, null],
+  'kiosk-416': [4, 4, 2],
+  'kiosk-417': [2, 2, 1],
+  'kiosk-419': [3, 3, 1],
+  'kiosk-420': [null, 3, 1],
+  'kiosk-420-bar': [4, 4, 2],
+  'kiosk-423': [4, 4, 1],
+  'kiosk-424': [2, 1, 1],
+  'kiosk-426': [5, 4, 2],
+  'kiosk-427': [3, 3, null],
+  'kiosk-429': [3, 3, null],
 }
 
 /** De opslagtypes die na de sync moeten gelden. */

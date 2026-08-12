@@ -33,10 +33,14 @@ export interface KioskStandardConfig {
 /**
  * Bronprioriteit voor een voorraadnorm:
  *
- *   1. De handmatige dranknotitie van 12 augustus 2026, maar uitsluitend voor
- *      de combinaties kiosk + product die daarin met name genoemd worden.
+ *   1. De nieuwste handmatige lijst, maar uitsluitend voor de combinaties
+ *      kiosk + product die daarin met name genoemd worden. Voor drank is dat de
+ *      bijgewerkte stocklijst, voor bierbekers de aparte bekerlijst.
  *   2. De kolom "Standaard" van de papieren bestellijst van diezelfde kiosk.
  *   3. Geen actieve norm.
+ *
+ * Alles wat op geen enkele handmatige lijst staat — chips, post-mix, koffie,
+ * verpakkingen, sauzen, schoonmaak — komt dus onveranderd van papier.
  *
  * Nooit een andere kiosk als terugval gebruiken wanneer de eigen papieren
  * Standaard bekend is. Dat is eerder wél gebeurd — bij elf combinaties werd een
@@ -44,18 +48,18 @@ export interface KioskStandardConfig {
  * koeling — en dat leverde normen op die niemand had opgeschreven. Een kiosk
  * die zelf op papier 5 zegt hoort geen 10 te krijgen omdat de buurman dat heeft.
  *
- * De twee bronnen staan daarom apart en worden expliciet samengevoegd, zodat
- * bij elk getal te zien blijft waar het vandaan komt.
+ * De bronnen staan daarom apart en worden expliciet samengevoegd, zodat bij elk
+ * getal te zien blijft waar het vandaan komt.
  */
 
 /**
  * De dranknormen zoals ze op de papieren bestellijst staan — compleet.
  *
- * Alle tien de drankproducten per grote koeling, ook waar de latere notitie ze
- * toch overschrijft. Dat is niet overbodig: hier staat wat de kiosk volgens de
- * bestellijst hoort te hebben, en dat blijft de basis als een notitiewaarde ooit
- * vervalt. Eerder stonden hier alleen de gaten die de notitie openliet, en dan
- * lijkt een half ingevulde bron op de hele waarheid.
+ * Alle tien de drankproducten per grote koeling, ook waar een latere handmatige
+ * lijst ze overschrijft. Dat is niet overbodig: hier staat wat de kiosk volgens
+ * de bestellijst hoort te hebben, en dat blijft de basis als een handmatige
+ * waarde ooit vervalt. Eerder stonden hier alleen de gaten die de notitie
+ * openliet, en dan lijkt een half ingevulde bron op de hele waarheid.
  */
 const PAPER_DRINKS: Record<string, Record<string, number>> = {
   'kiosk-401': {
@@ -183,21 +187,30 @@ export const PAPER_DRINK_PRODUCT_IDS = [
 ] as const
 
 /**
- * De handmatige dranknotitie van 12 augustus 2026.
+ * De nieuwste handmatige drankstocklijst.
  *
- * Overschrijft de papieren Standaard, maar alleen voor de producten die er
- * werkelijk in staan. Een kiosk waarvan de notitie zes producten noemt houdt
- * voor de andere vier gewoon zijn papieren norm.
+ * Vervangt de dranknotitie van 12 augustus 2026: waar die maar een deel van de
+ * producten noemde, staan hier voor alle negen grote koelingen alle tien de
+ * dranken. Voor deze combinaties valt er dus niets meer terug op papier — wat
+ * niet betekent dat de papieren basis overbodig is: die blijft vastleggen wat
+ * de kiosk volgens de bestellijst hoort te hebben, en is de basis zodra een
+ * handmatige waarde vervalt.
+ *
+ * Een paar getallen stonden met een vraagteken genoteerd. Het getal geldt
+ * gewoon; de twijfel staat apart in `unconfirmedStandards`.
  */
-const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
+const LATEST_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
   'kiosk-401': {
     'chaudfontaine-blauw': 25,
     'chaudfontaine-rood': 6,
     'fuze-tea': 25,
     'heineken-00': 12,
     radler: 8,
-    'stelz-icetea': 30, // genoteerd als "30 (? buffer)" — nog te bevestigen
-    'bacardi-cola': 30, // genoteerd als "30???" — nog te bevestigen
+    'stelz-icetea': 30, // genoteerd als "30 (? Buffer)" — nog te bevestigen
+    'bacardi-lemon': 10,
+    'jack-daniels': 6,
+    redbull: 8,
+    'bacardi-cola': 30, // stond eerder met vraagtekens, nu zonder
   },
   'kiosk-403': {
     'chaudfontaine-blauw': 25,
@@ -206,6 +219,8 @@ const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
     'heineken-00': 10,
     radler: 8,
     'stelz-icetea': 20,
+    'bacardi-lemon': 10,
+    'jack-daniels': 6,
     redbull: 8,
     'bacardi-cola': 25,
   },
@@ -215,10 +230,11 @@ const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
     'fuze-tea': 21,
     'heineken-00': 7,
     radler: 7,
-    'stelz-icetea': 29, // genoteerd als "29 (? buffer)" — nog te bevestigen
+    'stelz-icetea': 29, // genoteerd als "29 (? Buffer)" — nog te bevestigen
+    'bacardi-lemon': 10,
+    'jack-daniels': 8,
+    redbull: 8,
     'bacardi-cola': 15,
-    'bacardi-lemon': 12,
-    'jack-daniels': 12,
   },
   'kiosk-410': {
     'chaudfontaine-blauw': 25,
@@ -227,8 +243,10 @@ const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
     'heineken-00': 10,
     radler: 7,
     'stelz-icetea': 25,
-    'bacardi-cola': 30,
     'bacardi-lemon': 10,
+    'jack-daniels': 8,
+    redbull: 9,
+    'bacardi-cola': 30,
   },
   'kiosk-416': {
     'chaudfontaine-blauw': 25,
@@ -237,9 +255,10 @@ const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
     'heineken-00': 10,
     radler: 10,
     'stelz-icetea': 24,
-    'bacardi-cola': 30, // genoteerd als "30(?)" — nog te bevestigen
-    'bacardi-lemon': 8,
+    'bacardi-lemon': 10,
     'jack-daniels': 6,
+    redbull: 10,
+    'bacardi-cola': 30, // genoteerd als "30(?)" — nog te bevestigen
   },
   'kiosk-419': {
     'chaudfontaine-blauw': 20,
@@ -248,9 +267,10 @@ const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
     'heineken-00': 10,
     radler: 7,
     'stelz-icetea': 15,
-    'bacardi-cola': 30,
-    'bacardi-lemon': 8,
+    'bacardi-lemon': 10,
+    'jack-daniels': 6,
     redbull: 10,
+    'bacardi-cola': 30,
   },
   'kiosk-420': {
     'chaudfontaine-blauw': 25,
@@ -259,17 +279,21 @@ const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
     'heineken-00': 15,
     radler: 10,
     'stelz-icetea': 25,
-    'bacardi-cola': 20,
     'bacardi-lemon': 12,
     'jack-daniels': 8,
     redbull: 10,
+    'bacardi-cola': 20,
   },
   'kiosk-423': {
     'chaudfontaine-blauw': 20,
     'chaudfontaine-rood': 6,
     'fuze-tea': 20,
     'heineken-00': 15, // genoteerd als "15(?)" — nog te bevestigen
+    radler: 8,
     'stelz-icetea': 15,
+    'bacardi-lemon': 9,
+    'jack-daniels': 6,
+    redbull: 9,
     'bacardi-cola': 25,
   },
   'kiosk-426': {
@@ -279,46 +303,122 @@ const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
     'heineken-00': 15, // genoteerd als "15(?)" — nog te bevestigen
     radler: 10,
     'stelz-icetea': 15,
-    'bacardi-cola': 30,
     'bacardi-lemon': 10,
-    redbull: 10,
+    'jack-daniels': 8,
+    redbull: 8,
+    'bacardi-cola': 30,
   },
 }
 
+/** De drie bekerformaten, in de volgorde waarin ze op de lijst staan. */
+export const CUP_PRODUCT_IDS = ['bierbeker-05', 'bierbeker-04', 'bierbeker-03'] as const
+
 /**
- * Voegt een override samen met de basis.
+ * De nieuwste handmatige bekerlijst.
  *
- * Alleen exact dezelfde combinatie kiosk + product wordt overschreven; de rest
- * van de basis blijft ongemoeid. Dat is de hele regel, maar hij staat hier als
- * functie zodat er één plek is waar hij klopt — en zodat een test kan
- * vastleggen dat een override van zes producten de andere vier niet wist.
+ * Los van de dranklijst omdat het een aparte ronde langs de kiosken was, en
+ * omdat hij iets doet wat de dranklijst niet doet: een **0 betekent hier dat
+ * dat formaat bij die locatie geen actieve norm heeft**. Niet norm nul — dan
+ * zou het formaat bij het tellen blijven opduiken met een streefwaarde van
+ * niets. `applyStandardOverrides` haalt zo'n product uit de actieve normen.
+ *
+ * De nullen staan er expliciet in, en dat is het punt: zo blijft zichtbaar dat
+ * iemand ernaar gekeken heeft en "niet voeren" bedoelde, in plaats van dat de
+ * regel vergeten is.
+ *
+ * 422 en Ziggo Platform staan niet op deze lijst en houden dus wat ze hadden.
  */
-export function mergeStandards(
-  base: Record<string, number>,
-  override: Record<string, number> = {}
-): Record<string, number> {
-  return { ...base, ...override }
+const MANUAL_CUP_OVERRIDES: Record<string, Record<string, number>> = {
+  'kiosk-401': { 'bierbeker-05': 5, 'bierbeker-04': 4, 'bierbeker-03': 2 },
+  'kiosk-402': { 'bierbeker-05': 1, 'bierbeker-04': 1, 'bierbeker-03': 1 },
+  'kiosk-403': { 'bierbeker-05': 3, 'bierbeker-04': 3, 'bierbeker-03': 1 },
+  'kiosk-404': { 'bierbeker-05': 2, 'bierbeker-04': 2, 'bierbeker-03': 1 },
+  'kiosk-406': { 'bierbeker-05': 1, 'bierbeker-04': 2, 'bierbeker-03': 1 },
+  'kiosk-406-nieuw': { 'bierbeker-05': 2, 'bierbeker-04': 2, 'bierbeker-03': 1 },
+  'kiosk-407': { 'bierbeker-05': 4, 'bierbeker-04': 3, 'bierbeker-03': 2 },
+  'kiosk-409': { 'bierbeker-05': 1, 'bierbeker-04': 1, 'bierbeker-03': 1 },
+  'kiosk-410': { 'bierbeker-05': 4, 'bierbeker-04': 4, 'bierbeker-03': 2 },
+  'kiosk-412': { 'bierbeker-05': 3, 'bierbeker-04': 3, 'bierbeker-03': 0 },
+  'kiosk-414': { 'bierbeker-05': 3, 'bierbeker-04': 3, 'bierbeker-03': 0 },
+  'kiosk-416': { 'bierbeker-05': 4, 'bierbeker-04': 4, 'bierbeker-03': 2 },
+  'kiosk-417': { 'bierbeker-05': 2, 'bierbeker-04': 2, 'bierbeker-03': 1 },
+  'kiosk-419': { 'bierbeker-05': 3, 'bierbeker-04': 3, 'bierbeker-03': 1 },
+  'kiosk-420': { 'bierbeker-05': 0, 'bierbeker-04': 3, 'bierbeker-03': 1 },
+  'kiosk-420-bar': { 'bierbeker-05': 4, 'bierbeker-04': 4, 'bierbeker-03': 2 },
+  'kiosk-423': { 'bierbeker-05': 4, 'bierbeker-04': 4, 'bierbeker-03': 1 },
+  'kiosk-424': { 'bierbeker-05': 2, 'bierbeker-04': 1, 'bierbeker-03': 1 },
+  'kiosk-426': { 'bierbeker-05': 5, 'bierbeker-04': 4, 'bierbeker-03': 2 },
+  'kiosk-427': { 'bierbeker-05': 3, 'bierbeker-04': 3, 'bierbeker-03': 0 },
+  'kiosk-429': { 'bierbeker-05': 3, 'bierbeker-04': 3, 'bierbeker-03': 0 },
 }
 
-/** De papieren dranknormen van één locatie, zonder de latere notitie. */
+/**
+ * Opmerkingen die bij de bekerlijst genoteerd stonden.
+ *
+ * Ze zeggen waar een deel van de norm fysiek ligt, niet dat er iets bij moet.
+ * 401 blijft dus 5 en wordt geen 7. Puur toelichting; geen enkele berekening
+ * kijkt hiernaar, en daarom is er ook geen databasekolom voor.
+ */
+export const cupStorageNotes: ReadonlyArray<{
+  kioskKey: string
+  productId: string
+  note: string
+}> = [
+  { kioskKey: 'kiosk-401', productId: 'bierbeker-05', note: '2 dozen achter in de kiosk' },
+  { kioskKey: 'kiosk-410', productId: 'bierbeker-05', note: '1 doos achter in de kiosk' },
+  { kioskKey: 'kiosk-426', productId: 'bierbeker-05', note: '1 doos achter in de kiosk' },
+]
+
+/**
+ * Legt een handmatige lijst op de papieren basis.
+ *
+ * Alleen exact dezelfde combinatie kiosk + product wordt overschreven; de rest
+ * van de basis blijft ongemoeid. Een override van zes producten wist de andere
+ * vier dus niet.
+ *
+ * Nul is geen norm maar een streep: het product verdwijnt uit de actieve
+ * normen. Dat scheelt een categorie fouten waarbij een kiosk een formaat blijft
+ * tellen dat hij niet meer voert, met een streefwaarde van nul en dus een
+ * eeuwig "compleet".
+ */
+export function applyStandardOverrides(
+  base: Record<string, number>,
+  overrides: Record<string, number> = {}
+): Record<string, number> {
+  const result = { ...base }
+
+  for (const [productId, value] of Object.entries(overrides)) {
+    if (value === 0) {
+      delete result[productId]
+    } else {
+      result[productId] = value
+    }
+  }
+
+  return result
+}
+
+/** De papieren dranknormen van één locatie, zonder de latere handmatige lijst. */
 export function paperDrinksFor(kioskKey: string): Record<string, number> {
   return { ...(PAPER_DRINKS[kioskKey] ?? {}) }
 }
 
-/** De definitieve dranknormen van één grote koeling. */
-function drinksFor(kioskKey: string): Record<string, number> {
-  return mergeStandards(PAPER_DRINKS[kioskKey] ?? {}, NOTEPAD_DRINK_OVERRIDES[kioskKey])
+/** De nieuwste handmatige waarden van één locatie: drank én bekers. */
+export function latestOverridesFor(kioskKey: string): Record<string, number> {
+  // Drank en bekers overlappen niet, dus de volgorde maakt hier niets uit.
+  return { ...LATEST_DRINK_OVERRIDES[kioskKey], ...MANUAL_CUP_OVERRIDES[kioskKey] }
 }
 
 /**
- * Waarden die op de notitie een vraagteken hadden.
+ * Waarden die op de nieuwste handmatige lijst een vraagteken hadden.
  *
  * Het getal geldt gewoon als norm; dit zegt alleen dat het nog niet bevestigd
  * is. Bewust geen databasekolom: dit gaat over ons vertrouwen in een getal, niet
  * over de voorraad, en het is over een paar weken achterhaald.
  *
- * Wat hier níet meer in staat: de elf combinaties die eerder van een
- * vergelijkbare kiosk waren overgenomen. Die hebben nu hun eigen papieren norm.
+ * Wat hier níet meer in staat: 401 Bacardi Cola. Dat getal stond eerder met
+ * vraagtekens genoteerd en op de nieuwe lijst zonder — de twijfel is dus
+ * opgelost, ook al bleef de 30 hetzelfde.
  */
 export const unconfirmedStandards: ReadonlyArray<{
   kioskKey: string
@@ -326,7 +426,6 @@ export const unconfirmedStandards: ReadonlyArray<{
   reason: string
 }> = [
   { kioskKey: 'kiosk-401', productId: 'stelz-icetea', reason: 'genoteerd als "30 (? Buffer)"' },
-  { kioskKey: 'kiosk-401', productId: 'bacardi-cola', reason: 'genoteerd als "30???"' },
   { kioskKey: 'kiosk-407', productId: 'stelz-icetea', reason: 'genoteerd als "29 (? Buffer)"' },
   { kioskKey: 'kiosk-416', productId: 'bacardi-cola', reason: 'genoteerd als "30(?)"' },
   { kioskKey: 'kiosk-420', productId: 'fuze-tea', reason: 'genoteerd als "25(?)"' },
@@ -368,14 +467,22 @@ const KOFFIEHOEK: Record<string, number> = {
   opschuimmelk: 2,
 }
 
-export const secondRingStandards: KioskStandardConfig[] = [
+/**
+ * De lijsten zoals ze op papier staan.
+ *
+ * Alles hier komt van de papieren bestellijst per kiosk — ook de bekers, ook
+ * waar een latere handmatige lijst er overheen gaat. `secondRingStandards`
+ * hieronder legt die handmatige waarden erop; dit blijft staan zodat van elk
+ * getal te zien is waar het vandaan komt.
+ */
+const PAPER_STANDARDS: KioskStandardConfig[] = [
   {
     kioskKey: 'kiosk-401',
     drinkStorageType: DrinkStorageType.LARGE_COOLER,
     standards: {
       'bierbeker-05': 5,
       'bierbeker-04': 4,
-      ...drinksFor('kiosk-401'),
+      ...paperDrinksFor('kiosk-401'),
       'chips-blauw': 7,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -417,7 +524,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 2,
-      ...drinksFor('kiosk-403'),
+      ...paperDrinksFor('kiosk-403'),
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -520,7 +627,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
       'bierbeker-05': 4,
       'bierbeker-04': 4,
       'bierbeker-03': 2,
-      ...drinksFor('kiosk-407'),
+      ...paperDrinksFor('kiosk-407'),
       'chips-blauw': 6,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -566,7 +673,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 5,
       'bierbeker-04': 4,
-      ...drinksFor('kiosk-410'),
+      ...paperDrinksFor('kiosk-410'),
       'chips-blauw': 7,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -637,7 +744,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 4,
       'bierbeker-04': 3,
-      ...drinksFor('kiosk-416'),
+      ...paperDrinksFor('kiosk-416'),
       'chips-blauw': 7,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -687,7 +794,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 2,
-      ...drinksFor('kiosk-419'),
+      ...paperDrinksFor('kiosk-419'),
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -709,7 +816,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     drinkStorageType: DrinkStorageType.LARGE_COOLER,
     standards: {
       'bierbeker-04': 3,
-      ...drinksFor('kiosk-420'),
+      ...paperDrinksFor('kiosk-420'),
       'chips-blauw': 6,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -790,7 +897,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 4,
       'bierbeker-04': 3,
-      ...drinksFor('kiosk-423'),
+      ...paperDrinksFor('kiosk-423'),
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -827,7 +934,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 5,
       'bierbeker-04': 4,
-      ...drinksFor('kiosk-426'),
+      ...paperDrinksFor('kiosk-426'),
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -914,6 +1021,19 @@ export const secondRingStandards: KioskStandardConfig[] = [
     },
   },
 ]
+
+/**
+ * De normen zoals ze werkelijk gelden.
+ *
+ * De papieren lijst met daarop de nieuwste handmatige waarden: drank uit de
+ * bijgewerkte stocklijst, bekers uit de bekerlijst. Producten die op geen van
+ * beide lijsten staan houden hun papieren norm; een beker die op de lijst een
+ * 0 heeft, verdwijnt hier uit de actieve normen.
+ */
+export const secondRingStandards: KioskStandardConfig[] = PAPER_STANDARDS.map((config) => ({
+  ...config,
+  standards: applyStandardOverrides(config.standards, latestOverridesFor(config.kioskKey)),
+}))
 
 /**
  * Voor welke kiosken deze config gezag heeft.

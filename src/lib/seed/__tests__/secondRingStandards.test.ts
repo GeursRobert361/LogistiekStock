@@ -93,7 +93,7 @@ describe('dranknormen van de grote koelingen', () => {
         'chaudfontaine-blauw': 20,
         'fuze-tea': 21,
         'stelz-icetea': 29,
-        'jack-daniels': 12,
+        'jack-daniels': 8,
         'bacardi-cola': 15,
       },
     ],
@@ -108,7 +108,7 @@ describe('dranknormen van de grote koelingen', () => {
         'heineken-00': 10,
         radler: 7,
         'stelz-icetea': 15,
-        'bacardi-lemon': 8,
+        'bacardi-lemon': 10,
         redbull: 10,
         'bacardi-cola': 30,
       },
@@ -127,9 +127,9 @@ describe('dranknormen van de grote koelingen', () => {
 
 describe('419 volgens de papieren lijst', () => {
   it('heeft de non-dranknormen van het papier', () => {
+    // Bewust zonder de bekers: die komen sinds de nieuwe bekerlijst niet meer
+    // van papier. Zie de test hieronder.
     const verwacht: Record<string, number> = {
-      'bierbeker-05': 3,
-      'bierbeker-04': 2,
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -146,6 +146,13 @@ describe('419 volgens de papieren lijst', () => {
     for (const [productId, aantal] of Object.entries(verwacht)) {
       expect(norm('kiosk-419', productId), productId).toBe(aantal)
     }
+  })
+
+  it('volgt voor de bekers de nieuwere handmatige lijst', () => {
+    // Papier zei 3 en 2 en kende geen 0,3; de bekerlijst zegt 3, 3 en 1.
+    expect(norm('kiosk-419', 'bierbeker-05')).toBe(3)
+    expect(norm('kiosk-419', 'bierbeker-04')).toBe(3)
+    expect(norm('kiosk-419', 'bierbeker-03')).toBe(1)
   })
 
   it('voert geen post-mix en geen van de andere niet-genoemde producten', () => {
@@ -202,8 +209,11 @@ describe('420 Bar', () => {
 
 describe('406 Oud en 406 Nieuw', () => {
   it('zijn twee losse locaties met eigen normen', () => {
-    expect(norm('kiosk-406', 'bierbeker-05')).toBe(2)
-    expect(norm('kiosk-406-nieuw', 'bierbeker-05')).toBe(3)
+    // Allebei apart op de bekerlijst genoteerd: 406 Oud 1, 406 Nieuw 2.
+    expect(norm('kiosk-406', 'bierbeker-05')).toBe(1)
+    expect(norm('kiosk-406-nieuw', 'bierbeker-05')).toBe(2)
+    expect(norm('kiosk-406', 'bierbeker-04')).toBe(2)
+    expect(norm('kiosk-406-nieuw', 'bierbeker-04')).toBe(2)
   })
 
   it('tonen allebei een eigen opschrift', () => {

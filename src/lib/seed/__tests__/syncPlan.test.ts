@@ -3,6 +3,7 @@ import {
   buildSyncPlan,
   planKioskChanges,
   planStandardChanges,
+  EXPECTED_CUP_MATRIX,
   EXPECTED_DRINK_MATRIX,
   EXPECTED_STORAGE_TYPES,
   type CurrentKiosk,
@@ -204,6 +205,30 @@ describe('verwachtingen voor de verificatie na afloop', () => {
       })
       expect(werkelijk, kioskKey).toEqual(verwacht)
     }
+  })
+
+  it('komt overeen met de bekers in de stamdata', () => {
+    const VOLGORDE = ['bierbeker-05', 'bierbeker-04', 'bierbeker-03']
+
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_CUP_MATRIX)) {
+      const werkelijk = VOLGORDE.map((productId) => {
+        const standard = demoStandards.find(
+          (s) => s.kioskId === kioskKey && s.productId === productId
+        )
+        // null in de matrix betekent "geen actieve norm"; in de stamdata is dat
+        // een ontbrekende regel.
+        return standard ? standard.targetQuantityQuarters / 4 : null
+      })
+      expect(werkelijk, kioskKey).toEqual(verwacht)
+    }
+  })
+
+  it('controleert de bekers van alle locaties op de handmatige lijst', () => {
+    // 422 en Ziggo Platform staan er bewust niet op en worden dus niet
+    // gecontroleerd; de andere eenentwintig wel.
+    expect(Object.keys(EXPECTED_CUP_MATRIX)).toHaveLength(21)
+    expect(EXPECTED_CUP_MATRIX['kiosk-422']).toBeUndefined()
+    expect(EXPECTED_CUP_MATRIX['kiosk-ziggo-platform']).toBeUndefined()
   })
 
   it('komt overeen met de opslagtypes in de stamdata', () => {

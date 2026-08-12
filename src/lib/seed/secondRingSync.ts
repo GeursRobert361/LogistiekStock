@@ -1,10 +1,11 @@
 import { DrinkStorageType } from '@/types'
 import { demoKiosks, demoStandards } from './demoData'
 import { demoProducts } from './catalogue'
-import { authoritativeKioskKeys } from './secondRingStandards'
+import { authoritativeKioskKeys, CUP_PRODUCT_IDS } from './secondRingStandards'
 import { assertSchemaReady, resolveKioskIds, resolveProductIds, type SqlClient } from './dbIds'
 import {
   buildSyncPlan,
+  EXPECTED_CUP_MATRIX,
   EXPECTED_DRINK_MATRIX,
   EXPECTED_STORAGE_TYPES,
   type CurrentKiosk,
@@ -336,13 +337,27 @@ async function applyChanges(client: SqlClient): Promise<void> {
  * Leest de database opnieuw en controleert de uitkomst.
  *
  * Een sync die zegt dat hij klaar is zonder te kijken wat er staat, is een
- * sync die je op zijn woord moet geloven. Geeft de problemen terug; leeg
- * betekent goed.
+ * sync die je op zijn woord moet geloven. Controleert de drankmatrix, de
+ * bekerlijst — inclusief de formaten die géén actieve norm horen te hebben —
+ * en de opslagtypes. Geeft de problemen terug; leeg betekent goed.
  */
 export async function verifySecondRing(client: SqlClient): Promise<string[]> {
   const problemen: string[] = []
   const kioskIds = await resolveKioskIds(client, demoKiosks)
   const productIds = await resolveProductIds(client)
+
+  /** De actieve norm in hele verpakkingen, of undefined als hij niet actief is. */
+  async function activeStandard(
+    kioskId: string,
+    productSeedId: string
+  ): Promise<number | undefined> {
+    const { rows } = await client.query<{ target_quantity_quarters: number }>(
+      `select target_quantity_quarters from kiosk_product_standards
+        where kiosk_id = $1 and product_id = $2 and is_active = true`,
+      [kioskId, productIds.get(productSeedId)]
+    )
+    return rows[0] ? Number(rows[0].target_quantity_quarters) / 4 : undefined
+  }
 
   for (const [kioskKey, verwacht] of Object.entries(EXPECTED_DRINK_MATRIX)) {
     const kioskId = kioskIds.get(kioskKey)
@@ -352,17 +367,37 @@ export async function verifySecondRing(client: SqlClient): Promise<string[]> {
     }
 
     for (const [index, productSeedId] of PAPER_DRINK_ORDER.entries()) {
-      const productId = productIds.get(productSeedId)
-      const { rows } = await client.query<{ target_quantity_quarters: number }>(
-        `select target_quantity_quarters from kiosk_product_standards
-          where kiosk_id = $1 and product_id = $2 and is_active = true`,
-        [kioskId, productId]
-      )
-      const gevonden = rows[0] ? Number(rows[0].target_quantity_quarters) / 4 : undefined
+      const gevonden = await activeStandard(kioskId, productSeedId)
       if (gevonden !== verwacht[index]) {
         problemen.push(
           `${kioskKey} ${productSeedId}: ${gevonden ?? 'ontbreekt'} ≠ ${verwacht[index]}`
         )
+      }
+    }
+  }
+
+  for (const [kioskKey, verwacht] of Object.entries(EXPECTED_CUP_MATRIX)) {
+    const kioskId = kioskIds.get(kioskKey)
+    if (!kioskId) {
+      problemen.push(`${kioskKey} bestaat niet`)
+      continue
+    }
+
+    for (const [index, productSeedId] of CUP_PRODUCT_IDS.entries()) {
+      const gevonden = await activeStandard(kioskId, productSeedId)
+      const hoort = verwacht[index]
+
+      // Een expliciete 0 op de bekerlijst betekent "geen actieve norm". Een rij
+      // die er nog actief staat — ook op nul — is dus fout.
+      if (hoort === null) {
+        if (gevonden !== undefined) {
+          problemen.push(`${kioskKey} ${productSeedId}: ${gevonden}, hoort geen actieve norm te zijn`)
+        }
+        continue
+      }
+
+      if (gevonden !== hoort) {
+        problemen.push(`${kioskKey} ${productSeedId}: ${gevonden ?? 'ontbreekt'} ≠ ${hoort}`)
       }
     }
   }

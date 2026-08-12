@@ -52,7 +52,7 @@ async function main(): Promise<void> {
       return
     }
     if (applied) {
-      console.log('✓ Verificatie geslaagd: drankmatrix en opslagtypes kloppen.')
+      console.log('✓ Verificatie geslaagd: drank, bekers en opslagtypes kloppen.')
     }
   } finally {
     await client.end()

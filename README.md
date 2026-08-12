@@ -283,8 +283,9 @@ npx tsx scripts/syncSecondRingMasterData.ts --apply
 ```
 
 Stap 6 controleert zichzelf achteraf: hij leest de database opnieuw en vergelijkt
-de drankmatrix en de opslagtypes met de stamdata. Klopt er iets niet, dan eindigt
-het script met een foutcode.
+de drankmatrix, de bekernormen en de opslagtypes met de stamdata. Daar hoort ook
+bij dat een bekerformaat dat een locatie niet meer voert géén actieve norm heeft.
+Klopt er iets niet, dan eindigt het script met een foutcode.
 
 De sync raakt uitsluitend de locaties waarvoor een echte lijst is aangeleverd.
 Eerste ring, evenementen, tellingen, bijvulbehoeften, leveringen, gebruikers en
