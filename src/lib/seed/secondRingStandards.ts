@@ -31,23 +31,59 @@ export interface KioskStandardConfig {
 }
 
 /**
- * Dranknormen van de grote koelingen, telronde 12 augustus 2026.
+ * Bronprioriteit voor een voorraadnorm:
  *
- * Deze vervangen de oudere gedrukte dranknormen: waar het papier en deze lijst
- * elkaar tegenspreken, geldt deze.
+ *   1. De handmatige dranknotitie van 12 augustus 2026, maar uitsluitend voor
+ *      de combinaties kiosk + product die daarin met name genoemd worden.
+ *   2. De kolom "Standaard" van de papieren bestellijst van diezelfde kiosk.
+ *   3. Geen actieve norm.
+ *
+ * Nooit een andere kiosk als terugval gebruiken wanneer de eigen papieren
+ * Standaard bekend is. Dat is eerder wél gebeurd — bij elf combinaties werd een
+ * ontbrekende notitiewaarde ingevuld met het getal van een vergelijkbare grote
+ * koeling — en dat leverde normen op die niemand had opgeschreven. Een kiosk
+ * die zelf op papier 5 zegt hoort geen 10 te krijgen omdat de buurman dat heeft.
+ *
+ * De twee bronnen staan daarom apart en worden expliciet samengevoegd, zodat
+ * bij elk getal te zien blijft waar het vandaan komt.
  */
-const LARGE_COOLER_DRINKS: Record<string, Record<string, number>> = {
+
+/**
+ * De dranknormen zoals ze op de papieren bestellijst staan.
+ *
+ * Alleen wat we werkelijk van papier weten. Voor de meeste dranken bij een
+ * grote koeling heeft de notitie een nieuwere waarde en is de papieren waarde
+ * niet overgeleverd; die staan hier dus niet. Wat hier ontbreekt én niet in de
+ * notitie staat, krijgt geen norm.
+ */
+const PAPER_DRINKS: Record<string, Record<string, number>> = {
+  'kiosk-401': { 'bacardi-lemon': 10, 'jack-daniels': 6, redbull: 6 },
+  'kiosk-403': { 'bacardi-lemon': 8, 'jack-daniels': 5 },
+  'kiosk-407': { redbull: 10 },
+  'kiosk-410': { 'jack-daniels': 6, redbull: 6 },
+  'kiosk-416': { redbull: 6 },
+  'kiosk-419': { 'jack-daniels': 5 },
+  'kiosk-420': {},
+  'kiosk-423': { radler: 5, 'bacardi-lemon': 10, 'jack-daniels': 5, redbull: 6 },
+  'kiosk-426': { 'jack-daniels': 6 },
+}
+
+/**
+ * De handmatige dranknotitie van 12 augustus 2026.
+ *
+ * Overschrijft de papieren Standaard, maar alleen voor de producten die er
+ * werkelijk in staan. Een kiosk waarvan de notitie zes producten noemt houdt
+ * voor de andere vier gewoon zijn papieren norm.
+ */
+const NOTEPAD_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
   'kiosk-401': {
     'chaudfontaine-blauw': 25,
     'chaudfontaine-rood': 6,
     'fuze-tea': 25,
     'heineken-00': 12,
     radler: 8,
-    'stelz-icetea': 30, // genoteerd als "30 (? buffer)" — nog uitproberen
-    'bacardi-cola': 30, // genoteerd als "30???" — nog uitproberen
-    'bacardi-lemon': 10, // tijdelijk
-    'jack-daniels': 8, // tijdelijk
-    redbull: 10, // tijdelijk
+    'stelz-icetea': 30, // genoteerd als "30 (? buffer)" — nog te bevestigen
+    'bacardi-cola': 30, // genoteerd als "30???" — nog te bevestigen
   },
   'kiosk-403': {
     'chaudfontaine-blauw': 25,
@@ -56,10 +92,8 @@ const LARGE_COOLER_DRINKS: Record<string, Record<string, number>> = {
     'heineken-00': 10,
     radler: 8,
     'stelz-icetea': 20,
-    'bacardi-cola': 25,
     redbull: 8,
-    'bacardi-lemon': 8, // tijdelijk
-    'jack-daniels': 6, // tijdelijk
+    'bacardi-cola': 25,
   },
   'kiosk-407': {
     'chaudfontaine-blauw': 20,
@@ -67,11 +101,10 @@ const LARGE_COOLER_DRINKS: Record<string, Record<string, number>> = {
     'fuze-tea': 21,
     'heineken-00': 7,
     radler: 7,
-    'stelz-icetea': 29, // genoteerd als "29 (? buffer)" — nog uitproberen
+    'stelz-icetea': 29, // genoteerd als "29 (? buffer)" — nog te bevestigen
     'bacardi-cola': 15,
     'bacardi-lemon': 12,
     'jack-daniels': 12,
-    redbull: 10, // tijdelijk
   },
   'kiosk-410': {
     'chaudfontaine-blauw': 25,
@@ -82,8 +115,6 @@ const LARGE_COOLER_DRINKS: Record<string, Record<string, number>> = {
     'stelz-icetea': 25,
     'bacardi-cola': 30,
     'bacardi-lemon': 10,
-    redbull: 10,
-    'jack-daniels': 8, // tijdelijk
   },
   'kiosk-416': {
     'chaudfontaine-blauw': 25,
@@ -92,10 +123,9 @@ const LARGE_COOLER_DRINKS: Record<string, Record<string, number>> = {
     'heineken-00': 10,
     radler: 10,
     'stelz-icetea': 24,
-    'bacardi-cola': 30, // genoteerd als "30(?)" — nog uitproberen
+    'bacardi-cola': 30, // genoteerd als "30(?)" — nog te bevestigen
     'bacardi-lemon': 8,
     'jack-daniels': 6,
-    redbull: 10, // tijdelijk
   },
   'kiosk-419': {
     'chaudfontaine-blauw': 20,
@@ -107,12 +137,11 @@ const LARGE_COOLER_DRINKS: Record<string, Record<string, number>> = {
     'bacardi-cola': 30,
     'bacardi-lemon': 8,
     redbull: 10,
-    'jack-daniels': 8, // tijdelijk
   },
   'kiosk-420': {
     'chaudfontaine-blauw': 25,
     'chaudfontaine-rood': 8,
-    'fuze-tea': 25, // genoteerd als "25(?)" — nog uitproberen
+    'fuze-tea': 25, // genoteerd als "25(?)" — nog te bevestigen
     'heineken-00': 15,
     radler: 10,
     'stelz-icetea': 25,
@@ -125,61 +154,65 @@ const LARGE_COOLER_DRINKS: Record<string, Record<string, number>> = {
     'chaudfontaine-blauw': 20,
     'chaudfontaine-rood': 6,
     'fuze-tea': 20,
-    'heineken-00': 15, // genoteerd als "15(?)" — nog uitproberen
+    'heineken-00': 15, // genoteerd als "15(?)" — nog te bevestigen
     'stelz-icetea': 15,
     'bacardi-cola': 25,
-    radler: 10, // tijdelijk
-    'bacardi-lemon': 10, // tijdelijk
-    'jack-daniels': 6, // tijdelijk
-    redbull: 10, // tijdelijk
   },
   'kiosk-426': {
     'chaudfontaine-blauw': 25,
     'chaudfontaine-rood': 6,
     'fuze-tea': 28,
-    'heineken-00': 15, // genoteerd als "15(?)" — nog uitproberen
+    'heineken-00': 15, // genoteerd als "15(?)" — nog te bevestigen
     radler: 10,
     'stelz-icetea': 15,
     'bacardi-cola': 30,
     'bacardi-lemon': 10,
     redbull: 10,
-    'jack-daniels': 8, // tijdelijk
   },
 }
 
 /**
- * Aannames die nog bevestigd moeten worden.
+ * Voegt een override samen met de basis.
  *
- * Bewust geen databasekolom: dit zegt iets over ons vertrouwen in een getal,
- * niet over de voorraad. Een kolom zou meegemigreerd en onderhouden moeten
- * worden voor iets dat over een paar weken achterhaald is.
+ * Alleen exact dezelfde combinatie kiosk + product wordt overschreven; de rest
+ * van de basis blijft ongemoeid. Dat is de hele regel, maar hij staat hier als
+ * functie zodat er één plek is waar hij klopt — en zodat een test kan
+ * vastleggen dat een override van zes producten de andere vier niet wist.
  */
-export const temporaryStandardAssumptions: ReadonlyArray<{
+export function mergeStandards(
+  base: Record<string, number>,
+  override: Record<string, number> = {}
+): Record<string, number> {
+  return { ...base, ...override }
+}
+
+/** De definitieve dranknormen van één grote koeling. */
+function drinksFor(kioskKey: string): Record<string, number> {
+  return mergeStandards(PAPER_DRINKS[kioskKey] ?? {}, NOTEPAD_DRINK_OVERRIDES[kioskKey])
+}
+
+/**
+ * Waarden die op de notitie een vraagteken hadden.
+ *
+ * Het getal geldt gewoon als norm; dit zegt alleen dat het nog niet bevestigd
+ * is. Bewust geen databasekolom: dit gaat over ons vertrouwen in een getal, niet
+ * over de voorraad, en het is over een paar weken achterhaald.
+ *
+ * Wat hier níet meer in staat: de elf combinaties die eerder van een
+ * vergelijkbare kiosk waren overgenomen. Die hebben nu hun eigen papieren norm.
+ */
+export const unconfirmedStandards: ReadonlyArray<{
   kioskKey: string
   productId: string
   reason: string
 }> = [
-  { kioskKey: 'kiosk-401', productId: 'bacardi-lemon', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-401', productId: 'jack-daniels', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-401', productId: 'redbull', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-401', productId: 'stelz-icetea', reason: 'geteld als "30 (? buffer)"' },
-  { kioskKey: 'kiosk-401', productId: 'bacardi-cola', reason: 'geteld als "30???"' },
-  { kioskKey: 'kiosk-403', productId: 'bacardi-lemon', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-403', productId: 'jack-daniels', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-407', productId: 'redbull', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-407', productId: 'stelz-icetea', reason: 'geteld als "29 (? buffer)"' },
-  { kioskKey: 'kiosk-410', productId: 'jack-daniels', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-416', productId: 'redbull', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-416', productId: 'bacardi-cola', reason: 'geteld als "30(?)"' },
-  { kioskKey: 'kiosk-419', productId: 'jack-daniels', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-420', productId: 'fuze-tea', reason: 'geteld als "25(?)"' },
-  { kioskKey: 'kiosk-423', productId: 'radler', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-423', productId: 'bacardi-lemon', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-423', productId: 'jack-daniels', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-423', productId: 'redbull', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-423', productId: 'heineken-00', reason: 'geteld als "15(?)"' },
-  { kioskKey: 'kiosk-426', productId: 'jack-daniels', reason: 'tijdelijke waarde' },
-  { kioskKey: 'kiosk-426', productId: 'heineken-00', reason: 'geteld als "15(?)"' },
+  { kioskKey: 'kiosk-401', productId: 'stelz-icetea', reason: 'genoteerd als "30 (? Buffer)"' },
+  { kioskKey: 'kiosk-401', productId: 'bacardi-cola', reason: 'genoteerd als "30???"' },
+  { kioskKey: 'kiosk-407', productId: 'stelz-icetea', reason: 'genoteerd als "29 (? Buffer)"' },
+  { kioskKey: 'kiosk-416', productId: 'bacardi-cola', reason: 'genoteerd als "30(?)"' },
+  { kioskKey: 'kiosk-420', productId: 'fuze-tea', reason: 'genoteerd als "25(?)"' },
+  { kioskKey: 'kiosk-423', productId: 'heineken-00', reason: 'genoteerd als "15(?)"' },
+  { kioskKey: 'kiosk-426', productId: 'heineken-00', reason: 'genoteerd als "15(?)"' },
 ]
 
 /**
@@ -223,7 +256,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 5,
       'bierbeker-04': 4,
-      ...LARGE_COOLER_DRINKS['kiosk-401']!,
+      ...drinksFor('kiosk-401'),
       'chips-blauw': 7,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -265,7 +298,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 2,
-      ...LARGE_COOLER_DRINKS['kiosk-403']!,
+      ...drinksFor('kiosk-403'),
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -368,7 +401,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
       'bierbeker-05': 4,
       'bierbeker-04': 4,
       'bierbeker-03': 2,
-      ...LARGE_COOLER_DRINKS['kiosk-407']!,
+      ...drinksFor('kiosk-407'),
       'chips-blauw': 6,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -414,7 +447,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 5,
       'bierbeker-04': 4,
-      ...LARGE_COOLER_DRINKS['kiosk-410']!,
+      ...drinksFor('kiosk-410'),
       'chips-blauw': 7,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -485,7 +518,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 4,
       'bierbeker-04': 3,
-      ...LARGE_COOLER_DRINKS['kiosk-416']!,
+      ...drinksFor('kiosk-416'),
       'chips-blauw': 7,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -535,7 +568,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 2,
-      ...LARGE_COOLER_DRINKS['kiosk-419']!,
+      ...drinksFor('kiosk-419'),
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -557,7 +590,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     drinkStorageType: DrinkStorageType.LARGE_COOLER,
     standards: {
       'bierbeker-04': 3,
-      ...LARGE_COOLER_DRINKS['kiosk-420']!,
+      ...drinksFor('kiosk-420'),
       'chips-blauw': 6,
       'chips-rood': 6,
       'chips-oranje': 6,
@@ -638,7 +671,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 4,
       'bierbeker-04': 3,
-      ...LARGE_COOLER_DRINKS['kiosk-423']!,
+      ...drinksFor('kiosk-423'),
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -675,7 +708,7 @@ export const secondRingStandards: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 5,
       'bierbeker-04': 4,
-      ...LARGE_COOLER_DRINKS['kiosk-426']!,
+      ...drinksFor('kiosk-426'),
       'chips-blauw': 6,
       'chips-rood': 5,
       'chips-oranje': 5,
