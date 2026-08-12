@@ -378,6 +378,7 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
               key={cat.id}
               categoryName={cat.name}
               products={cat.products}
+              kiosk={kiosk}
               standards={standards}
               counts={counts}
               onCountChange={handleCountChange}

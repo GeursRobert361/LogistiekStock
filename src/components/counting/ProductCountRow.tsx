@@ -15,6 +15,8 @@ interface ProductCountRowProps {
   onCountChange: (productId: string, valueQuarters: number) => void
   onCountClear: (productId: string) => void
   halfPackageThresholdPercentage?: number
+  /** Waar de voorraad van dit product bij deze kiosk ligt, als dat afwijkt. */
+  storageNote?: string
 }
 
 export function ProductCountRow({
@@ -24,6 +26,7 @@ export function ProductCountRow({
   onCountChange,
   onCountClear,
   halfPackageThresholdPercentage = 80,
+  storageNote,
 }: ProductCountRowProps) {
   const targetQty = fromQuarterUnits(targetQuantityQuarters)
   const isCounted = countedQuantityQuarters !== undefined
@@ -78,6 +81,16 @@ export function ProductCountRow({
           {!isCounted ? 'Nog tellen' : isFull ? 'Vol' : `+${result?.restockQuantity ?? 0}`}
         </p>
       </div>
+
+      {/* Waar de rest van de voorraad ligt. Blijft staan ook nadat er geteld
+          is: anders verdwijnt bij het nakijken van een telling juist de reden
+          waarom het aantal hoger is dan wat er vooraan staat. */}
+      {storageNote && (
+        <p className="mb-2 flex items-start gap-1.5 rounded-lg bg-amber-50 px-2.5 py-1.5 text-xs font-medium text-amber-900">
+          <span aria-hidden="true">📦</span>
+          <span>{storageNote}</span>
+        </p>
+      )}
 
       <QuarterQuantityInput
         value={countedQty}

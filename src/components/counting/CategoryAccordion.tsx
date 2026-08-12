@@ -2,12 +2,15 @@
 
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
+import { storageNoteFor } from '@/lib/storageNotes'
 import { ProductCountRow } from './ProductCountRow'
-import type { Product, KioskProductStandard } from '@/types'
+import type { Product, Kiosk, KioskProductStandard } from '@/types'
 
 interface CategoryAccordionProps {
   categoryName: string
   products: Product[]
+  /** De kiosk die geteld wordt; nodig voor de opmerkingen over waar iets ligt. */
+  kiosk?: Pick<Kiosk, 'number'> | null
   standards: Map<string, KioskProductStandard>
   /** productId → kwarteenheden. Ontbrekende sleutel = nog niet geteld. */
   counts: Map<string, number>
@@ -21,6 +24,7 @@ interface CategoryAccordionProps {
 export function CategoryAccordion({
   categoryName,
   products,
+  kiosk,
   standards,
   counts,
   onCountChange,
@@ -87,6 +91,7 @@ export function CategoryAccordion({
                   onCountChange={onCountChange}
                   onCountClear={onCountClear}
                   halfPackageThresholdPercentage={std?.halfPackageThresholdPercentage ?? 80}
+                  storageNote={storageNoteFor(kiosk, product)}
                 />
               </div>
             )
