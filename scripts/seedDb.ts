@@ -24,6 +24,7 @@ import {
   demoAgenda,
   DEMO_PASSWORDS,
 } from '../src/lib/seed/demoData'
+import { authoritativeKioskKeys } from '../src/lib/seed/secondRingStandards'
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..')
 loadEnvFile(root)
@@ -107,12 +108,16 @@ async function seedKiosks(): Promise<void> {
     const ringId = ringIds.get(kiosk.ringId)
     if (!ringId) continue
 
+    // De bronkiosk van een satelliet blijft hier buiten: die is nog niet
+    // vastgesteld, en een seed die er een zou raden legt een verkeerde relatie
+    // vast die daarna moeilijk te herkennen is.
     const result = await client.query<{ id: string }>(
-      `insert into kiosks (ring_id, number, label, name, sort_order, is_active)
-       values ($1, $2, $3, $4, $5, $6)
+      `insert into kiosks (ring_id, number, label, name, sort_order, is_active, drink_storage_type)
+       values ($1, $2, $3, $4, $5, $6, $7)
        on conflict (ring_id, number) do update
          set label = excluded.label, name = excluded.name,
-             sort_order = excluded.sort_order, is_active = excluded.is_active
+             sort_order = excluded.sort_order, is_active = excluded.is_active,
+             drink_storage_type = excluded.drink_storage_type
        returning id`,
       [
         ringId,
@@ -121,6 +126,7 @@ async function seedKiosks(): Promise<void> {
         kiosk.name ?? null,
         kiosk.sortOrder,
         kiosk.isActive,
+        kiosk.drinkStorageType,
       ]
     )
     kioskIds.set(kiosk.id, result.rows[0]!.id)
@@ -206,6 +212,7 @@ async function seedProducts(): Promise<void> {
       own_round_threshold: product.ownRoundThreshold,
       priority: product.priority,
       refrigerated: product.refrigerated,
+      supplied_from_large_cooler_for_satellite: product.suppliedFromLargeCoolerForSatellite,
     }))
   )
   for (const product of demoProducts) {
@@ -252,36 +259,57 @@ async function seedStandards(): Promise<void> {
     count++
   }
 
-  // Normen voor producten die een kiosk niet meer voert gaan uit, zodat ze
-  // niet meer geteld hoeven te worden.
-  const active = new Set(demoStandards.map((s) => `${s.kioskId}|${s.productId}`))
-  const stale = await client.query<{ id: string }>(
-    `select s.id from kiosk_product_standards s where s.is_active = true`
+  /*
+   * Normen voor producten die een kiosk niet meer voert gaan uit, zodat ze niet
+   * meer geteld hoeven te worden.
+   *
+   * Maar alleen bij de kiosken waarover deze seed werkelijk iets te zeggen
+   * heeft. Eerder liep deze stap over álle actieve normen in de database, en
+   * dat is gevaarlijk zodra de seed niet meer de enige bron is: een norm die
+   * iemand in Beheer heeft toegevoegd, of een locatie waarvoor nog geen lijst
+   * is aangeleverd, zou stilzwijgend uitgeschakeld worden. Wat we niet
+   * beheren, laten we staan.
+   */
+  const authoritativeKioskDbIds = new Set(
+    [...authoritativeKioskKeys]
+      .map((key) => kioskIds.get(key))
+      .filter((id): id is string => id !== undefined)
   )
-  let deactivated = 0
-  for (const row of stale.rows) {
-    const { rows: detail } = await client.query<{ kiosk_id: string; product_id: string }>(
-      'select kiosk_id, product_id from kiosk_product_standards where id = $1',
-      [row.id]
-    )
-    const found = detail[0]
-    if (!found) continue
 
-    const stillWanted = [...active].some((key) => {
-      const [demoKioskId, demoProductId] = key.split('|')
-      return (
-        kioskIds.get(demoKioskId!) === found.kiosk_id &&
-        productIds.get(demoProductId!) === found.product_id
-      )
-    })
-    if (!stillWanted) {
-      await client.query('update kiosk_product_standards set is_active = false where id = $1', [
-        row.id,
-      ])
-      deactivated++
-    }
+  if (authoritativeKioskDbIds.size === 0) {
+    console.log(`✓ ${count} voorraadnormen`)
+    return
   }
-  if (deactivated > 0) console.log(`  · ${deactivated} verouderde normen uitgeschakeld`)
+
+  // Wat de config wél wil hebben, als paren van database-id's.
+  const wanted = new Set(
+    demoStandards
+      .map((s) => {
+        const kioskId = kioskIds.get(s.kioskId)
+        const productId = productIds.get(s.productId)
+        return kioskId && productId ? `${kioskId}|${productId}` : null
+      })
+      .filter((key): key is string => key !== null)
+  )
+
+  const stale = await client.query<{ id: string; kiosk_id: string; product_id: string }>(
+    `select id, kiosk_id, product_id
+       from kiosk_product_standards
+      where is_active = true and kiosk_id = any($1::uuid[])`,
+    [[...authoritativeKioskDbIds]]
+  )
+
+  const toDeactivate = stale.rows
+    .filter((row) => !wanted.has(`${row.kiosk_id}|${row.product_id}`))
+    .map((row) => row.id)
+
+  if (toDeactivate.length > 0) {
+    await client.query(
+      'update kiosk_product_standards set is_active = false where id = any($1::uuid[])',
+      [toDeactivate]
+    )
+    console.log(`  · ${toDeactivate.length} verouderde normen uitgeschakeld`)
+  }
 
   console.log(`✓ ${count} voorraadnormen`)
 }

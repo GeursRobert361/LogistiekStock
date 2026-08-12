@@ -2,7 +2,7 @@ import { test, expect, type Page } from '@playwright/test'
 import { login, resetAppData, fillAllCounts } from './helpers'
 
 /**
- * Kiosk 116 heeft een drankkoeling, en daar staat Chaudfontaine Blauw op
+ * Kiosk 116 heeft een drankkoeling, en daar staat Water Blauw op
  * norm 15 — handig om de afrondingsregels doorheen te halen. Kiosken zonder
  * koeling voeren die producten helemaal niet.
  */

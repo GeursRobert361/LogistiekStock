@@ -1,5 +1,6 @@
 import type { IProductRepository } from '@/repositories/interfaces/IProductRepository'
 import type { KioskProductStandard, Product, ProductCategory } from '@/types'
+import type { DrinkStorageType } from '@/types'
 import { query, queryOne, queryRequired, buildUpdate, buildUpsert, transaction } from '@/server/db/pool'
 import {
   mapCategory,
@@ -98,12 +99,19 @@ export const productRepository: IProductRepository = {
 
   async getStandardMatrix(ringId) {
     const kioskRows = await query(
-      `select id, number from kiosks
+      `select id, number, label, drink_storage_type from kiosks
        where ring_id = $1 and is_active = true and deleted_at is null
        order by sort_order`,
       [ringId]
     )
-    const kiosks = kioskRows.map((row) => ({ id: String(row.id), number: Number(row.number) }))
+    const kiosks = kioskRows.map((row) => ({
+      id: String(row.id),
+      number: Number(row.number),
+      // Zonder opschrift is "406 Oud" in deze tabel niet van "406 Nieuw" te
+      // onderscheiden; er staat dan twee keer een nummer.
+      label: row.label === null || row.label === undefined ? undefined : String(row.label),
+      drinkStorageType: String(row.drink_storage_type) as DrinkStorageType,
+    }))
     const products = await this.getProducts({ activeOnly: true })
 
     const standards: Record<string, Record<string, KioskProductStandard>> = {}

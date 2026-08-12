@@ -1,4 +1,5 @@
 import type { KioskCount, CountEntry, RestockRequirement } from '@/types/domain'
+import type { DrinkStorageType } from '@/types/enums'
 import { buildRestockRequirements, type RequirementDraft } from './buildRequirements'
 
 /**
@@ -25,6 +26,9 @@ export interface ReconcileRequirementsInput {
   existing: RestockRequirement[]
   /** Kiosken waar deze telronde over gaat; daarbuiten wordt niets gewijzigd. */
   scopeKioskIds: Iterable<string>
+  /** Zie `buildRestockRequirements`: nodig voor de satellietuitzondering. */
+  kioskStorage?: Map<string, DrinkStorageType>
+  satelliteSuppliedProductIds?: ReadonlySet<string>
 }
 
 export interface RequirementReconciliation {
@@ -54,7 +58,15 @@ export function isRequirementInUse(requirement: RestockRequirement): boolean {
 export function reconcileRestockRequirements(
   input: ReconcileRequirementsInput
 ): RequirementReconciliation {
-  const { eventId, kioskCounts, entriesByKioskCount, existing, scopeKioskIds } = input
+  const {
+    eventId,
+    kioskCounts,
+    entriesByKioskCount,
+    existing,
+    scopeKioskIds,
+    kioskStorage,
+    satelliteSuppliedProductIds,
+  } = input
   const scope = new Set(scopeKioskIds)
 
   const desired = buildRestockRequirements({
@@ -62,6 +74,8 @@ export function reconcileRestockRequirements(
     kioskCounts,
     entriesByKioskCount,
     existing,
+    kioskStorage,
+    satelliteSuppliedProductIds,
   }).filter((draft) => scope.has(draft.kioskId))
 
   const desiredByKey = new Map(

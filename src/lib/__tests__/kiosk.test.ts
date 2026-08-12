@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { kioskLabel, kioskTitle } from '../kiosk'
 import type { Kiosk } from '@/types'
+import { DrinkStorageType } from '@/types'
 
 function kiosk(overrides: Partial<Kiosk> = {}): Kiosk {
   return {
@@ -9,6 +10,7 @@ function kiosk(overrides: Partial<Kiosk> = {}): Kiosk {
     number: 120,
     sortOrder: 200,
     isActive: true,
+    drinkStorageType: DrinkStorageType.NONE,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,

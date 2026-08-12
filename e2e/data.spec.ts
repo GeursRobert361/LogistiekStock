@@ -51,7 +51,7 @@ test.describe('Data', () => {
     await expect(page.getByText(/gemeten met de telling van/)).toBeVisible()
 
     // Zonder vulronde ertussen: 2 geteld, 1 over, dus 1 verbruikt per product.
-    const water = page.getByRole('button', { name: /Chaudfontaine Blauw/ })
+    const water = page.getByRole('button', { name: /Water Blauw/ })
     await expect(water).toBeVisible()
     await expect(water).toContainText('1')
 

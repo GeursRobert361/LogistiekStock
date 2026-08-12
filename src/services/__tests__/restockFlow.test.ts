@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { FakeRestockRepository } from './fakeRestockRepository'
 import type { Event, Kiosk, Product } from '@/types'
+import { DrinkStorageType } from '@/types'
 
 const fakeRestockRepo = new FakeRestockRepository()
 
@@ -17,6 +18,7 @@ const KIOSKS: Kiosk[] = [
     number: 101 + i,
     sortOrder: i + 1,
     isActive: true,
+    drinkStorageType: DrinkStorageType.NONE,
     createdAt: '',
     updatedAt: '',
   })),
@@ -26,6 +28,7 @@ const KIOSKS: Kiosk[] = [
     number: 201 + i,
     sortOrder: i + 1,
     isActive: true,
+    drinkStorageType: DrinkStorageType.NONE,
     createdAt: '',
     updatedAt: '',
   })),
@@ -114,6 +117,7 @@ function product(id: string, overrides: Partial<Product> = {}): Product {
     ownRoundThreshold: 20,
     priority: 0,
     refrigerated: false,
+    suppliedFromLargeCoolerForSatellite: false,
     createdAt: '',
     updatedAt: '',
     ...overrides,

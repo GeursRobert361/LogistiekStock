@@ -62,6 +62,7 @@ function product(
     ownRoundThreshold: 20,
     priority: 0,
     refrigerated: false,
+    suppliedFromLargeCoolerForSatellite: false,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -91,6 +92,18 @@ const HALF_STEP: Partial<Product> = {
   allowPartialPackage: true,
 }
 
+/**
+ * De gekoelde tray- en pakkendranken die een satelliet tijdens een evenement
+ * uit een grote koeling haalt in plaats van uit het magazijn.
+ *
+ * Dit kenmerk en niet de categorie "Drank": daar zitten ook Caprisun en witte
+ * wijn in, en die worden bij een satelliet gewoon centraal aangevuld. Zie
+ * `shouldGenerateCentralRestock`.
+ */
+const SATELLITE_SUPPLIED: Partial<Product> = {
+  suppliedFromLargeCoolerForSatellite: true,
+}
+
 export const demoProducts: Product[] = [
   // ── Bierbekers ─────────────────────────────────────────────────────────
   product('bierbeker-05', CAT_BIERBEKERS_ID, 'Bierbekers 0,5', 'Beker 0,5', 'rol', 'rollen', 1, BULK),
@@ -100,42 +113,61 @@ export const demoProducts: Product[] = [
     roundType: RoundType.AUTO,
   }),
 
-  // ── Drank; staat alleen in kiosken met een koeling ──────────────────────
-  product('chaudfontaine-blauw', CAT_DRANK_ID, 'Chaudfontaine Blauw', 'Chaud. Blauw', 'pak', 'pakken', 10, { ...BULK, refrigerated: true }),
-  product('chaudfontaine-rood', CAT_DRANK_ID, 'Chaudfontaine Rood', 'Chaud. Rood', 'pak', 'pakken', 11, { ...BULK, refrigerated: true }),
-  product('fuze-tea', CAT_DRANK_ID, 'Fuze Tea', 'Fuze Tea', 'pak', 'pakken', 12, { ...BULK, refrigerated: true }),
-  product('heineken-00', CAT_DRANK_ID, 'Heineken 0.0%', 'Heineken 0.0', 'pak', 'pakken', 13, {
+  // ── Drank ───────────────────────────────────────────────────────────────
+  // De namen volgen wat er op de bestellijst staat; de id's blijven zoals ze
+  // waren, zodat eerdere tellingen naar hetzelfde product blijven wijzen.
+  //
+  // Alles met SATELLITE_SUPPLIED wordt bij een satelliet uit een grote koeling
+  // bijgehaald en niet uit het magazijn. Caprisun en witte wijn staan er
+  // bewust niet bij: die worden overal normaal aangevuld.
+  product('chaudfontaine-blauw', CAT_DRANK_ID, 'Water Blauw', 'Water Blauw', 'pak', 'pakken', 10, { ...BULK, ...SATELLITE_SUPPLIED, refrigerated: true }),
+  product('chaudfontaine-rood', CAT_DRANK_ID, 'Water Rood', 'Water Rood', 'pak', 'pakken', 11, { ...BULK, ...SATELLITE_SUPPLIED, refrigerated: true }),
+  product('fuze-tea', CAT_DRANK_ID, 'Fuze Tea', 'Fuze Tea', 'pak', 'pakken', 12, { ...BULK, ...SATELLITE_SUPPLIED, refrigerated: true }),
+  product('heineken-00', CAT_DRANK_ID, 'Heineken 0.0', 'Heineken 0.0', 'pak', 'pakken', 13, {
     ...HALF_STEP,
+    ...SATELLITE_SUPPLIED,
     refrigerated: true,
     priority: 6,
   }),
-  product('radler', CAT_DRANK_ID, 'Radler 2.0%', 'Radler', 'pak', 'pakken', 14, {
+  product('radler', CAT_DRANK_ID, 'Radler 2.0', 'Radler', 'pak', 'pakken', 14, {
     ...HALF_STEP,
+    ...SATELLITE_SUPPLIED,
     refrigerated: true,
     priority: 6,
   }),
-  product('bacardi-lemon', CAT_DRANK_ID, 'Bacardi Lemon', 'Bac. Lemon', 'blikje', 'trays', 15, {
+  product('bacardi-lemon', CAT_DRANK_ID, 'Bacardi Lime & Lemonade', 'Bac. Lime', 'blikje', 'trays', 15, {
     ...HALF_STEP,
+    ...SATELLITE_SUPPLIED,
     refrigerated: true,
   }),
-  product('stelz-icetea', CAT_DRANK_ID, 'Stelz Icetea', 'Stelz', 'blikje', 'trays', 16, {
+  product('stelz-icetea', CAT_DRANK_ID, 'Stelz Ice Tea', 'Stelz', 'blikje', 'trays', 16, {
     ...HALF_STEP,
+    ...SATELLITE_SUPPLIED,
     refrigerated: true,
     priority: 5,
   }),
-  product('jack-daniels', CAT_DRANK_ID, 'Jack Daniels', 'Jack D.', 'blikje', 'trays', 17, {
+  product('jack-daniels', CAT_DRANK_ID, 'Jack Daniels Cola', 'Jack D.', 'blikje', 'trays', 17, {
     ...SMALL,
+    ...SATELLITE_SUPPLIED,
     refrigerated: true,
   }),
-  product('redbull', CAT_DRANK_ID, 'Redbull', 'Redbull', 'blikje', 'trays', 18, {
+  product('redbull', CAT_DRANK_ID, 'Red Bull', 'Red Bull', 'blikje', 'trays', 18, {
     ...SMALL,
+    ...SATELLITE_SUPPLIED,
     refrigerated: true,
   }),
   product('bacardi-cola', CAT_DRANK_ID, 'Bacardi Cola', 'Bac. Cola', 'blikje', 'trays', 19, {
     ...HALF_STEP,
+    ...SATELLITE_SUPPLIED,
     refrigerated: true,
   }),
   product('witte-wijn', CAT_DRANK_ID, 'Witte Wijn', 'Witte Wijn', 'fles', 'dozen', 20, {
+    ...SMALL,
+    refrigerated: true,
+  }),
+  // Staat bij Ziggo Platform als gewone voorraad: wordt dus normaal vanuit het
+  // magazijn aangevuld, ook al is het een satelliet.
+  product('caprisun', CAT_DRANK_ID, 'Caprisun', 'Caprisun', 'pak', 'dozen', 21, {
     ...SMALL,
     refrigerated: true,
   }),
@@ -176,28 +208,34 @@ export const demoProducts: Product[] = [
     ...SMALL,
     refrigerated: true,
   }),
+  product('latiz', CAT_KOFFIE_ID, 'Latiz', 'Latiz', 'pak', 'pakken', 69, SMALL),
+  product('lavazza-bekers', CAT_KOFFIE_ID, 'Lavazza Bekers', 'Lavazza bekers', 'sleeve', 'dozen', 70, SMALL),
+  product('lavazza-cupjes', CAT_KOFFIE_ID, 'Lavazza Cupjes', 'Lavazza cupjes', 'doos', 'dozen', 71, SMALL),
 
   // ── Verpakkingen ───────────────────────────────────────────────────────
-  product('square-bakjes', CAT_VERPAKKINGEN_ID, 'Square Bakjes', 'Square Bakjes', 'pak', 'pakken', 70, SMALL),
-  product('rectangular-bakjes', CAT_VERPAKKINGEN_ID, 'Rectangular Bakjes', 'Rect. Bakjes', 'pak', 'pakken', 71, SMALL),
-  product('patat-bakjes', CAT_VERPAKKINGEN_ID, 'Patat Bakjes', 'Patat Bakjes', 'pak', 'pakken', 72, SMALL),
-  product('patat-vorkjes', CAT_VERPAKKINGEN_ID, 'Patat Vorkjes', 'Patat Vorkjes', 'pak', 'pakken', 73, SMALL),
-  product('servetten', CAT_VERPAKKINGEN_ID, 'Servetten', 'Servetten', 'pak', 'pakken', 74, SMALL),
-  product('sixpacks', CAT_VERPAKKINGEN_ID, 'Sixpacks', 'Sixpacks', 'pak', 'pakken', 75, SMALL),
-  product('arena-blaadjes', CAT_VERPAKKINGEN_ID, 'Arena Blaadjes', 'Arena Blaadjes', 'pak', 'pakken', 76, SMALL),
-  product('kassa-bonnen', CAT_VERPAKKINGEN_ID, 'Kassa Bonnen', 'Kassabonnen', 'rol', 'rollen', 77, SMALL),
+  product('square-bakjes', CAT_VERPAKKINGEN_ID, 'Square Bakjes', 'Square Bakjes', 'pak', 'pakken', 72, SMALL),
+  product('rectangular-bakjes', CAT_VERPAKKINGEN_ID, 'Rectangular Bakjes', 'Rect. Bakjes', 'pak', 'pakken', 73, SMALL),
+  product('patat-bakjes', CAT_VERPAKKINGEN_ID, 'Patat Bakjes', 'Patat Bakjes', 'pak', 'pakken', 74, SMALL),
+  product('patat-vorkjes', CAT_VERPAKKINGEN_ID, 'Patat Vorkjes', 'Patat Vorkjes', 'pak', 'pakken', 75, SMALL),
+  product('servetten', CAT_VERPAKKINGEN_ID, 'Servetten', 'Servetten', 'pak', 'pakken', 76, SMALL),
+  product('sixpacks', CAT_VERPAKKINGEN_ID, 'Sixpacks', 'Sixpacks', 'pak', 'pakken', 77, SMALL),
+  product('arena-blaadjes', CAT_VERPAKKINGEN_ID, 'Arena Blaadjes', 'Arena Blaadjes', 'pak', 'pakken', 78, SMALL),
+  product('kassa-bonnen', CAT_VERPAKKINGEN_ID, 'Kassa Bonnen', 'Kassabonnen', 'rol', 'rollen', 79, SMALL),
   // Het eten zelf — broodjes, worsten, kroketten, kipburgers — telt logistiek
   // niet; dat loopt via de keuken.
 
   // ── Sauzen ─────────────────────────────────────────────────────────────
   product('mayo-emmers', CAT_SAUZEN_ID, 'Mayo Emmers', 'Mayo emmer', 'emmer', 'emmers', 80, SMALL),
   product('ketchup-emmers', CAT_SAUZEN_ID, 'Ketchup Emmers', 'Ketchup emmer', 'emmer', 'emmers', 81, SMALL),
-  // Flessen worden per pak geteld, niet per fles: een norm staat dus in pakken.
-  product('mayo-flessen', CAT_SAUZEN_ID, 'Mayo Flessen', 'Mayo', 'pak', 'pakken', 82, SMALL),
-  product('ketchup-flessen', CAT_SAUZEN_ID, 'Ketchup Flessen', 'Ketchup', 'pak', 'pakken', 83, SMALL),
-  product('mosterd-flessen', CAT_SAUZEN_ID, 'Mosterd Flessen', 'Mosterd', 'pak', 'pakken', 84, SMALL),
+  // Per fles, niet per pak. De bestellijst geeft hier normen van 15, en dat is
+  // een aantal flessen — vijftien pakken saus staat in geen enkele kiosk. De
+  // teller hoort te zien wat hij in zijn hand heeft.
+  product('mayo-flessen', CAT_SAUZEN_ID, 'Mayo Flessen', 'Mayo', 'fles', 'flessen', 82, SMALL),
+  product('ketchup-flessen', CAT_SAUZEN_ID, 'Ketchup Flessen', 'Ketchup', 'fles', 'flessen', 83, SMALL),
+  product('mosterd-flessen', CAT_SAUZEN_ID, 'Mosterd Flessen', 'Mosterd', 'fles', 'flessen', 84, SMALL),
 
   // ── Schoonmaak ─────────────────────────────────────────────────────────
   product('tork-rol', CAT_SCHOONMAAK_ID, 'Tork Rol', 'Tork', 'rol', 'rollen', 90, SMALL),
   product('vuilniszakken', CAT_SCHOONMAAK_ID, 'Vuilniszakken', 'Vuilniszakken', 'rol', 'rollen', 91, SMALL),
+  product('theedoeken', CAT_SCHOONMAAK_ID, 'Theedoeken', 'Theedoeken', 'stuk', 'pakken', 92, SMALL),
 ]

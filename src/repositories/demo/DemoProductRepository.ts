@@ -1,5 +1,5 @@
 import type { IProductRepository } from '../interfaces/IProductRepository'
-import type { Product, ProductCategory, KioskProductStandard } from '@/types'
+import type { Product, ProductCategory, KioskProductStandard, Kiosk } from '@/types'
 import { demoTables } from './demoTables'
 import { newId } from '@/lib/ids'
 
@@ -53,13 +53,13 @@ export class DemoProductRepository implements IProductRepository {
 
   async getStandardMatrix(ringId: string): Promise<{
     products: Product[]
-    kiosks: Array<{ id: string; number: number }>
+    kiosks: Array<Pick<Kiosk, 'id' | 'number' | 'label' | 'drinkStorageType'>>
     standards: Record<string, Record<string, KioskProductStandard>>
   }> {
     const kiosks = demoTables.kiosks
       .filter((k) => k.ringId === ringId && k.isActive)
       .sort((a, b) => a.sortOrder - b.sortOrder)
-      .map((k) => ({ id: k.id, number: k.number }))
+      .map((k) => ({ id: k.id, number: k.number, label: k.label, drinkStorageType: k.drinkStorageType }))
 
     const products = await this.getProducts({ activeOnly: true })
 

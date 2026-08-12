@@ -41,6 +41,7 @@ import {
   IncidentCategory,
   DeliveryReason,
   UserRole,
+  DrinkStorageType,
 } from '@/types'
 
 type Row = Record<string, unknown>
@@ -197,6 +198,8 @@ export function mapKiosk(row: Row): Kiosk {
     isActive: bool(row.is_active),
     location: optStr(row.location),
     notes: optStr(row.notes),
+    drinkStorageType: str(row.drink_storage_type) as DrinkStorageType,
+    drinkSourceKioskId: optStr(row.drink_source_kiosk_id) ?? null,
     createdAt: str(row.created_at),
     updatedAt: str(row.updated_at),
   }
@@ -214,6 +217,12 @@ export function kioskToRow(data: Partial<Kiosk>): Row {
   if (data.isActive !== undefined) row.is_active = data.isActive
   if (data.location !== undefined) row.location = data.location
   if (data.notes !== undefined) row.notes = data.notes
+  if (data.drinkStorageType !== undefined) row.drink_storage_type = data.drinkStorageType
+  // Leeg betekent hier echt leeg: een satelliet zonder vastgestelde bronkiosk
+  // hoort NULL te zijn en niet een lege tekst.
+  if (data.drinkSourceKioskId !== undefined) {
+    row.drink_source_kiosk_id = data.drinkSourceKioskId || null
+  }
   return row
 }
 
@@ -255,6 +264,7 @@ export function mapProduct(row: Row): Product {
     priority: num(row.priority),
     storageLocation: optStr(row.storage_location),
     refrigerated: bool(row.refrigerated),
+    suppliedFromLargeCoolerForSatellite: bool(row.supplied_from_large_cooler_for_satellite),
     notes: optStr(row.notes),
     deletedAt: optStr(row.deleted_at),
     createdAt: str(row.created_at),
@@ -281,6 +291,9 @@ export function productToRow(data: Partial<Product>): Row {
   if (data.priority !== undefined) row.priority = data.priority
   if (data.storageLocation !== undefined) row.storage_location = data.storageLocation
   if (data.refrigerated !== undefined) row.refrigerated = data.refrigerated
+  if (data.suppliedFromLargeCoolerForSatellite !== undefined) {
+    row.supplied_from_large_cooler_for_satellite = data.suppliedFromLargeCoolerForSatellite
+  }
   if (data.notes !== undefined) row.notes = data.notes
   return row
 }

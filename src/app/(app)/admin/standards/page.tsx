@@ -16,11 +16,12 @@ import {
   validateStandardValue,
 } from '@/services/standardsService'
 import { formatQuantity, fromQuarterUnits } from '@/lib/quarterUnits'
-import type { KioskProductStandard, Product, Ring } from '@/types'
+import type { KioskProductStandard, Product, Ring, Kiosk } from '@/types'
+import { DrinkStorageType, DRINK_STORAGE_LABEL } from '@/types'
 
 interface MatrixData {
   products: Product[]
-  kiosks: Array<{ id: string; number: number }>
+  kiosks: Array<Pick<Kiosk, 'id' | 'number' | 'label' | 'drinkStorageType'>>
   standards: Record<string, Record<string, KioskProductStandard>>
 }
 
@@ -168,10 +169,21 @@ export default function AdminStandardsPage() {
                       {matrix.kiosks.map((kiosk) => (
                         <th
                           key={kiosk.id}
-                          title={kioskTitle(kiosk)}
+                          title={`${kioskTitle(kiosk)} — ${DRINK_STORAGE_LABEL[kiosk.drinkStorageType]}`}
                           className="min-w-[3.5rem] px-1 py-2 text-center font-medium leading-tight text-gray-600"
                         >
                           {kioskLabel(kiosk)}
+                          {/* Een satelliet telt drank wel, maar het magazijn
+                              vult die niet aan. Dat hoort zichtbaar te zijn
+                              waar je normen zit te zetten. */}
+                          {kiosk.drinkStorageType === DrinkStorageType.SATELLITE && (
+                            <span
+                              className="block text-[0.6rem] font-normal text-ink-faint"
+                              aria-label="satelliet"
+                            >
+                              sat.
+                            </span>
+                          )}
                         </th>
                       ))}
                     </tr>

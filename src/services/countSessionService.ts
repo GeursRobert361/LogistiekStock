@@ -305,12 +305,27 @@ export async function approveSession(session: CountSession): Promise<ApprovalRes
   }
 
   const restock = repositories.restock()
+
+  // Nodig om te bepalen welke tekorten het magazijn moet aanvullen: bij een
+  // satelliet komt de gewone drank uit een grote kiosk in de buurt en niet uit
+  // het magazijn.
+  const [kiosks, products] = await Promise.all([
+    repositories.kiosk().getKiosks(),
+    repositories.product().getProducts({ activeOnly: false }),
+  ])
+
   const reconciliation = reconcileRestockRequirements({
     eventId: fresh.eventId,
     kioskCounts,
     entriesByKioskCount,
     existing: await restock.getRequirements(fresh.eventId),
     scopeKioskIds: fresh.kioskRoute,
+    kioskStorage: new Map(kiosks.map((kiosk) => [kiosk.id, kiosk.drinkStorageType])),
+    satelliteSuppliedProductIds: new Set(
+      products
+        .filter((product) => product.suppliedFromLargeCoolerForSatellite)
+        .map((product) => product.id)
+    ),
   })
 
   if (reconciliation.blocked.length > 0) {

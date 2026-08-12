@@ -13,6 +13,7 @@ import { ListSkeleton } from '@/components/shared/LoadingSkeleton'
 import { EditSheet, ToggleField } from '@/components/admin/EditSheet'
 import { repositories } from '@/repositories'
 import type { Kiosk, Ring } from '@/types'
+import { DrinkStorageType, DRINK_STORAGE_LABEL } from '@/types'
 
 interface KioskDraft {
   ringId: string
@@ -23,6 +24,8 @@ interface KioskDraft {
   notes: string
   isActive: boolean
   label: string
+  drinkStorageType: DrinkStorageType
+  drinkSourceKioskId: string
 }
 
 function toDraft(kiosk: Kiosk | undefined, fallbackRingId: string): KioskDraft {
@@ -35,6 +38,8 @@ function toDraft(kiosk: Kiosk | undefined, fallbackRingId: string): KioskDraft {
     location: kiosk?.location ?? '',
     notes: kiosk?.notes ?? '',
     isActive: kiosk?.isActive ?? true,
+    drinkStorageType: kiosk?.drinkStorageType ?? DrinkStorageType.NONE,
+    drinkSourceKioskId: kiosk?.drinkSourceKioskId ?? '',
   }
 }
 
@@ -121,6 +126,10 @@ export default function AdminKiosksPage() {
       location: draft.location.trim() || undefined,
       notes: draft.notes.trim() || undefined,
       isActive: draft.isActive,
+      drinkStorageType: draft.drinkStorageType,
+      // Leeg blijft leeg: een satelliet zonder vastgestelde bronkiosk hoort
+      // NULL te zijn, niet een lege tekst.
+      drinkSourceKioskId: draft.drinkSourceKioskId || null,
     }
 
     if (editing === 'new') {
@@ -253,6 +262,43 @@ export default function AdminKiosksPage() {
           value={draft.notes}
           onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
         />
+
+        <Select
+          label="Drankopslag"
+          value={draft.drinkStorageType}
+          onChange={(e) =>
+            setDraft({ ...draft, drinkStorageType: e.target.value as DrinkStorageType })
+          }
+          options={Object.values(DrinkStorageType).map((type) => ({
+            value: type,
+            label: DRINK_STORAGE_LABEL[type],
+          }))}
+        />
+        <p className="text-xs text-gray-600">
+          Een satelliet verkoopt drank maar heeft geen koeling: die haalt tijdens het evenement bij
+          uit een grote kiosk. Dranktekorten daar gaan niet naar het magazijn. Al het andere —
+          bekers, chips, post-mix, koffie — wordt gewoon aangevuld.
+        </p>
+
+        {draft.drinkStorageType === DrinkStorageType.SATELLITE && (
+          <>
+            <Select
+              label="Bronkiosk"
+              value={draft.drinkSourceKioskId}
+              onChange={(e) => setDraft({ ...draft, drinkSourceKioskId: e.target.value })}
+              options={[
+                { value: '', label: 'Nog niet vastgesteld' },
+                ...kiosks
+                  .filter((kiosk) => kiosk.drinkStorageType === DrinkStorageType.LARGE_COOLER)
+                  .map((kiosk) => ({ value: kiosk.id, label: kioskTitle(kiosk) })),
+              ]}
+            />
+            <p className="text-xs text-gray-600">
+              Uit welke grote koeling deze satelliet zijn drank haalt. Mag leeg blijven — er gebeurt
+              voorlopig nog niets mee.
+            </p>
+          </>
+        )}
         <ToggleField
           label="Actief"
           checked={draft.isActive}

@@ -1,4 +1,4 @@
-import type { Product, ProductCategory, KioskProductStandard } from '@/types'
+import type { Product, ProductCategory, KioskProductStandard, Kiosk } from '@/types'
 
 export interface IProductRepository {
   getCategories(options?: { includeInactive?: boolean }): Promise<ProductCategory[]>
@@ -13,7 +13,7 @@ export interface IProductRepository {
   getStandards(kioskId: string): Promise<KioskProductStandard[]>
   getStandardMatrix(ringId: string): Promise<{
     products: Product[]
-    kiosks: Array<{ id: string; number: number }>
+    kiosks: Array<Pick<Kiosk, 'id' | 'number' | 'label' | 'drinkStorageType'>>
     standards: Record<string, Record<string, KioskProductStandard>>
   }>
   upsertStandard(data: Omit<KioskProductStandard, 'id' | 'createdAt' | 'updatedAt'>): Promise<KioskProductStandard>

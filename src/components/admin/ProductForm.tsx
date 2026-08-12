@@ -61,6 +61,7 @@ export function ProductForm({
     priority: initial?.priority ?? 0,
     storageLocation: initial?.storageLocation ?? '',
     refrigerated: initial?.refrigerated ?? false,
+    suppliedFromLargeCoolerForSatellite: initial?.suppliedFromLargeCoolerForSatellite ?? false,
     notes: initial?.notes ?? '',
   })
   const [isSaving, setIsSaving] = useState(false)
@@ -205,6 +206,11 @@ export function ProductForm({
           label="Gekoeld"
           checked={values.refrigerated}
           onChange={(checked) => set('refrigerated', checked)}
+        />
+        <Toggle
+          label="Satelliet haalt dit uit een grote koeling"
+          checked={values.suppliedFromLargeCoolerForSatellite}
+          onChange={(checked) => set('suppliedFromLargeCoolerForSatellite', checked)}
         />
         <Toggle
           label="Deelverpakking toegestaan"

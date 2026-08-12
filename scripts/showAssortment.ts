@@ -5,7 +5,7 @@
  * Draaien met: npx tsx scripts/showAssortment.ts [kiosknummer...]
  */
 import { demoProducts, demoStandards, demoKiosks } from '../src/lib/seed/demoData'
-import { KIOSKS_WITH_DRINKS_FRIDGE } from '../src/lib/seed/assortment'
+import { DRINK_STORAGE_LABEL } from '../src/types'
 import { kioskTitle } from '../src/lib/kiosk'
 
 const requested = process.argv.slice(2).map(Number).filter(Number.isFinite)
@@ -23,7 +23,7 @@ for (const number of numbers) {
   }
 
   const mine = demoStandards.filter((s) => s.kioskId === kiosk.id)
-  const fridge = KIOSKS_WITH_DRINKS_FRIDGE.has(number) ? 'met koeling' : 'zonder koeling'
+  const fridge = DRINK_STORAGE_LABEL[kiosk.drinkStorageType]
 
   console.log(`── ${kioskTitle(kiosk)} (${fridge}) — ${mine.length} producten`)
   for (const standard of mine) {

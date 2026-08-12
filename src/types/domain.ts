@@ -17,6 +17,7 @@ import type {
   SyncStatus,
   DeliveryReason,
   AuditAction,
+  DrinkStorageType,
 } from './enums'
 
 // ─── User / Auth ─────────────────────────────────────────────────────────────
@@ -61,6 +62,18 @@ export interface Kiosk {
   isActive: boolean
   location?: string
   notes?: string
+  /**
+   * Hoe dit telpunt zijn drank opslaat. Bepaalt of een dranktekort door het
+   * centrale magazijn wordt aangevuld — zie `shouldGenerateCentralRestock`.
+   */
+  drinkStorageType: DrinkStorageType
+  /**
+   * Uit welke grote kiosk een satelliet zijn drank haalt.
+   *
+   * Voorlopig overal leeg: de bronrelaties zijn nog niet vastgesteld. Zodra ze
+   * bekend zijn kan hier een interne drankoverdracht op gebouwd worden.
+   */
+  drinkSourceKioskId?: string | null
   createdAt: string
   updatedAt: string
 }
@@ -97,6 +110,16 @@ export interface Product {
   priority: number
   storageLocation?: string
   refrigerated: boolean
+  /**
+   * Haalt een satelliet dit product uit een grote koeling in plaats van uit
+   * het magazijn?
+   *
+   * Alleen waar voor de gekoelde tray- en pakkendranken. Bewust een kenmerk op
+   * het product en niet de categorie "Drank": die is te grof — Caprisun staat
+   * bij Ziggo Platform als gewone voorraad, en witte wijn is geen tray uit een
+   * koeling.
+   */
+  suppliedFromLargeCoolerForSatellite: boolean
   notes?: string
   /**
    * Verwijderd: het product verdwijnt uit alle lijsten, maar de rij blijft

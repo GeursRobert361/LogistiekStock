@@ -6,11 +6,21 @@ const fakeCountRepo = new FakeCountRepository()
 const fakeRestockRepo = new FakeRestockRepository()
 const updateEventStatus = vi.fn(async () => undefined)
 
+/**
+ * Goedkeuren leest kiosken en producten om te bepalen welke tekorten het
+ * magazijn moet aanvullen. Hier zonder bijzonderheden: geen satellieten, dus
+ * elke behoefte telt gewoon mee.
+ */
+const fakeKiosks: Array<{ id: string; drinkStorageType: string }> = []
+const fakeProducts: Array<{ id: string; suppliedFromLargeCoolerForSatellite: boolean }> = []
+
 vi.mock('@/repositories', () => ({
   repositories: {
     count: () => fakeCountRepo,
     restock: () => fakeRestockRepo,
     event: () => ({ updateEventStatus }),
+    kiosk: () => ({ getKiosks: async () => fakeKiosks }),
+    product: () => ({ getProducts: async () => fakeProducts }),
   },
 }))
 

@@ -153,3 +153,29 @@ export enum AuditAction {
   STORING_GEWIJZIGD = 'storing_gewijzigd',
   EVENEMENT_AFGESLOTEN = 'evenement_afgesloten',
 }
+
+/**
+ * Hoe een telpunt zijn drank opslaat.
+ *
+ * Bepaalt of een dranktekort door het centrale magazijn moet worden
+ * aangevuld. Een satelliet verkoopt drank maar heeft geen buffer: die haalt
+ * tijdens het evenement bij uit een grote kiosk, dus een tekort daar is geen
+ * magazijnwerk. Bij de andere types is het dat wel.
+ */
+export enum DrinkStorageType {
+  /** Grote koeling; de dranknorm is echte buffervoorraad. */
+  LARGE_COOLER = 'LARGE_COOLER',
+  /** Geen buffer; gewone drank komt uit een grote kiosk in de buurt. */
+  SATELLITE = 'SATELLITE',
+  /** Eigen kleine voorraad, wél centraal aan te vullen. */
+  SMALL_BAR = 'SMALL_BAR',
+  /** Geen normale drankvoorraad. */
+  NONE = 'NONE',
+}
+
+export const DRINK_STORAGE_LABEL: Record<DrinkStorageType, string> = {
+  [DrinkStorageType.LARGE_COOLER]: 'Grote koeling',
+  [DrinkStorageType.SATELLITE]: 'Satelliet',
+  [DrinkStorageType.SMALL_BAR]: 'Kleine bar',
+  [DrinkStorageType.NONE]: 'Geen drankvoorraad',
+}

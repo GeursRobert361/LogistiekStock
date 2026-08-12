@@ -1,4 +1,5 @@
 import { assortmentForKiosk } from './assortment'
+import { secondRingStandards, authoritativeKioskKeys } from './secondRingStandards'
 import type {
   AgendaEntry,
   Profile,
@@ -7,7 +8,7 @@ import type {
   KioskProductStandard,
   Event,
 } from '@/types'
-import { UserRole, EventStatus, EventType } from '@/types'
+import { UserRole, EventStatus, EventType, DrinkStorageType } from '@/types'
 
 // ─── Rings ────────────────────────────────────────────────────────────────
 
@@ -57,6 +58,11 @@ function makeKiosks(ringId: string, start: number, count: number): Kiosk[] {
       isActive: true,
       location: undefined,
       notes: undefined,
+      // Wordt hierna gezet vanuit de tweede-ringconfig. NONE is de veilige
+      // uitgangswaarde: wie niets weet van een telpunt gaat er niet vanuit dat
+      // er een koeling staat.
+      drinkStorageType: DrinkStorageType.NONE,
+      drinkSourceKioskId: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
     }
@@ -77,6 +83,8 @@ const cubes120: Kiosk = {
   location: 'Tegenover kiosk 120',
   sortOrder: 205, // direct na 120 (200), vóór 121 (210)
   isActive: true,
+  drinkStorageType: DrinkStorageType.NONE,
+  drinkSourceKioskId: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 }
@@ -94,16 +102,79 @@ const bar420: Kiosk = {
   location: 'Naast kiosk 420',
   sortOrder: 205, // direct na 420 (200), vóór 421 (210)
   isActive: true,
+  drinkStorageType: DrinkStorageType.NONE,
+  drinkSourceKioskId: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
 }
+
+/**
+ * Naast kiosk 406 staat een tweede telpunt met een eigen assortiment.
+ *
+ * Twee losse locaties, geen twee namen voor hetzelfde: ze worden apart geteld
+ * en apart gevuld. De database staat maar één keer nummer 406 per ring toe, dus
+ * de nieuwe krijgt intern 4061 — hetzelfde patroon als "120 Cubes" (1201) en
+ * "420 Bar" (4201). Op het scherm zie je altijd het opschrift.
+ *
+ * De bestaande kiosk 406 wordt "406 Oud"; die rij blijft dus staan, met alles
+ * wat eraan hangt.
+ */
+const kiosk406Nieuw: Kiosk = {
+  id: 'kiosk-406-nieuw',
+  ringId: RING2_ID,
+  number: 4061,
+  label: '406 Nieuw',
+  name: 'Kiosk 406 nieuw',
+  location: 'Naast kiosk 406',
+  sortOrder: 65, // tussen 406 (60) en 407 (70)
+  isActive: true,
+  drinkStorageType: DrinkStorageType.NONE,
+  drinkSourceKioskId: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+}
+
+/**
+ * Het Ziggo Platform: een eigen verkooppunt met een korte lijst.
+ *
+ * Waar het precies in de looproute valt is nog niet bevestigd, dus het staat
+ * achteraan in plaats van dat er een ligging verzonnen wordt. De volgorde is
+ * een gewoon veld en in kioskbeheer aan te passen zodra het bekend is.
+ */
+const ziggoPlatform: Kiosk = {
+  id: 'kiosk-ziggo-platform',
+  ringId: RING2_ID,
+  number: 4300,
+  label: 'Ziggo Platform',
+  name: 'Ziggo Platform',
+  sortOrder: 300, // achteraan; positie in de route nog te bepalen
+  isActive: true,
+  drinkStorageType: DrinkStorageType.NONE,
+  drinkSourceKioskId: null,
+  createdAt: '2026-01-01T00:00:00Z',
+  updatedAt: '2026-01-01T00:00:00Z',
+}
+
+/** Het opslagtype komt uit de tweede-ringconfig; de rest blijft NONE. */
+const storageByKioskKey = new Map(
+  secondRingStandards.map((config) => [config.kioskKey, config.drinkStorageType])
+)
 
 export const demoKiosks: Kiosk[] = [
   ...makeKiosks(RING1_ID, 101, 28), // 101–128
   cubes120,
   ...makeKiosks(RING2_ID, 401, 29), // 401–429, daarna wrapt de ring naar 401
   bar420,
-].sort((a, b) => a.sortOrder - b.sortOrder)
+  kiosk406Nieuw,
+  ziggoPlatform,
+]
+  .map((kiosk) => ({
+    ...kiosk,
+    drinkStorageType: storageByKioskKey.get(kiosk.id) ?? kiosk.drinkStorageType,
+    // Op de vloer heet dit "406 Oud" sinds er een tweede bijstaat.
+    label: kiosk.id === 'kiosk-406' ? '406 Oud' : kiosk.label,
+  }))
+  .sort((a, b) => a.sortOrder - b.sortOrder)
 
 // ─── Users / Profiles ────────────────────────────────────────────────────
 
@@ -218,12 +289,41 @@ function standard(
 }
 
 /**
- * Welke producten een kiosk voert en hoeveel ervan, staat in assortment.ts —
- * dicht bij de regels die eruit voortkomen (koeling, patat, hotdog, snoep).
+ * De voorraadnormen.
+ *
+ * Twee bronnen, en de volgorde is niet willekeurig. Voor de locaties waarvoor
+ * echte papieren lijsten zijn aangeleverd geldt `secondRingStandards`: dat is
+ * stamdata, overgenomen van de vloer. Al het andere valt terug op
+ * `assortmentForKiosk`, dat normen afleidt uit regels op het kiosknummer —
+ * een benadering, goed genoeg zolang er geen echte lijst is.
+ *
+ * Wat níet in de config staat krijgt dus geen norm bij die kiosk. Een leeg vak
+ * op de lijst betekent "geen actieve norm", niet "norm 0".
  */
-export const demoStandards: KioskProductStandard[] = demoKiosks.flatMap((kiosk) =>
-  assortmentForKiosk(kiosk.number).map((item) => standard(kiosk.id, item.productId, item.target))
+const standardsByKioskKey = new Map(
+  secondRingStandards.map((config) => [config.kioskKey, config.standards])
 )
+
+export const demoStandards: KioskProductStandard[] = demoKiosks.flatMap((kiosk) => {
+  const explicit = standardsByKioskKey.get(kiosk.id)
+  if (explicit) {
+    return Object.entries(explicit).map(([productId, target]) =>
+      standard(kiosk.id, productId, target)
+    )
+  }
+  return assortmentForKiosk(kiosk.number).map((item) =>
+    standard(kiosk.id, item.productId, item.target)
+  )
+})
+
+/**
+ * Locaties waarvoor echte normdata is aangeleverd.
+ *
+ * De rest draait nog op afgeleide demo-normen. Dat onderscheid moet zichtbaar
+ * blijven: anders is over een maand niet meer te zien welke lijst je kunt
+ * vertrouwen.
+ */
+export const kiosksWithRealStandards: ReadonlySet<string> = authoritativeKioskKeys
 
 // ─── Demo event ───────────────────────────────────────────────────────────
 
