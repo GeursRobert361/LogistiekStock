@@ -39,10 +39,12 @@ export default function LoginPage() {
         {/* Logo / titel */}
         <div className="mb-8 text-center">
           <div className="mx-auto mb-3 flex h-16 w-16 items-center justify-center rounded-full bg-arena-red">
-            <span className="text-2xl font-bold text-white">LS</span>
+            <span className="text-2xl font-bold text-white">SF</span>
           </div>
-          <h1 className="text-xl font-bold text-gray-900">LogistiekStock</h1>
-          <p className="mt-1 text-sm text-gray-500">Johan Cruijff ArenA</p>
+          <h1 className="text-xl font-bold text-gray-900">StockFlow</h1>
+          <p className="mt-1 text-sm text-gray-500">
+            Voorraad &amp; logistiek · Johan Cruijff ArenA
+          </p>
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-4">

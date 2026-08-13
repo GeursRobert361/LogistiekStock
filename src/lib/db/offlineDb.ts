@@ -16,6 +16,10 @@ class OfflineDatabase extends Dexie {
   outbox!: Table<OutboxEntry>
   conflicts!: Table<SyncConflict>
 
+  // De naam blijft `LogistiekStockDB`, ook nu de app StockFlow heet. Dit is de
+  // sleutel waaronder IndexedDB op het toestel van de teller staat: hernoemen
+  // opent een lege database en laat een niet-gesynchroniseerde telling met zijn
+  // outbox onbereikbaar achter. Een naam die niemand ziet is dat niet waard.
   constructor(name = 'LogistiekStockDB') {
     super(name)
 

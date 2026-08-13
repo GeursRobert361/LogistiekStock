@@ -42,13 +42,14 @@ const plexCondensed = localFont({
 })
 
 export const metadata: Metadata = {
-  title: 'LogistiekStock — Johan Cruijff ArenA',
+  title: 'StockFlow — Voorraad & logistiek',
   description: 'Voorraadbeheer voor kiosken in de Johan Cruijff ArenA',
   manifest: '/manifest.json',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'default',
-    title: 'LogistiekStock',
+    // Staat onder het icoon op het beginscherm; daar past alleen de naam.
+    title: 'StockFlow',
   },
 }
 

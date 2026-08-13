@@ -1,7 +1,7 @@
 {
-  "name": "LogistiekStock",
-  "short_name": "LogistiekStock",
-  "description": "Voorraadbeheer voor kiosken in de Johan Cruijff ArenA",
+  "name": "StockFlow — Voorraad & logistiek",
+  "short_name": "StockFlow",
+  "description": "Voorraad & logistiek: tellen en bijvullen van kiosken in de Johan Cruijff ArenA",
   "start_url": "/",
   "display": "standalone",
   "orientation": "portrait",

@@ -37,7 +37,7 @@ export function AppHeader({ title, backHref, actions }: AppHeaderProps) {
             <h1 className="truncate text-base font-semibold text-ink">{title}</h1>
           ) : (
             <span className="text-base font-bold tracking-tight text-ink">
-              Logistiek<span className="text-arena-red">Stock</span>
+              Stock<span className="text-arena-red">Flow</span>
             </span>
           )}
         </div>

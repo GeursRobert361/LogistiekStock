@@ -1,5 +1,10 @@
 /**
- * Service worker voor LogistiekStock.
+ * Service worker voor StockFlow.
+ *
+ * De cachenamen hieronder houden hun `logistiekstock-`-voorvoegsel. Dat is een
+ * interne sleutel, geen naam die iemand ziet, en het opruimen verderop werkt
+ * op precies dat voorvoegsel: hernoemen zou de oude caches onaanraakbaar op elk
+ * toestel laten staan.
  *
  * Uitgangspunt: alleen de app-shell en statische build-assets worden gecachet.
  * Operationele gegevens (tellingen, bijvullijsten, gebruikersprofielen) gaan

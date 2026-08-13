@@ -1,5 +1,5 @@
 export const metadata = {
-  title: 'Offline — LogistiekStock',
+  title: 'Offline — StockFlow',
 }
 
 export default function OfflinePage() {

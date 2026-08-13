@@ -8,7 +8,7 @@ test.describe('Authenticatie', () => {
 
   test('inloggen met het demo-adminaccount', async ({ page }) => {
     await page.goto('/login')
-    await expect(page.getByRole('heading', { name: 'LogistiekStock' })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'StockFlow' })).toBeVisible()
 
     await page.getByLabel('E-mailadres').fill('admin@demo.nl')
     await page.getByLabel('Wachtwoord').fill(DEMO_PASSWORD)

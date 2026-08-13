@@ -1,6 +1,12 @@
-# LogistiekStock
+# StockFlow — Voorraad & logistiek
 
 Mobiele PWA voor het tellen en bijvullen van voorraden in kiosken van de **Johan Cruijff ArenA**.
+
+> De app heet naar buiten toe StockFlow. De repository, het npm-pakket, de
+> containers en het pad `/opt/logistiek-stock` op de server houden hun oude
+> naam: dat zijn technische identifiers, en hernoemen levert alleen kapotte
+> links, verweesde caches en een migratie op zonder dat een gebruiker er iets
+> van merkt.
 
 ## Doel
 

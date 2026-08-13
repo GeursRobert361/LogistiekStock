@@ -9,6 +9,9 @@
  * de offline-cache van de *client*; deze store is de gesimuleerde *server*.
  */
 
+// Voorvoegsel houdt de oude naam, ook nu de app StockFlow heet: het is de
+// sleutel waaronder bestaande demo-data in localStorage staat, en die weggooien
+// om cosmetische redenen wist een lopende demo-telronde.
 const STORAGE_PREFIX = 'logistiekstock.demo.v1.'
 
 function isBrowser(): boolean {
