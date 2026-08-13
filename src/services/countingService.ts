@@ -5,7 +5,7 @@ import { countEntryId, kioskCountId as deriveKioskCountId, newId } from '@/lib/i
 import { calculateRestockQuantity } from '@/domain/counting/calculateRestock'
 import { findActiveSessionForRing } from '@/domain/counting/sessionStatus'
 import { fromQuarterUnits } from '@/lib/quarterUnits'
-import { KioskCountStatus, CountSessionStatus, SyncStatus } from '@/types'
+import { KioskCountStatus, CountSessionStatus, SyncStatus, FractionStrategy } from '@/types'
 import type { CountSession, KioskCount, CountEntry, KioskProductStandard } from '@/types'
 import {
   getLocalSession,
@@ -275,16 +275,24 @@ export interface SaveCountParams {
   standard: Pick<KioskProductStandard, 'targetQuantityQuarters' | 'halfPackageThresholdPercentage'>
   countedQuarters: number
   userId: string
+  /**
+   * Hoe een aangebroken verpakking meetelt. Weglaten geeft de algemene regel.
+   *
+   * De aanroeper haalt hem uit `fractionStrategyFor`; deze service kent geen
+   * producten, alleen normen en aantallen.
+   */
+  fractionStrategy?: FractionStrategy
 }
 
 /** Bouwt een telregel inclusief bijvuladvies. Pure functie — makkelijk te testen. */
 export function buildCountEntry(params: SaveCountParams): CountEntry {
-  const { kioskCountId, productId, standard, countedQuarters, userId } = params
+  const { kioskCountId, productId, standard, countedQuarters, userId, fractionStrategy } = params
 
   const result = calculateRestockQuantity({
     targetQuantity: fromQuarterUnits(standard.targetQuantityQuarters),
     countedQuantity: fromQuarterUnits(countedQuarters),
     halfPackageThresholdPercentage: standard.halfPackageThresholdPercentage,
+    fractionStrategy,
   })
 
   return {

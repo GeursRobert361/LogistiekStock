@@ -224,6 +224,34 @@ test.describe('Assortiment per kiosk', () => {
     await expect(page.getByText('Bierbekers 0,5')).toBeVisible()
     await expect(page.getByText('Chips Blauw')).toBeVisible()
   })
+
+  test('een satelliet in de tweede ring telt geen drank maar wel de rest', async ({ page }) => {
+    // 402 heeft geen koeling. Hier stond elk drankproduct op norm 1 als
+    // assortimentsindicatie; dat leverde regels op die niemand kon tellen.
+    await page.goto('/events/event-demo-ajax/count/start')
+    // De kiosklijst volgt de gekozen ring; 402 zit in de tweede.
+    await page.getByLabel('Ring').selectOption({ label: 'Tweede ring' })
+    await page.getByLabel('Startkiosk').selectOption({ label: 'Kiosk 402' })
+    await page.getByRole('button', { name: /Telronde starten/ }).click()
+    await page.waitForURL(/\/kiosk\/kiosk-402/)
+
+    await expect(page.locator(WATER)).toHaveCount(0)
+    await expect(page.locator('#product-redbull')).toHaveCount(0)
+    await expect(page.locator('#product-bacardi-cola')).toHaveCount(0)
+
+    await expect(page.locator('#product-bierbeker-05')).toBeVisible()
+    await expect(page.locator('#product-chips-blauw')).toBeVisible()
+    await expect(page.locator('#product-koffie')).toBeVisible()
+    await expect(page.locator('#product-tork-rol')).toBeVisible()
+  })
+
+  test('toont de eenheid waarin er werkelijk geteld wordt', async ({ page }) => {
+    await startCountAt(page, KIOSK)
+
+    // Bekers en trays, niet rollen en pakken.
+    await expect(page.locator('#product-bierbeker-05')).toContainText('dozen')
+    await expect(page.locator('#product-heineken-00')).toContainText('trays')
+  })
 })
 
 test.describe('Offline', () => {

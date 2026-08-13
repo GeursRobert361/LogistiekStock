@@ -93,6 +93,18 @@ const HALF_STEP: Partial<Product> = {
 }
 
 /**
+ * Per kwart te tellen.
+ *
+ * Voor verpakkingen die uit vier gelijke delen bestaan: een tray bier is vier
+ * sixpacks, een doos biertrays telt af per kwart. Een kwart is daar geen
+ * schatting maar een aantal dat je kunt aanwijzen.
+ */
+const QUARTER_STEP: Partial<Product> = {
+  inputStep: InputStep.QUARTER,
+  allowPartialPackage: true,
+}
+
+/**
  * De gekoelde tray- en pakkendranken die een satelliet tijdens een evenement
  * uit een grote koeling haalt in plaats van uit het magazijn.
  *
@@ -106,9 +118,9 @@ const SATELLITE_SUPPLIED: Partial<Product> = {
 
 export const demoProducts: Product[] = [
   // ── Bierbekers ─────────────────────────────────────────────────────────
-  product('bierbeker-05', CAT_BIERBEKERS_ID, 'Bierbekers 0,5', 'Beker 0,5', 'rol', 'rollen', 1, BULK),
-  product('bierbeker-04', CAT_BIERBEKERS_ID, 'Bierbekers 0,4', 'Beker 0,4', 'rol', 'rollen', 2, BULK),
-  product('bierbeker-03', CAT_BIERBEKERS_ID, 'Bierbekers 0,3', 'Beker 0,3', 'rol', 'rollen', 3, {
+  product('bierbeker-05', CAT_BIERBEKERS_ID, 'Bierbekers 0,5', 'Beker 0,5', 'doos', 'dozen', 1, BULK),
+  product('bierbeker-04', CAT_BIERBEKERS_ID, 'Bierbekers 0,4', 'Beker 0,4', 'doos', 'dozen', 2, BULK),
+  product('bierbeker-03', CAT_BIERBEKERS_ID, 'Bierbekers 0,3', 'Beker 0,3', 'doos', 'dozen', 3, {
     ...BULK,
     roundType: RoundType.AUTO,
   }),
@@ -123,14 +135,16 @@ export const demoProducts: Product[] = [
   product('chaudfontaine-blauw', CAT_DRANK_ID, 'Water Blauw', 'Water Blauw', 'pak', 'pakken', 10, { ...BULK, ...SATELLITE_SUPPLIED, refrigerated: true }),
   product('chaudfontaine-rood', CAT_DRANK_ID, 'Water Rood', 'Water Rood', 'pak', 'pakken', 11, { ...BULK, ...SATELLITE_SUPPLIED, refrigerated: true }),
   product('fuze-tea', CAT_DRANK_ID, 'Fuze Tea', 'Fuze Tea', 'pak', 'pakken', 12, { ...BULK, ...SATELLITE_SUPPLIED, refrigerated: true }),
-  product('heineken-00', CAT_DRANK_ID, 'Heineken 0.0', 'Heineken 0.0', 'pak', 'pakken', 13, {
-    ...HALF_STEP,
+  // Bier komt per tray van vier sixpacks. Een kwart tray is dus precies één
+  // sixpack — een aantal dat de teller in zijn hand heeft, geen schatting.
+  product('heineken-00', CAT_DRANK_ID, 'Heineken 0.0', 'Heineken 0.0', 'tray', 'trays', 13, {
+    ...QUARTER_STEP,
     ...SATELLITE_SUPPLIED,
     refrigerated: true,
     priority: 6,
   }),
-  product('radler', CAT_DRANK_ID, 'Radler 2.0', 'Radler', 'pak', 'pakken', 14, {
-    ...HALF_STEP,
+  product('radler', CAT_DRANK_ID, 'Radler 2.0', 'Radler', 'tray', 'trays', 14, {
+    ...QUARTER_STEP,
     ...SATELLITE_SUPPLIED,
     refrigerated: true,
     priority: 6,
@@ -177,15 +191,15 @@ export const demoProducts: Product[] = [
   // luik komt in elke kiosk voor. Vandaar halve stappen, met dezelfde betekenis
   // als bij de bekers en de dranken — `calculateRestockQuantity` doet er
   // niets bijzonders mee.
-  product('chips-blauw', CAT_CHIPS_ID, 'Chips Blauw', 'Chips Blauw', 'zak', 'dozen', 30, {
+  product('chips-blauw', CAT_CHIPS_ID, 'Chips Blauw', 'Chips Blauw', 'doos', 'dozen', 30, {
     ...SMALL,
     ...HALF_STEP,
   }),
-  product('chips-rood', CAT_CHIPS_ID, 'Chips Rood', 'Chips Rood', 'zak', 'dozen', 31, {
+  product('chips-rood', CAT_CHIPS_ID, 'Chips Rood', 'Chips Rood', 'doos', 'dozen', 31, {
     ...SMALL,
     ...HALF_STEP,
   }),
-  product('chips-oranje', CAT_CHIPS_ID, 'Chips Oranje', 'Chips Oranje', 'zak', 'dozen', 32, {
+  product('chips-oranje', CAT_CHIPS_ID, 'Chips Oranje', 'Chips Oranje', 'doos', 'dozen', 32, {
     ...SMALL,
     ...HALF_STEP,
   }),
@@ -237,7 +251,7 @@ export const demoProducts: Product[] = [
   product('melk', CAT_KOFFIE_ID, 'Melk', 'Melk', 'pak', 'pakken', 62, { ...SMALL, refrigerated: true }),
   product('suiker', CAT_KOFFIE_ID, 'Suiker', 'Suiker', 'doos', 'dozen', 63, SMALL),
   product('roerstaafjes', CAT_KOFFIE_ID, 'Roerstaafjes', 'Roerstaafjes', 'pak', 'pakken', 64, SMALL),
-  product('koffiebekers', CAT_KOFFIE_ID, 'Koffie Bekers', 'Koffiebekers', 'sleeve', 'dozen', 65, {
+  product('koffiebekers', CAT_KOFFIE_ID, 'Koffie Bekers', 'Koffiebekers', 'rol', 'rollen', 65, {
     ownRoundThreshold: 40,
   }),
   product('thee-earl-grey', CAT_KOFFIE_ID, 'Thee Earl Grey', 'Earl Grey', 'doos', 'dozen', 66, SMALL),
@@ -251,12 +265,20 @@ export const demoProducts: Product[] = [
   product('lavazza-cupjes', CAT_KOFFIE_ID, 'Lavazza Cupjes', 'Lavazza cupjes', 'doos', 'dozen', 71, SMALL),
 
   // ── Verpakkingen ───────────────────────────────────────────────────────
-  product('square-bakjes', CAT_VERPAKKINGEN_ID, 'Square Bakjes', 'Square Bakjes', 'pak', 'pakken', 72, SMALL),
-  product('rectangular-bakjes', CAT_VERPAKKINGEN_ID, 'Rectangular Bakjes', 'Rect. Bakjes', 'pak', 'pakken', 73, SMALL),
-  product('patat-bakjes', CAT_VERPAKKINGEN_ID, 'Patat Bakjes', 'Patat Bakjes', 'pak', 'pakken', 74, SMALL),
+  product('square-bakjes', CAT_VERPAKKINGEN_ID, 'Square Bakjes', 'Square Bakjes', 'doos', 'dozen', 72, SMALL),
+  product('rectangular-bakjes', CAT_VERPAKKINGEN_ID, 'Rectangular Bakjes', 'Rect. Bakjes', 'doos', 'dozen', 73, SMALL),
+  product('patat-bakjes', CAT_VERPAKKINGEN_ID, 'Patat Bakjes', 'Patat Bakjes', 'doos', 'dozen', 74, SMALL),
   product('patat-vorkjes', CAT_VERPAKKINGEN_ID, 'Patat Vorkjes', 'Patat Vorkjes', 'pak', 'pakken', 75, SMALL),
   product('servetten', CAT_VERPAKKINGEN_ID, 'Servetten', 'Servetten', 'pak', 'pakken', 76, SMALL),
-  product('sixpacks', CAT_VERPAKKINGEN_ID, 'Sixpacks', 'Sixpacks', 'pak', 'pakken', 77, SMALL),
+  // Heette "Sixpacks", maar het gaat om dozen met biertrays; de oude naam liet
+  // tellers naar losse sixpacks zoeken. Het id blijft `sixpacks`, zodat elke
+  // eerdere telling naar dezelfde rij blijft wijzen. Een aangebroken doos telt
+  // af per kwart, en pas vanaf driekwart telt hij nog als vol — zie
+  // `fractionStrategy.ts`.
+  product('sixpacks', CAT_VERPAKKINGEN_ID, 'Biertrays', 'Biertrays', 'doos', 'dozen', 77, {
+    ...SMALL,
+    ...QUARTER_STEP,
+  }),
   product('arena-blaadjes', CAT_VERPAKKINGEN_ID, 'Arena Blaadjes', 'Arena Blaadjes', 'pak', 'pakken', 78, SMALL),
   product('kassa-bonnen', CAT_VERPAKKINGEN_ID, 'Kassa Bonnen', 'Kassabonnen', 'rol', 'rollen', 79, SMALL),
   // Het eten zelf — broodjes, worsten, kroketten, kipburgers — telt logistiek

@@ -4,6 +4,7 @@ import { QuarterQuantityInput } from './QuarterQuantityInput'
 import { QuickQuantityInput } from './QuickQuantityInput'
 import { calculateRestockQuantity } from '@/domain/counting/calculateRestock'
 import { getQuickCountConfig } from '@/lib/counting/quickCountConfig'
+import { fractionStrategyFor } from '@/lib/counting/fractionStrategy'
 import { fromQuarterUnits, formatQuantity } from '@/lib/quarterUnits'
 import { cn } from '@/lib/utils'
 import type { Product } from '@/types'
@@ -46,6 +47,7 @@ export function ProductCountRow({
           targetQuantity: targetQty,
           countedQuantity: countedQty,
           halfPackageThresholdPercentage,
+          fractionStrategy: fractionStrategyFor(product.name),
         })
 
   const isFull = result !== null && result.restockQuantity === 0

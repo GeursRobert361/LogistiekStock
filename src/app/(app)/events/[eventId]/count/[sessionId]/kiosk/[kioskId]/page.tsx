@@ -2,6 +2,7 @@
 
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import { kioskLabel } from '@/lib/kiosk'
+import { fractionStrategyFor } from '@/lib/counting/fractionStrategy'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -142,12 +143,15 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
         standard,
         countedQuarters: quarters,
         userId: profileId,
+        // Zelfde strategie als de regel op het scherm gebruikt, anders zou het
+        // opgeslagen advies afwijken van wat de teller ziet staan.
+        fractionStrategy: fractionStrategyFor(products.find((p) => p.id === productId)?.name),
       }).catch((error: unknown) => {
         console.error('[telling] Opslaan van een telling mislukt.', error)
         setSaveError('Opslaan is mislukt. Probeer de waarde opnieuw in te voeren.')
       })
     },
-    [kioskCount, profileId, standards]
+    [kioskCount, profileId, standards, products]
   )
 
   const handleCountClear = useCallback(

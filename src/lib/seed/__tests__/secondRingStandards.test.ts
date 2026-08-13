@@ -183,9 +183,12 @@ describe('419 volgens de papieren lijst', () => {
 })
 
 describe('satellieten', () => {
-  it('houdt de dranknorm op 1 zodat er geteld kan worden', () => {
+  it('voert geen drank, want er staat geen koeling', () => {
+    // Hier stond elk drankproduct op 1 als assortimentsindicatie. Dat leverde
+    // een teller regels op die hij niet kon tellen en het magazijn tekorten van
+    // één; alleen een grote koeling telt drank.
     for (const productId of ['chaudfontaine-blauw', 'fuze-tea', 'bacardi-cola', 'redbull']) {
-      expect(norm('kiosk-402', productId), productId).toBe(1)
+      expect(norm('kiosk-402', productId), productId).toBeUndefined()
     }
   })
 
@@ -200,14 +203,22 @@ describe('satellieten', () => {
 })
 
 describe('420 Bar', () => {
-  it('heeft echte dranknormen van 2', () => {
-    expect(norm('kiosk-420-bar', 'fuze-tea')).toBe(2)
-    expect(norm('kiosk-420-bar', 'redbull')).toBe(2)
+  it('voert geen drank meer', () => {
+    // Een tappunt zonder koeling. Stond eerder op 2 per drankproduct.
+    expect(norm('kiosk-420-bar', 'fuze-tea')).toBeUndefined()
+    expect(norm('kiosk-420-bar', 'redbull')).toBeUndefined()
   })
 
   it('staat los van kiosk 420', () => {
+    // 420 heeft de koeling en telt dus wél; de bar ernaast niet.
     expect(norm('kiosk-420', 'chaudfontaine-blauw')).toBe(25)
-    expect(norm('kiosk-420-bar', 'chaudfontaine-blauw')).toBe(2)
+    expect(norm('kiosk-420-bar', 'chaudfontaine-blauw')).toBeUndefined()
+  })
+
+  it('houdt zijn eigen bekers, chips en Post-mix', () => {
+    expect(norm('kiosk-420-bar', 'bierbeker-05')).toBe(4)
+    expect(norm('kiosk-420-bar', 'chips-blauw')).toBe(10)
+    expect(norm('kiosk-420-bar', 'cola-zero')).toBe(6)
   })
 })
 
@@ -247,13 +258,19 @@ describe('Ziggo Platform', () => {
     expect(kiosk?.drinkStorageType).toBe(DrinkStorageType.SATELLITE)
   })
 
-  it('voert Caprisun als gewone voorraad', () => {
-    expect(norm('kiosk-ziggo-platform', 'caprisun')).toBe(1)
+  it('voert geen Caprisun meer, want dat is drank', () => {
+    // Caprisun stond hier als gewone voorraad, maar valt onder de categorie
+    // Drank en die wordt alleen bij een grote koeling geteld.
+    expect(norm('kiosk-ziggo-platform', 'caprisun')).toBeUndefined()
 
-    // En Caprisun valt niet onder de satellietuitzondering, anders zou hij
-    // hier nooit aangevuld worden.
-    const caprisun = demoProducts.find((p) => p.id === 'caprisun')
-    expect(caprisun?.suppliedFromLargeCoolerForSatellite).toBe(false)
+    // Het product bestaat nog wel; alleen deze locatie voert het niet.
+    expect(demoProducts.find((p) => p.id === 'caprisun')).toBeDefined()
+  })
+
+  it('houdt zijn bekers, chips en Post-mix', () => {
+    expect(norm('kiosk-ziggo-platform', 'bierbeker-05')).toBe(1)
+    expect(norm('kiosk-ziggo-platform', 'chips-blauw')).toBe(2)
+    expect(norm('kiosk-ziggo-platform', 'cola')).toBe(2)
   })
 })
 

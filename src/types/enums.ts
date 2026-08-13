@@ -123,6 +123,26 @@ export enum FractionRule {
   THREE_QUARTER_UP = 'THREE_QUARTER_UP',
 }
 
+/**
+ * Hoe een aangebroken verpakking meetelt voor het bijvuladvies.
+ *
+ * Niet elk product breekt hetzelfde af. Bij het meeste geldt de algemene regel;
+ * bij een enkel product weet de vloer beter wanneer een aangebroken doos
+ * praktisch leeg is.
+ */
+export enum FractionStrategy {
+  /** De algemene regel: .25 omlaag, .75 omhoog, .50 volgens de 80%-drempel. */
+  STANDARD = 'STANDARD',
+  /**
+   * Aangebroken telt pas mee vanaf driekwart: .25 en .50 omlaag, .75 omhoog.
+   *
+   * Voor dozen waar de restanten in de praktijk niet toereikend zijn: een halve
+   * doos biertrays is tijdens een evenement zo weg, dus wie daarop rekent staat
+   * met lege handen.
+   */
+  BREAK_AT_THREE_QUARTER = 'BREAK_AT_THREE_QUARTER',
+}
+
 export enum SyncStatus {
   LOCAL = 'LOCAL',
   SYNCING = 'SYNCING',

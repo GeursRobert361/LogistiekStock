@@ -1,4 +1,4 @@
-import { FractionRule } from '@/types/enums'
+import { FractionRule, FractionStrategy } from '@/types/enums'
 import type { RestockCalculationInput, RestockCalculationResult } from '@/types/domain'
 import { toQuarterUnits, fromQuarterUnits, getFractionQuarters, isValidQuantity } from '@/lib/quarterUnits'
 
@@ -15,11 +15,22 @@ import { toQuarterUnits, fromQuarterUnits, getFractionQuarters, isValidQuantity 
  *
  * Threshold defaults to 80% of targetQuantity.
  * Quantities are stored as integer quarter units to avoid floating-point issues.
+ *
+ * Eén product wijkt af van de halve-regel. `FractionStrategy` bepaalt dat, en
+ * die komt van de aanroeper: welk product welke strategie heeft is stamdata en
+ * geen rekenregel, dus daar hoort deze functie niets van te weten. Alleen de
+ * beslissing bij .50 verandert; .00, .25 en .75 doen in beide strategieën
+ * hetzelfde, en de algemene 80%-regel blijft ongewijzigd de standaard.
  */
 export function calculateRestockQuantity(
   input: RestockCalculationInput
 ): RestockCalculationResult {
-  const { targetQuantity, countedQuantity, halfPackageThresholdPercentage = 80 } = input
+  const {
+    targetQuantity,
+    countedQuantity,
+    halfPackageThresholdPercentage = 80,
+    fractionStrategy = FractionStrategy.STANDARD,
+  } = input
 
   // ── Validation ──────────────────────────────────────────────────────────
   if (!isValidQuantity(targetQuantity)) {
@@ -62,6 +73,12 @@ export function calculateRestockQuantity(
     // .75 → round up: add a quarter to reach the next whole
     effectiveQU = countedQU + 1
     appliedFractionRule = FractionRule.THREE_QUARTER_UP
+  } else if (fractionStrategy === FractionStrategy.BREAK_AT_THREE_QUARTER) {
+    // .50 telt hier niet mee: een halve doos is tijdens een evenement zo weg,
+    // dus wie hem meerekent staat halverwege met lege handen. Alleen deze tak
+    // wijkt af; de 80%-regel hieronder blijft voor al het andere gelden.
+    effectiveQU = countedQU - 2
+    appliedFractionRule = FractionRule.HALF_DOWN
   } else {
     // .50 → 80%-rule based on the whole-package count.
     //

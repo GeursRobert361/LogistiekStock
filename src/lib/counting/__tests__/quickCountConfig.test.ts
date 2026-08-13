@@ -196,7 +196,7 @@ describe('chips tellen per halve doos', () => {
 
   it('laat de rest van de chipsgegevens ongemoeid', () => {
     const chips = byId.get('chips-blauw')!
-    expect(chips.countUnit).toBe('zak')
+    expect(chips.countUnit).toBe('doos')
     expect(chips.packagingUnit).toBe('dozen')
     expect(chips.categoryId).toBe('cat-chips')
   })

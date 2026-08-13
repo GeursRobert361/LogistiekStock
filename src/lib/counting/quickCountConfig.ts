@@ -108,7 +108,10 @@ export const QUICK_COUNT_CONFIG: Record<string, QuickCountConfig> = {
   'Square Bakjes': INTEGER(5),
   'Patat Bakjes': INTEGER(5),
   'Patat Vorkjes': INTEGER(5),
-  Sixpacks: INTEGER(5),
+  // Hele dozen op de knoppen; een aangebroken doos telt af per kwart en gaat
+  // via "Meer…". Het handmatige veld klapt daar vanzelf open, omdat de knoppen
+  // 2,25 niet kunnen tonen.
+  Biertrays: INTEGER(5),
   'Arena Blaadjes': INTEGER(5),
   'Kassa Bonnen': INTEGER(5),
   Servetten: INTEGER(6),

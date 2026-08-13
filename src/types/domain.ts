@@ -14,6 +14,7 @@ import type {
   IncidentUrgency,
   IncidentCategory,
   FractionRule,
+  FractionStrategy,
   SyncStatus,
   DeliveryReason,
   AuditAction,
@@ -437,6 +438,11 @@ export interface RestockCalculationInput {
   targetQuantity: number
   countedQuantity: number
   halfPackageThresholdPercentage?: number
+  /**
+   * Hoe een aangebroken verpakking meetelt. Standaard de algemene regel; de
+   * aanroeper kiest hem uit `fractionStrategyFor`.
+   */
+  fractionStrategy?: FractionStrategy
 }
 
 export interface RestockCalculationResult {

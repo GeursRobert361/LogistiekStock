@@ -137,9 +137,9 @@ const kiosk406Nieuw: Kiosk = {
 /**
  * Het Ziggo Platform: een eigen verkooppunt met een korte lijst.
  *
- * Waar het precies in de looproute valt is nog niet bevestigd, dus het staat
- * achteraan in plaats van dat er een ligging verzonnen wordt. De volgorde is
- * een gewoon veld en in kioskbeheer aan te passen zodra het bekend is.
+ * De ligging is inmiddels bevestigd: wie 420 heeft geteld loopt hierlangs en
+ * komt daarna pas bij 420 Bar. Stond eerder achteraan omdat de plek in de route
+ * nog niet vaststond.
  */
 const ziggoPlatform: Kiosk = {
   id: 'kiosk-ziggo-platform',
@@ -147,7 +147,7 @@ const ziggoPlatform: Kiosk = {
   number: 4300,
   label: 'Ziggo Platform',
   name: 'Ziggo Platform',
-  sortOrder: 300, // achteraan; positie in de route nog te bepalen
+  sortOrder: 204, // tussen 420 (200) en 420 Bar (205)
   isActive: true,
   drinkStorageType: DrinkStorageType.NONE,
   drinkSourceKioskId: null,

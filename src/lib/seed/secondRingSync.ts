@@ -237,22 +237,33 @@ async function applyChanges(client: SqlClient): Promise<void> {
     )
   }
 
-  // Producten: alleen de velden die bij deze stamdata horen. Prijzen, formaten
-  // en drempels blijven van de catalogus en worden hier niet aangeraakt.
+  // Producten: alleen de velden die bij deze stamdata horen — hoe een product
+  // heet, waarin het geteld wordt en in welke stappen. Formaten, drempels,
+  // ronde-indeling en prioriteit blijven van de catalogus en worden hier niet
+  // aangeraakt.
+  //
+  // `input_step` en `allow_partial_package` gingen eerder alleen mee bij het
+  // aanmaken van een product. Daardoor bleef een bestaand product in productie
+  // op hele verpakkingen staan terwijl de catalogus al halve of kwart stappen
+  // zei — de teller kon een halve doos chips dan niet invoeren. Ze horen bij de
+  // teleenheid en gaan dus mee bij het bijwerken.
   const productIds = await resolveProductIds(client)
   for (const product of demoProducts) {
     const id = productIds.get(product.id)
     if (id) {
       await client.query(
         `update products set name = $1, short_name = $2, count_unit = $3, packaging_unit = $4,
-                supplied_from_large_cooler_for_satellite = $5
-          where id = $6`,
+                supplied_from_large_cooler_for_satellite = $5,
+                input_step = $6, allow_partial_package = $7
+          where id = $8`,
         [
           product.name,
           product.shortName,
           product.countUnit,
           product.packagingUnit,
           product.suppliedFromLargeCoolerForSatellite,
+          String(product.inputStep),
+          product.allowPartialPackage,
           id,
         ]
       )

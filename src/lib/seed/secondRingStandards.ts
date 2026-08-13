@@ -174,6 +174,27 @@ const PAPER_DRINKS: Record<string, Record<string, number>> = {
   },
 }
 
+/**
+ * Wie telt de gekoelde drank?
+ *
+ * Alleen een telpunt met een grote koeling. Nergens anders staat drank als
+ * voorraad: een satelliet, een kleine bar en een koffiehoek verkopen hem wel,
+ * maar hebben niets om hem in te bewaren.
+ *
+ * Hiervóór stond bij twaalf satellieten elk drankproduct op norm 1 en bij
+ * 420 Bar op 2, bedoeld als "het staat in het assortiment". Dat leverde een
+ * teller vijftien regels op die hij niet kon tellen omdat er geen koeling is,
+ * en het magazijn een reeks tekorten van één. Een norm hoort te zeggen hoeveel
+ * er moet liggen; als dat nergens is, is er geen norm.
+ *
+ * Dit gaat uitsluitend over de categorie Drank. Post-mix, bekers, chips,
+ * koffie, verpakkingen, sauzen en schoonmaak worden overal geteld waar ze op de
+ * lijst staan.
+ */
+export function countsChilledDrinks(storage: DrinkStorageType): boolean {
+  return storage === DrinkStorageType.LARGE_COOLER
+}
+
 /** De tien drankproducten die op elke papieren bestellijst staan. */
 export const PAPER_DRINK_PRODUCT_IDS = [
   'chaudfontaine-blauw',
@@ -460,9 +481,9 @@ export const POSTMIX_COUNTING_RULE = {
  *      blijft dus gewoon uit de papieren config komen.
  *   2. Andere kiosken. 419 voert geen Post-mix en houdt dat.
  *
- * De satelliet-drankuitzondering geldt hier niet: Post-mix wordt bij een
- * satelliet volstrekt normaal vanuit het magazijn aangevuld. Zie
- * `shouldGenerateCentralRestock`.
+ * Post-mix valt buiten de drankregel. Dat alleen een grote koeling de gekoelde
+ * dranken telt, zegt niets over de BIB-pakken achter de tap: die staan er
+ * gewoon en worden volstrekt normaal vanuit het magazijn aangevuld.
  *
  * "420 Hok" van de bron is de voorraadruimte van kiosk 420 en geen eigen
  * telpunt — er bestaat in de stamdata ook geen aparte locatie met die naam.
@@ -570,26 +591,6 @@ export const unconfirmedStandards: ReadonlyArray<{
   { kioskKey: 'kiosk-426', productId: 'heineken-00', reason: 'genoteerd als "15(?)"' },
 ]
 
-/**
- * De werkvoorraad drank van een satelliet: overal één.
- *
- * Dat is geen buffer maar een assortimentsindicatie — het product staat er,
- * en tijdens het evenement wordt bijgehaald uit een grote kiosk in de buurt.
- * De norm blijft zichtbaar bij het tellen; alleen het magazijn hoeft er niets
- * mee.
- */
-const SATELLITE_DRINKS: Record<string, number> = {
-  'chaudfontaine-blauw': 1,
-  'chaudfontaine-rood': 1,
-  'fuze-tea': 1,
-  'heineken-00': 1,
-  radler: 1,
-  'stelz-icetea': 1,
-  'bacardi-lemon': 1,
-  'jack-daniels': 1,
-  redbull: 1,
-  'bacardi-cola': 1,
-}
 
 /** De koffiehoek zoals die op vrijwel elke lijst terugkomt. */
 const KOFFIEHOEK: Record<string, number> = {
@@ -646,7 +647,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
       'bierbeker-05': 1,
       'bierbeker-04': 1,
       'bierbeker-03': 1,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 2,
       'chips-rood': 2,
       'chips-oranje': 2,
@@ -683,7 +683,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 2,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 5,
       'chips-rood': 5,
       'chips-oranje': 5,
@@ -710,7 +709,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 2,
       'bierbeker-04': 2,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 5,
       'chips-rood': 4,
       'chips-oranje': 3,
@@ -740,7 +738,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
       'bierbeker-05': 3,
       'bierbeker-04': 2,
       'bierbeker-03': 1,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 5,
       'chips-rood': 4,
       'chips-oranje': 4,
@@ -794,7 +791,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
       'bierbeker-05': 1,
       'bierbeker-04': 1,
       'bierbeker-03': 1,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 2,
       'chips-rood': 2,
       'chips-oranje': 2,
@@ -837,7 +833,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 3,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 2,
       'chips-rood': 2,
       'chips-oranje': 2,
@@ -859,7 +854,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 3,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 2,
       'chips-rood': 2,
       'chips-oranje': 2,
@@ -907,7 +901,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 2,
       'bierbeker-04': 2,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 5,
       'chips-rood': 4,
       'chips-oranje': 4,
@@ -977,24 +970,16 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     },
   },
   {
-    // Kleine bar, geen satelliet: deze dranknormen van 2 zijn echte voorraad
-    // en mogen dus gewoon vanuit het magazijn worden aangevuld.
+    // Een tappunt zonder koeling. Er stond hier drank met norm 2, maar die
+    // wordt op de bar niet uit voorraad geteld; alleen een grote koeling doet
+    // dat. Wat er wél ligt — bekers, chips, Post-mix, trays, schoonmaak —
+    // blijft gewoon staan.
     kioskKey: 'kiosk-420-bar',
     drinkStorageType: DrinkStorageType.SMALL_BAR,
     standards: {
       'bierbeker-05': 4,
       'bierbeker-04': 3,
       'bierbeker-03': 2,
-      'chaudfontaine-blauw': 2,
-      'chaudfontaine-rood': 2,
-      'fuze-tea': 2,
-      'heineken-00': 2,
-      radler: 2,
-      'stelz-icetea': 2,
-      'bacardi-lemon': 2,
-      'jack-daniels': 2,
-      redbull: 2,
-      'bacardi-cola': 2,
       'chips-blauw': 10,
       'chips-rood': 10,
       'chips-oranje': 10,
@@ -1056,7 +1041,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 1,
       'bierbeker-04': 1,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 2,
       'chips-rood': 2,
       'chips-oranje': 2,
@@ -1097,7 +1081,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 3,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 2,
       'chips-rood': 2,
       'chips-oranje': 2,
@@ -1119,7 +1102,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     standards: {
       'bierbeker-05': 3,
       'bierbeker-04': 3,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 2,
       'chips-rood': 2,
       'chips-oranje': 2,
@@ -1136,14 +1118,13 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
     },
   },
   {
-    // Caprisun staat hier als gewone voorraad en wordt dus normaal vanuit het
-    // magazijn aangevuld, ondanks dat dit een satelliet is.
+    // Caprisun stond hier als gewone voorraad, maar valt onder Drank en wordt
+    // dus alleen nog bij een grote koeling geteld. Post-mix en de rest blijven.
     kioskKey: 'kiosk-ziggo-platform',
     drinkStorageType: DrinkStorageType.SATELLITE,
     standards: {
       'bierbeker-05': 1,
       'bierbeker-04': 1,
-      ...SATELLITE_DRINKS,
       'chips-blauw': 2,
       'chips-rood': 2,
       'chips-oranje': 2,
@@ -1151,7 +1132,6 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
       'cola-zero': 2,
       fanta: 2,
       sprite: 2,
-      caprisun: 1,
       sixpacks: 3,
       'tork-rol': 6,
       vuilniszakken: 1,

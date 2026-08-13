@@ -6,6 +6,7 @@ import {
   paperDrinksFor,
   paperStandardsFor,
   latestOverridesFor,
+  countsChilledDrinks,
   PAPER_DRINK_PRODUCT_IDS,
   CUP_PRODUCT_IDS,
   CHIP_PRODUCT_IDS,
@@ -14,8 +15,8 @@ import {
 } from '../secondRingStandards'
 import { storageNotes, categoryStorageNoteFor } from '@/lib/storageNotes'
 import { demoKiosks, demoStandards } from '../demoData'
-import { demoProducts, CAT_POSTMIX_ID } from '../catalogue'
-import { InputStep } from '@/types'
+import { demoProducts, CAT_POSTMIX_ID, CAT_DRANK_ID } from '../catalogue'
+import { InputStep, DrinkStorageType } from '@/types'
 
 /**
  * De bronprioriteit van voorraadnormen.
@@ -412,6 +413,131 @@ describe('Fuze Tea Peach Hibiscus', () => {
 
     expect(metNorm).toEqual(['kiosk-407'])
     expect(norm('kiosk-407', 'fuze-tea-peach-hibiscus')).toBe(2)
+  })
+})
+
+describe('alleen een grote koeling telt drank', () => {
+  const drankProductIds = new Set(
+    demoProducts.filter((p) => p.categoryId === CAT_DRANK_ID).map((p) => p.id)
+  )
+
+  it('kent tien gekoelde dranken plus witte wijn en Caprisun', () => {
+    expect(drankProductIds.size).toBe(12)
+  })
+
+  it.each(
+    secondRingStandards
+      .filter((config) => config.drinkStorageType !== DrinkStorageType.LARGE_COOLER)
+      .map((config) => [config.kioskKey, config.drinkStorageType] as const)
+  )('%s (%s) voert geen enkel drankproduct', (kioskKey) => {
+    // Een norm hoort te zeggen hoeveel er moet liggen. Zonder koeling ligt er
+    // niets, dus is er geen norm — geen 1 als "het staat in het assortiment".
+    const drank = demoStandards
+      .filter((s) => s.kioskId === kioskKey && drankProductIds.has(s.productId))
+      .map((s) => s.productId)
+
+    expect(drank).toEqual([])
+  })
+
+  it('laat 402 helemaal geen drank meer zien', () => {
+    for (const productId of PRODUCT_VOLGORDE) {
+      expect(norm('kiosk-402', productId), productId).toBeUndefined()
+    }
+  })
+
+  it('laat 420 Bar helemaal geen drank meer zien', () => {
+    // Stonden hier eerder op 2.
+    for (const productId of ['chaudfontaine-blauw', 'fuze-tea', 'bacardi-cola']) {
+      expect(norm('kiosk-420-bar', productId), productId).toBeUndefined()
+    }
+  })
+
+  it('laat Ziggo Platform geen drank meer zien, ook geen Caprisun', () => {
+    for (const productId of ['chaudfontaine-blauw', 'fuze-tea', 'caprisun']) {
+      expect(norm('kiosk-ziggo-platform', productId), productId).toBeUndefined()
+    }
+  })
+
+  it('houdt de negen grote koelingen ongewijzigd', () => {
+    // De drankmatrix hierboven dekt alle negentig waarden; dit is de steekproef
+    // uit de opdracht, zodat een regressie hier meteen zichtbaar is.
+    expect(norm('kiosk-401', 'chaudfontaine-blauw')).toBe(25)
+    expect(norm('kiosk-403', 'fuze-tea')).toBe(15)
+    expect(norm('kiosk-407', 'stelz-icetea')).toBe(29)
+    expect(norm('kiosk-410', 'bacardi-cola')).toBe(30)
+    expect(norm('kiosk-416', 'redbull')).toBe(10)
+    expect(norm('kiosk-419', 'jack-daniels')).toBe(8)
+    expect(norm('kiosk-420', 'fuze-tea')).toBe(25)
+    expect(norm('kiosk-423', 'radler')).toBe(8)
+    expect(norm('kiosk-426', 'chaudfontaine-blauw')).toBe(25)
+  })
+
+  it('legt de regel vast als functie en niet als losse lijst', () => {
+    expect(countsChilledDrinks(DrinkStorageType.LARGE_COOLER)).toBe(true)
+    expect(countsChilledDrinks(DrinkStorageType.SATELLITE)).toBe(false)
+    expect(countsChilledDrinks(DrinkStorageType.SMALL_BAR)).toBe(false)
+    expect(countsChilledDrinks(DrinkStorageType.NONE)).toBe(false)
+  })
+})
+
+describe('een kiosk zonder drank raakt niet leeg', () => {
+  it('laat 402 zijn overige voorraad houden', () => {
+    expect(norm('kiosk-402', 'bierbeker-05')).toBe(1)
+    expect(norm('kiosk-402', 'chips-blauw')).toBe(2)
+    expect(norm('kiosk-402', 'koffie')).toBe(2)
+    expect(norm('kiosk-402', 'tork-rol')).toBe(6)
+    expect(norm('kiosk-402', 'vuilniszakken')).toBe(1)
+  })
+
+  it('laat 404 zijn Post-mix houden', () => {
+    // "Geen drank" gaat over de categorie Drank; de BIB-pakken achter de tap
+    // staan er gewoon.
+    expect(norm('kiosk-404', 'cola')).toBe(2)
+    expect(norm('kiosk-404', 'cola-zero')).toBe(4)
+    expect(norm('kiosk-404', 'koolzuur')).toBe(2)
+  })
+
+  it('laat 406 Oud zijn hele lijst houden', () => {
+    expect(norm('kiosk-406', 'chips-blauw')).toBe(5)
+    expect(norm('kiosk-406', 'bierbeker-05')).toBe(1)
+    expect(norm('kiosk-406', 'cola-zero')).toBe(4)
+    expect(norm('kiosk-406', 'lavazza-bekers')).toBe(5)
+    expect(norm('kiosk-406', 'tork-rol')).toBe(6)
+  })
+
+  it('laat 420 Bar zijn overige voorraad houden', () => {
+    expect(norm('kiosk-420-bar', 'bierbeker-05')).toBe(4)
+    expect(norm('kiosk-420-bar', 'chips-blauw')).toBe(10)
+    expect(norm('kiosk-420-bar', 'cola')).toBe(4)
+    expect(norm('kiosk-420-bar', 'koolzuur')).toBe(2)
+    expect(norm('kiosk-420-bar', 'sixpacks')).toBe(3)
+  })
+
+  it('laat Ziggo Platform zijn overige voorraad houden', () => {
+    expect(norm('kiosk-ziggo-platform', 'bierbeker-05')).toBe(1)
+    expect(norm('kiosk-ziggo-platform', 'chips-blauw')).toBe(2)
+    expect(norm('kiosk-ziggo-platform', 'cola')).toBe(2)
+  })
+})
+
+describe('de tweede-ringroute rond 420', () => {
+  it('loopt 420, Ziggo Platform, 420 Bar, 421', () => {
+    // Op id en niet op opschrift: een label is zo veranderd, de volgorde in de
+    // route bepaalt waar iemand fysiek naartoe loopt.
+    const volgorde = demoKiosks.map((k) => k.id)
+    const index = (id: string) => volgorde.indexOf(id)
+
+    expect(index('kiosk-420')).toBeGreaterThanOrEqual(0)
+    expect(index('kiosk-420')).toBeLessThan(index('kiosk-ziggo-platform'))
+    expect(index('kiosk-ziggo-platform')).toBeLessThan(index('kiosk-420-bar'))
+    expect(index('kiosk-420-bar')).toBeLessThan(index('kiosk-421'))
+  })
+
+  it('zet Ziggo Platform niet meer achteraan', () => {
+    const ziggo = demoKiosks.find((k) => k.id === 'kiosk-ziggo-platform')!
+    const laatste = demoKiosks[demoKiosks.length - 1]!
+
+    expect(ziggo.sortOrder).toBeLessThan(laatste.sortOrder)
   })
 })
 
