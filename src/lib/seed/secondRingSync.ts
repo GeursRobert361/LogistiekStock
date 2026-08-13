@@ -1,12 +1,21 @@
 import { DrinkStorageType } from '@/types'
 import { demoKiosks, demoStandards } from './demoData'
 import { demoProducts } from './catalogue'
-import { authoritativeKioskKeys, CUP_PRODUCT_IDS } from './secondRingStandards'
+import {
+  authoritativeKioskKeys,
+  CHIP_PRODUCT_IDS,
+  CUP_PRODUCT_IDS,
+  POSTMIX_PACKAGE_PRODUCT_IDS,
+} from './secondRingStandards'
 import { assertSchemaReady, resolveKioskIds, resolveProductIds, type SqlClient } from './dbIds'
 import {
   buildSyncPlan,
+  EXPECTED_CHIP_MATRIX,
+  EXPECTED_CHIP_PAPER_403,
   EXPECTED_CUP_MATRIX,
   EXPECTED_DRINK_MATRIX,
+  EXPECTED_KOOLZUUR,
+  EXPECTED_POSTMIX_MATRIX,
   EXPECTED_STORAGE_TYPES,
   type CurrentKiosk,
   type CurrentStandard,
@@ -337,9 +346,11 @@ async function applyChanges(client: SqlClient): Promise<void> {
  * Leest de database opnieuw en controleert de uitkomst.
  *
  * Een sync die zegt dat hij klaar is zonder te kijken wat er staat, is een
- * sync die je op zijn woord moet geloven. Controleert de drankmatrix, de
- * bekerlijst — inclusief de formaten die géén actieve norm horen te hebben —
- * en de opslagtypes. Geeft de problemen terug; leeg betekent goed.
+ * sync die je op zijn woord moet geloven. Controleert de vier normmatrices —
+ * drank, bekers, chips en Post-mix — inclusief de regels die géén actieve norm
+ * horen te hebben, plus de koolzuurnormen die de Post-mixlijst niet mocht
+ * wissen, de papieren chipsnorm van 403 en de opslagtypes. Geeft de problemen
+ * terug; leeg betekent goed.
  */
 export async function verifySecondRing(client: SqlClient): Promise<string[]> {
   const problemen: string[] = []
@@ -359,48 +370,61 @@ export async function verifySecondRing(client: SqlClient): Promise<string[]> {
     return rows[0] ? Number(rows[0].target_quantity_quarters) / 4 : undefined
   }
 
-  for (const [kioskKey, verwacht] of Object.entries(EXPECTED_DRINK_MATRIX)) {
-    const kioskId = kioskIds.get(kioskKey)
-    if (!kioskId) {
-      problemen.push(`${kioskKey} bestaat niet`)
-      continue
-    }
-
-    for (const [index, productSeedId] of PAPER_DRINK_ORDER.entries()) {
-      const gevonden = await activeStandard(kioskId, productSeedId)
-      if (gevonden !== verwacht[index]) {
-        problemen.push(
-          `${kioskKey} ${productSeedId}: ${gevonden ?? 'ontbreekt'} ≠ ${verwacht[index]}`
-        )
-      }
-    }
-  }
-
-  for (const [kioskKey, verwacht] of Object.entries(EXPECTED_CUP_MATRIX)) {
-    const kioskId = kioskIds.get(kioskKey)
-    if (!kioskId) {
-      problemen.push(`${kioskKey} bestaat niet`)
-      continue
-    }
-
-    for (const [index, productSeedId] of CUP_PRODUCT_IDS.entries()) {
-      const gevonden = await activeStandard(kioskId, productSeedId)
-      const hoort = verwacht[index]
-
-      // Een expliciete 0 op de bekerlijst betekent "geen actieve norm". Een rij
-      // die er nog actief staat — ook op nul — is dus fout.
-      if (hoort === null) {
-        if (gevonden !== undefined) {
-          problemen.push(`${kioskKey} ${productSeedId}: ${gevonden}, hoort geen actieve norm te zijn`)
-        }
+  /**
+   * Eén matrix van normen langslopen.
+   *
+   * `null` in de verwachting betekent "hoort geen actieve norm te hebben". Dat
+   * is een uitkomst om te controleren en niet om over te slaan: een rij die er
+   * nog actief staat — desnoods op nul — is precies wat een expliciete 0 op de
+   * handmatige lijst wilde uitsluiten.
+   */
+  async function checkMatrix(
+    matrix: Record<string, Array<number | null>>,
+    volgorde: readonly string[]
+  ): Promise<void> {
+    for (const [kioskKey, verwacht] of Object.entries(matrix)) {
+      const kioskId = kioskIds.get(kioskKey)
+      if (!kioskId) {
+        problemen.push(`${kioskKey} bestaat niet`)
         continue
       }
 
-      if (gevonden !== hoort) {
-        problemen.push(`${kioskKey} ${productSeedId}: ${gevonden ?? 'ontbreekt'} ≠ ${hoort}`)
+      for (const [index, productSeedId] of volgorde.entries()) {
+        const gevonden = await activeStandard(kioskId, productSeedId)
+        const hoort = verwacht[index]
+
+        if (hoort === null) {
+          if (gevonden !== undefined) {
+            problemen.push(
+              `${kioskKey} ${productSeedId}: ${gevonden}, hoort geen actieve norm te zijn`
+            )
+          }
+          continue
+        }
+
+        if (gevonden !== hoort) {
+          problemen.push(`${kioskKey} ${productSeedId}: ${gevonden ?? 'ontbreekt'} ≠ ${hoort}`)
+        }
       }
     }
   }
+
+  await checkMatrix(EXPECTED_DRINK_MATRIX, PAPER_DRINK_ORDER)
+  await checkMatrix(EXPECTED_CUP_MATRIX, CUP_PRODUCT_IDS)
+  await checkMatrix(EXPECTED_CHIP_MATRIX, CHIP_PRODUCT_IDS)
+  await checkMatrix(EXPECTED_POSTMIX_MATRIX, POSTMIX_PACKAGE_PRODUCT_IDS)
+
+  // 403 staat niet op de handmatige chipslijst — die noemt twee keer "402" —
+  // en houdt dus zijn papieren norm. Expliciet gecontroleerd, want stil
+  // overnemen van dat tweede blok is precies wat hier niet mag gebeuren.
+  await checkMatrix({ 'kiosk-403': EXPECTED_CHIP_PAPER_403 }, CHIP_PRODUCT_IDS)
+
+  // Koolzuur komt op de Post-mixlijst nergens voor en moet daar dus ook niet
+  // door verdwijnen.
+  await checkMatrix(
+    Object.fromEntries(Object.entries(EXPECTED_KOOLZUUR).map(([key, aantal]) => [key, [aantal]])),
+    ['koolzuur']
+  )
 
   for (const [kioskKey, verwacht] of Object.entries(EXPECTED_STORAGE_TYPES)) {
     const kioskId = kioskIds.get(kioskKey)

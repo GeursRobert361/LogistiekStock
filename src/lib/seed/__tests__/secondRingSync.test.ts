@@ -385,6 +385,112 @@ describe('verificatie achteraf', () => {
 
     expect(await verifySecondRing(fakeClient(state))).toHaveLength(1)
   })
+
+  it('ziet een verkeerde chipsnorm', async () => {
+    const state = syncedState()
+    state.standards.get(`${kioskDbId(423)}|${productDbId('chips-blauw')}`)!.targetQuantityQuarters =
+      24
+
+    expect(await verifySecondRing(fakeClient(state))).toEqual(['kiosk-423 chips-blauw: 6 ≠ 8'])
+  })
+
+  it('ziet het als 403 stilletjes de dubbele-402-waarde krijgt', async () => {
+    // 8/8/6 op 403 is precies de aanname die niet gemaakt mag worden. Staat hij
+    // er toch, dan hoort de sync te klagen in plaats van het te laten passeren.
+    const state = syncedState()
+    for (const [productId, aantal] of [
+      ['chips-blauw', 8],
+      ['chips-rood', 8],
+      ['chips-oranje', 6],
+    ] as const) {
+      state.standards.get(`${kioskDbId(403)}|${productDbId(productId)}`)!.targetQuantityQuarters =
+        aantal * 4
+    }
+
+    expect(await verifySecondRing(fakeClient(state))).toEqual([
+      'kiosk-403 chips-blauw: 8 ≠ 6',
+      'kiosk-403 chips-rood: 8 ≠ 5',
+      'kiosk-403 chips-oranje: 6 ≠ 5',
+    ])
+  })
+
+  it('ziet een verkeerde Post-mixnorm', async () => {
+    const state = syncedState()
+    state.standards.get(`${kioskDbId(416)}|${productDbId('cola-zero')}`)!.targetQuantityQuarters = 20
+
+    expect(await verifySecondRing(fakeClient(state))).toEqual(['kiosk-416 cola-zero: 5 ≠ 6'])
+  })
+
+  it('ziet 407 Fanta die actief bleef', async () => {
+    const state = syncedState()
+    const key = `${kioskDbId(407)}|${productDbId('fanta')}`
+    state.standards.set(key, {
+      id: `s-${key}`,
+      kioskId: kioskDbId(407),
+      productId: productDbId('fanta'),
+      targetQuantityQuarters: 4,
+      isActive: true,
+    })
+
+    expect(await verifySecondRing(fakeClient(state))).toEqual([
+      'kiosk-407 fanta: 1, hoort geen actieve norm te zijn',
+    ])
+  })
+
+  it('ziet Fuze Tea Peach Hibiscus die bij 407 ontbreekt', async () => {
+    const state = syncedState()
+    state.standards.delete(`${kioskDbId(407)}|${productDbId('fuze-tea-peach-hibiscus')}`)
+
+    expect(await verifySecondRing(fakeClient(state))).toEqual([
+      'kiosk-407 fuze-tea-peach-hibiscus: ontbreekt ≠ 2',
+    ])
+  })
+
+  it('ziet koolzuur dat door de Post-mixlijst is weggevallen', async () => {
+    // De pakkenlijst noemt koolzuur nergens; hem daardoor uitzetten is het soort
+    // fout waar niemand naar kijkt tot de tap het begeeft.
+    const state = syncedState()
+    state.standards.get(`${kioskDbId(410)}|${productDbId('koolzuur')}`)!.isActive = false
+
+    expect(await verifySecondRing(fakeClient(state))).toEqual([
+      'kiosk-410 koolzuur: ontbreekt ≠ 2',
+    ])
+  })
+})
+
+describe('expliciete removals', () => {
+  it('zet een bestaande beker- en Post-mixnorm uit die van de lijst af is', async () => {
+    // Een lijst die iets weghaalt moet dat ook in de database doen; alleen uit
+    // de TypeScript verdwijnen laat de norm gewoon staan.
+    const state = syncedState()
+    const weg: Array<[number, string]> = [
+      [420, 'bierbeker-05'],
+      [427, 'bierbeker-03'],
+      [412, 'bierbeker-03'],
+      [407, 'fanta'],
+    ]
+
+    for (const [nummer, productId] of weg) {
+      const key = `${kioskDbId(nummer)}|${productDbId(productId)}`
+      state.standards.set(key, {
+        id: `s-${key}`,
+        kioskId: kioskDbId(nummer),
+        productId: productDbId(productId),
+        targetQuantityQuarters: 8,
+        isActive: true,
+      })
+    }
+
+    const client = fakeClient(state)
+    const { applied, problems } = await runSecondRingSync(client, { apply: true })
+
+    expect(applied).toBe(true)
+    expect(problems).toEqual([])
+    for (const [nummer, productId] of weg) {
+      const row = client.state.standards.get(`${kioskDbId(nummer)}|${productDbId(productId)}`)
+      expect(row?.isActive, `${nummer} ${productId}`).toBe(false)
+    }
+  })
 })
 
 describe('scope', () => {

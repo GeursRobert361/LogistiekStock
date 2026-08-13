@@ -4,12 +4,20 @@ import {
   secondRingStandards,
   unconfirmedStandards,
   paperDrinksFor,
+  paperStandardsFor,
   latestOverridesFor,
+  chipsSourceWarning,
+  sourceWarnings,
   PAPER_DRINK_PRODUCT_IDS,
   CUP_PRODUCT_IDS,
+  CHIP_PRODUCT_IDS,
+  POSTMIX_PACKAGE_PRODUCT_IDS,
+  POSTMIX_COUNTING_RULE,
 } from '../secondRingStandards'
 import { storageNotes } from '@/lib/storageNotes'
 import { demoKiosks, demoStandards } from '../demoData'
+import { demoProducts, CAT_POSTMIX_ID } from '../catalogue'
+import { InputStep } from '@/types'
 
 /**
  * De bronprioriteit van voorraadnormen.
@@ -64,6 +72,14 @@ function cupsOf(kioskKey: string): Array<number | undefined> {
   return CUP_PRODUCT_IDS.map((productId) => norm(kioskKey, productId))
 }
 
+function chipsOf(kioskKey: string): Array<number | undefined> {
+  return CHIP_PRODUCT_IDS.map((productId) => norm(kioskKey, productId))
+}
+
+function postmixOf(kioskKey: string): Array<number | undefined> {
+  return POSTMIX_PACKAGE_PRODUCT_IDS.map((productId) => norm(kioskKey, productId))
+}
+
 describe('applyStandardOverrides', () => {
   it('laat de override winnen', () => {
     expect(applyStandardOverrides({ water: 15 }, { water: 25 })).toEqual({ water: 25 })
@@ -110,7 +126,13 @@ describe('bronprioriteit', () => {
     // Het papier blijft de basis voor als een handmatige waarde ooit vervalt;
     // dat is de reden dat PAPER_DRINKS compleet is en niet alleen de gaten.
     expect(paperDrinksFor('kiosk-419')['jack-daniels']).toBe(5)
-    expect(norm('kiosk-419', 'jack-daniels')).toBe(6)
+    expect(norm('kiosk-419', 'jack-daniels')).toBe(8)
+  })
+
+  it('laat de nieuwste lijst winnen van een oudere handmatige waarde', () => {
+    // 419 Jack Daniels stond op de vorige handmatige lijst op 6. De nieuwste
+    // zegt 8, en dat is geen halvering of typefout maar de bron van nu.
+    expect(norm('kiosk-419', 'jack-daniels')).toBe(8)
   })
 
   it('haalt elk drankgetal uit de eigen kiosk', () => {
@@ -129,19 +151,20 @@ describe('bronprioriteit', () => {
   })
 
   it('laat een override de rest van de lijst met rust', () => {
-    // De bekerlijst noemt voor 412 alleen de drie bekerformaten. De chips, de
-    // koffiehoek en de sauzen van diezelfde kiosk komen van papier.
-    expect(norm('kiosk-412', 'chips-blauw')).toBe(2)
+    // De handmatige lijsten noemen voor 412 de bekers en de chips. De
+    // koffiehoek, de verpakkingen en de sauzen van diezelfde kiosk komen van
+    // papier en blijven staan.
     expect(norm('kiosk-412', 'ketchup-flessen')).toBe(15)
     expect(norm('kiosk-412', 'koffiebekers')).toBe(8)
     expect(norm('kiosk-412', 'square-bakjes')).toBe(3)
   })
 
-  it('raakt producten buiten de twee handmatige lijsten niet aan', () => {
-    // 419 staat op beide lijsten, maar alleen voor drank en bekers.
-    expect(norm('kiosk-419', 'chips-blauw')).toBe(6)
+  it('raakt producten buiten de vier handmatige lijsten niet aan', () => {
+    // 419 staat op drie lijsten — drank, bekers en chips — maar voert geen
+    // Post-mix, en de verpakkingen en sauzen komen onveranderd van papier.
     expect(norm('kiosk-419', 'patat-bakjes')).toBe(3)
     expect(norm('kiosk-419', 'mayo-emmers')).toBe(5)
+    expect(norm('kiosk-419', 'cola')).toBeUndefined()
   })
 })
 
@@ -152,7 +175,7 @@ describe('definitieve drankmatrix', () => {
     'kiosk-407': [20, 6, 21, 7, 7, 29, 10, 8, 8, 15],
     'kiosk-410': [25, 8, 21, 10, 7, 25, 10, 8, 9, 30],
     'kiosk-416': [25, 6, 20, 10, 10, 24, 10, 6, 10, 30],
-    'kiosk-419': [20, 6, 20, 10, 7, 15, 10, 6, 10, 30],
+    'kiosk-419': [20, 6, 20, 10, 7, 15, 10, 8, 10, 30],
     'kiosk-420': [25, 8, 25, 15, 10, 25, 12, 8, 10, 20],
     'kiosk-423': [20, 6, 20, 15, 8, 15, 9, 6, 9, 25],
     'kiosk-426': [25, 6, 28, 15, 10, 15, 10, 8, 8, 30],
@@ -223,10 +246,190 @@ describe('definitieve bekermatrix', () => {
   })
 })
 
+describe('definitieve chipsmatrix', () => {
+  // Volgorde: Blauw / Rood / Oranje.
+  const MATRIX: Record<string, number[]> = {
+    'kiosk-401': [6, 6, 6],
+    'kiosk-402': [2, 2, 2],
+    'kiosk-404': [4, 4, 4],
+    'kiosk-406': [5, 4, 4],
+    'kiosk-406-nieuw': [5, 4, 4],
+    'kiosk-407': [5, 4, 4],
+    'kiosk-409': [2, 2, 2],
+    'kiosk-410': [8, 6, 6],
+    'kiosk-412': [3, 3, 3],
+    'kiosk-414': [3, 3, 3],
+    'kiosk-416': [7, 6, 6],
+    'kiosk-417': [5, 4, 4],
+    'kiosk-419': [7, 5, 5],
+    'kiosk-420': [6, 6, 6],
+    'kiosk-420-bar': [10, 10, 10],
+    'kiosk-423': [8, 6, 6],
+    'kiosk-424': [2, 2, 2],
+    'kiosk-426': [6, 6, 6],
+    'kiosk-427': [3, 3, 3],
+    'kiosk-429': [3, 3, 3],
+  }
+
+  it.each(Object.entries(MATRIX))('%s', (kioskKey, verwacht) => {
+    expect(chipsOf(kioskKey)).toEqual(verwacht)
+  })
+
+  it('noemt de twintig locaties van de lijst en niet meer', () => {
+    expect(Object.keys(MATRIX)).toHaveLength(20)
+    expect(MATRIX['kiosk-403']).toBeUndefined()
+  })
+
+  it('laat 403 op de papieren norm staan', () => {
+    // De chipslijst noemt twee keer "402" en kent 403 helemaal niet. Dat tweede
+    // blok stilzwijgend aan 403 toekennen is precies de fout die niemand
+    // achteraf nog terugvindt.
+    expect(chipsOf('kiosk-403')).toEqual([6, 5, 5])
+    expect(paperStandardsFor('kiosk-403')['chips-blauw']).toBe(6)
+  })
+
+  it('houdt 402 op het eerste expliciete blok', () => {
+    // Niet 8/8/6 uit het tweede blok.
+    expect(chipsOf('kiosk-402')).toEqual([2, 2, 2])
+  })
+
+  it('laat 422 en Ziggo Platform zoals ze waren', () => {
+    expect(chipsOf('kiosk-422')).toEqual([undefined, undefined, undefined])
+    expect(chipsOf('kiosk-ziggo-platform')).toEqual([2, 2, 2])
+  })
+})
+
+describe('de bronwaarschuwing van de chipslijst', () => {
+  it('legt de dubbele 402 vast als onopgelost', () => {
+    expect(sourceWarnings).toContain(chipsSourceWarning)
+    expect(chipsSourceWarning.message).toMatch(/402/)
+    expect(chipsSourceWarning.message).toMatch(/8\/8\/6/)
+    expect(chipsSourceWarning.resolution).toMatch(/403/)
+  })
+
+  it('staat er zolang 403 niet op de handmatige lijst staat', () => {
+    // Zodra iemand de bron naleest en 403 erbij komt, hoort deze waarschuwing
+    // weg. Deze test dwingt af dat die twee samen bewegen.
+    const handmatig = latestOverridesFor('kiosk-403')
+    const heeftHandmatigeChips = CHIP_PRODUCT_IDS.some((id) => id in handmatig)
+
+    expect(heeftHandmatigeChips).toBe(false)
+    expect(sourceWarnings).toContain(chipsSourceWarning)
+  })
+})
+
+describe('definitieve Post-mixmatrix', () => {
+  // Volgorde: Cola / Cola Zero / Fanta / Sprite / Fuze Tea Peach Hibiscus.
+  // De aantallen zijn reservepakken buiten het rek; het aangesloten pak telt
+  // niet mee.
+  const MATRIX: Record<string, Array<number | undefined>> = {
+    'kiosk-401': [4, 8, 4, 4, undefined],
+    'kiosk-404': [2, 4, 2, 2, undefined],
+    'kiosk-406': [2, 4, 2, 2, undefined],
+    'kiosk-407': [1, 2, undefined, 2, 2],
+    'kiosk-410': [4, 8, 4, 4, undefined],
+    'kiosk-416': [2, 6, 3, 3, undefined],
+    'kiosk-420': [4, 8, 4, 4, undefined],
+    'kiosk-420-bar': [4, 6, 3, 3, undefined],
+    'kiosk-426': [4, 8, 4, 4, undefined],
+  }
+
+  it.each(Object.entries(MATRIX))('%s', (kioskKey, verwacht) => {
+    expect(postmixOf(kioskKey)).toEqual(verwacht)
+  })
+
+  it('zet 407 Fanta uit in plaats van op nul', () => {
+    // De nieuwe lijst somt de reservepakken van 407 volledig op en noemt Fanta
+    // niet. Een norm van nul zou het pak bij het tellen laten staan met een
+    // streefwaarde van niets, en dus altijd "vol" heten.
+    expect(norm('kiosk-407', 'fanta')).toBeUndefined()
+    expect(demoStandards.some((s) => s.kioskId === 'kiosk-407' && s.productId === 'fanta')).toBe(
+      false
+    )
+  })
+
+  it('houdt de koolzuurcilinders overal staan', () => {
+    // Koolzuur staat niet op de pakkenlijst en mag daar dus ook niet door
+    // verdwijnen.
+    for (const kioskKey of Object.keys(MATRIX)) {
+      expect(norm(kioskKey, 'koolzuur'), kioskKey).toBe(2)
+    }
+  })
+
+  it('behandelt 420 Hok als de voorraad van kiosk 420', () => {
+    // "420 Hok" van de bron is de voorraadruimte van 420 en geen eigen telpunt;
+    // er bestaat in de stamdata ook geen locatie met die naam.
+    expect(demoKiosks.some((k) => k.label === '420 Hok')).toBe(false)
+    expect(postmixOf('kiosk-420')).toEqual([4, 8, 4, 4, undefined])
+
+    // 420 Bar is wél een eigen telpunt, met eigen aantallen.
+    expect(postmixOf('kiosk-420-bar')).toEqual([4, 6, 3, 3, undefined])
+  })
+
+  it('laat kiosken buiten de lijst hun bestaande Post-mix houden', () => {
+    // Ziggo Platform staat niet op de nieuwe lijst en houdt dus zijn papieren
+    // normen — ook al voert het Post-mix.
+    expect(postmixOf('kiosk-ziggo-platform')).toEqual([2, 2, 2, 2, undefined])
+    // 419 voerde geen Post-mix en krijgt hem er niet bij.
+    expect(postmixOf('kiosk-419')).toEqual([undefined, undefined, undefined, undefined, undefined])
+  })
+
+  it('telt Post-mix in hele pakken', () => {
+    // De 25%-regel gaat over het aangesloten pak en de telprocedure, niet over
+    // wat er in de app ingevoerd kan worden.
+    for (const productId of POSTMIX_PACKAGE_PRODUCT_IDS) {
+      const product = demoProducts.find((p) => p.id === productId)
+      expect(product?.inputStep, productId).toBe(InputStep.ONE)
+      expect(product?.allowPartialPackage, productId).toBe(false)
+    }
+  })
+
+  it('legt de telprocedure vast bij de stamdata', () => {
+    expect(POSTMIX_COUNTING_RULE.countsReservePackagesOnly).toBe(true)
+    expect(POSTMIX_COUNTING_RULE.connectedPackageEmptyBelowPct).toBe(25)
+    expect(POSTMIX_COUNTING_RULE.refillOrder).toBe('FIFO')
+  })
+})
+
+describe('Fuze Tea Peach Hibiscus', () => {
+  const product = demoProducts.find((p) => p.id === 'fuze-tea-peach-hibiscus')
+
+  it('bestaat als eigen Post-mixproduct', () => {
+    expect(product).toBeDefined()
+    expect(product?.categoryId).toBe(CAT_POSTMIX_ID)
+    expect(product?.name).toBe('Fuze Tea Peach Hibiscus')
+    expect(product?.countUnit).toBe('pak')
+    expect(product?.packagingUnit).toBe('pakken')
+    expect(product?.refrigerated).toBe(false)
+  })
+
+  it('is niet hetzelfde product als de gekoelde Fuze Tea', () => {
+    const gekoeld = demoProducts.find((p) => p.id === 'fuze-tea')
+    expect(gekoeld?.categoryId).not.toBe(product?.categoryId)
+    expect(gekoeld?.refrigerated).toBe(true)
+    // De koppeling met productie loopt via de naam; die twee mogen dus nooit
+    // gelijk worden.
+    expect(gekoeld?.name).not.toBe(product?.name)
+  })
+
+  it('valt niet onder de satelliet-drankuitzondering', () => {
+    expect(product?.suppliedFromLargeCoolerForSatellite).toBe(false)
+  })
+
+  it('staat alleen bij 407', () => {
+    const metNorm = demoStandards
+      .filter((s) => s.productId === 'fuze-tea-peach-hibiscus')
+      .map((s) => s.kioskId)
+
+    expect(metNorm).toEqual(['kiosk-407'])
+    expect(norm('kiosk-407', 'fuze-tea-peach-hibiscus')).toBe(2)
+  })
+})
+
 describe('non-drank blijft van papier', () => {
   it('houdt de papieren normen van een satelliet', () => {
-    expect(norm('kiosk-402', 'chips-blauw')).toBe(2)
     expect(norm('kiosk-402', 'tork-rol')).toBe(6)
+    expect(norm('kiosk-402', 'koffiebekers')).toBe(8)
   })
 
   it('houdt de papieren normen van een grote koeling', () => {
@@ -300,13 +503,28 @@ describe('de nieuwste handmatige lijst', () => {
     expect(dranken.sort()).toEqual([...PRODUCT_VOLGORDE].sort())
   })
 
-  it('noemt bij de bekerlijst alleen de drie bekerformaten', () => {
+  it('raakt alleen de producten van de vier lijsten aan', () => {
+    // Drank, bekers, chips en de Post-mixpakken — en verder niets. Koolzuur,
+    // de koffiehoek, de verpakkingen en de sauzen komen van papier en horen
+    // hier dus niet tussen te staan.
+    const handmatigeProducten = new Set<string>([
+      ...PRODUCT_VOLGORDE,
+      ...CUP_PRODUCT_IDS,
+      ...CHIP_PRODUCT_IDS,
+      ...POSTMIX_PACKAGE_PRODUCT_IDS,
+    ])
+
     for (const config of secondRingStandards) {
-      const handmatig = latestOverridesFor(config.kioskKey)
-      const overig = Object.keys(handmatig).filter(
-        (id) => !PRODUCT_VOLGORDE.includes(id) && !CUP_PRODUCT_IDS.includes(id as never)
+      const overig = Object.keys(latestOverridesFor(config.kioskKey)).filter(
+        (id) => !handmatigeProducten.has(id)
       )
       expect(overig, config.kioskKey).toEqual([])
+    }
+  })
+
+  it('laat koolzuur buiten elke handmatige lijst', () => {
+    for (const config of secondRingStandards) {
+      expect('koolzuur' in latestOverridesFor(config.kioskKey), config.kioskKey).toBe(false)
     }
   })
 })

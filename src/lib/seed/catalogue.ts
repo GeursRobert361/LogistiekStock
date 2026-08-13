@@ -178,6 +178,14 @@ export const demoProducts: Product[] = [
   product('chips-oranje', CAT_CHIPS_ID, 'Chips Oranje', 'Chips Oranje', 'zak', 'dozen', 32, SMALL),
 
   // ── Post-mix ───────────────────────────────────────────────────────────
+  // Geteld worden de reservepakken buiten het rek; het pak dat aangesloten zit
+  // telt niet mee. Vandaar hele pakken: `inputStep = ONE` en geen halve
+  // verpakkingen. Zie POSTMIX_COUNTING_RULE in secondRingStandards.ts.
+  //
+  // De namen blijven staan zoals ze zijn. De koppeling met productie loopt via
+  // de productnaam (`resolveProductIds`), dus "Fanta" hernoemen naar "Fanta
+  // Orange" zou de bestaande rij niet meer vinden en er een tweede naast
+  // zetten — precies de duplicaten die de historie breken.
   product('cola', CAT_POSTMIX_ID, 'Coca-Cola', 'Cola', 'pak', 'pakken', 40),
   product('cola-zero', CAT_POSTMIX_ID, 'Coca-Cola Zero', 'Zero', 'pak', 'pakken', 41),
   product('fanta', CAT_POSTMIX_ID, 'Fanta', 'Fanta', 'pak', 'pakken', 42, SMALL),
@@ -186,6 +194,23 @@ export const demoProducts: Product[] = [
     productSize: ProductSize.LARGE,
     estimatedPalletLoad: 3,
   }),
+  // Een eigen product, niet de gekoelde `fuze-tea` uit de drankkast: dit is een
+  // Post-mixpak voor de tap bij 407. Zelfde smaaknaam, andere verpakking,
+  // andere voorraad — één id voor allebei zou de tellingen door elkaar halen.
+  //
+  // Staat achter Koolzuur omdat de volgorde van bestaande producten niet
+  // meeverhuist naar productie: de sync werkt `sort_order` bewust niet bij, dus
+  // hem hier tussenvoegen zou lokaal en in productie uit elkaar lopen.
+  product(
+    'fuze-tea-peach-hibiscus',
+    CAT_POSTMIX_ID,
+    'Fuze Tea Peach Hibiscus',
+    'Fuze Peach',
+    'pak',
+    'pakken',
+    45,
+    SMALL
+  ),
 
   // ── Snoep ──────────────────────────────────────────────────────────────
   product('winegums', CAT_SNOEP_ID, 'Winegums', 'Winegums', 'zak', 'dozen', 50, SMALL),

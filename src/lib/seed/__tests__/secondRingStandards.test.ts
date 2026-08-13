@@ -127,12 +127,9 @@ describe('dranknormen van de grote koelingen', () => {
 
 describe('419 volgens de papieren lijst', () => {
   it('heeft de non-dranknormen van het papier', () => {
-    // Bewust zonder de bekers: die komen sinds de nieuwe bekerlijst niet meer
-    // van papier. Zie de test hieronder.
+    // Bewust zonder de bekers en de chips: die komen sinds de nieuwe handmatige
+    // lijsten niet meer van papier. Zie de tests hieronder.
     const verwacht: Record<string, number> = {
-      'chips-blauw': 6,
-      'chips-rood': 5,
-      'chips-oranje': 5,
       'square-bakjes': 2,
       'patat-bakjes': 3,
       servetten: 5,
@@ -153,6 +150,13 @@ describe('419 volgens de papieren lijst', () => {
     expect(norm('kiosk-419', 'bierbeker-05')).toBe(3)
     expect(norm('kiosk-419', 'bierbeker-04')).toBe(3)
     expect(norm('kiosk-419', 'bierbeker-03')).toBe(1)
+  })
+
+  it('volgt voor de chips de nieuwere handmatige lijst', () => {
+    // Papier zei 6, 5 en 5; de chipslijst zegt 7, 5 en 5.
+    expect(norm('kiosk-419', 'chips-blauw')).toBe(7)
+    expect(norm('kiosk-419', 'chips-rood')).toBe(5)
+    expect(norm('kiosk-419', 'chips-oranje')).toBe(5)
   })
 
   it('voert geen post-mix en geen van de andere niet-genoemde producten', () => {

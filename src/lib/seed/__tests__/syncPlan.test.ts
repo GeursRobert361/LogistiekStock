@@ -3,14 +3,22 @@ import {
   buildSyncPlan,
   planKioskChanges,
   planStandardChanges,
+  EXPECTED_CHIP_MATRIX,
+  EXPECTED_CHIP_PAPER_403,
   EXPECTED_CUP_MATRIX,
   EXPECTED_DRINK_MATRIX,
+  EXPECTED_KOOLZUUR,
+  EXPECTED_POSTMIX_MATRIX,
   EXPECTED_STORAGE_TYPES,
   type CurrentKiosk,
   type CurrentStandard,
 } from '../syncPlan'
 import { demoKiosks, demoStandards } from '../demoData'
-import { authoritativeKioskKeys } from '../secondRingStandards'
+import {
+  authoritativeKioskKeys,
+  CHIP_PRODUCT_IDS,
+  POSTMIX_PACKAGE_PRODUCT_IDS,
+} from '../secondRingStandards'
 import { DrinkStorageType } from '@/types'
 
 /**
@@ -229,6 +237,55 @@ describe('verwachtingen voor de verificatie na afloop', () => {
     expect(Object.keys(EXPECTED_CUP_MATRIX)).toHaveLength(21)
     expect(EXPECTED_CUP_MATRIX['kiosk-422']).toBeUndefined()
     expect(EXPECTED_CUP_MATRIX['kiosk-ziggo-platform']).toBeUndefined()
+  })
+
+  it('komt overeen met de chips in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_CHIP_MATRIX)) {
+      const werkelijk = CHIP_PRODUCT_IDS.map((productId) => {
+        const standard = demoStandards.find(
+          (s) => s.kioskId === kioskKey && s.productId === productId
+        )
+        return standard ? standard.targetQuantityQuarters / 4 : undefined
+      })
+      expect(werkelijk, kioskKey).toEqual(verwacht)
+    }
+  })
+
+  it('controleert de twintig chipslocaties en laat 403 op papier staan', () => {
+    expect(Object.keys(EXPECTED_CHIP_MATRIX)).toHaveLength(20)
+    // 403 hoort niet in de nieuwe matrix zolang de dubbele "402" niet is
+    // nagekeken; wel wordt gecontroleerd dat hij zijn papieren norm houdt.
+    expect(EXPECTED_CHIP_MATRIX['kiosk-403']).toBeUndefined()
+
+    const werkelijk = CHIP_PRODUCT_IDS.map(
+      (productId) =>
+        demoStandards.find((s) => s.kioskId === 'kiosk-403' && s.productId === productId)!
+          .targetQuantityQuarters / 4
+    )
+    expect(werkelijk).toEqual(EXPECTED_CHIP_PAPER_403)
+  })
+
+  it('komt overeen met de Post-mix in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_POSTMIX_MATRIX)) {
+      const werkelijk = POSTMIX_PACKAGE_PRODUCT_IDS.map((productId) => {
+        const standard = demoStandards.find(
+          (s) => s.kioskId === kioskKey && s.productId === productId
+        )
+        // null in de matrix betekent "geen actieve norm"; in de stamdata is dat
+        // een ontbrekende regel.
+        return standard ? standard.targetQuantityQuarters / 4 : null
+      })
+      expect(werkelijk, kioskKey).toEqual(verwacht)
+    }
+  })
+
+  it('komt overeen met het koolzuur in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_KOOLZUUR)) {
+      const standard = demoStandards.find(
+        (s) => s.kioskId === kioskKey && s.productId === 'koolzuur'
+      )
+      expect(standard?.targetQuantityQuarters, kioskKey).toBe(verwacht * 4)
+    }
   })
 
   it('komt overeen met de opslagtypes in de stamdata', () => {

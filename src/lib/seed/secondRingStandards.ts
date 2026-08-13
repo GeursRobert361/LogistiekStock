@@ -34,13 +34,15 @@ export interface KioskStandardConfig {
  * Bronprioriteit voor een voorraadnorm:
  *
  *   1. De nieuwste handmatige lijst, maar uitsluitend voor de combinaties
- *      kiosk + product die daarin met name genoemd worden. Voor drank is dat de
- *      bijgewerkte stocklijst, voor bierbekers de aparte bekerlijst.
+ *      kiosk + product die daarin met name genoemd worden. Er zijn er vier:
+ *      de bijgewerkte drankstocklijst, de bekerlijst, de chipslijst en de
+ *      Post-mixlijst.
  *   2. De kolom "Standaard" van de papieren bestellijst van diezelfde kiosk.
  *   3. Geen actieve norm.
  *
- * Alles wat op geen enkele handmatige lijst staat — chips, post-mix, koffie,
- * verpakkingen, sauzen, schoonmaak — komt dus onveranderd van papier.
+ * Alles wat op geen enkele handmatige lijst staat — koffie, verpakkingen,
+ * sauzen, schoonmaak, en de koolzuurcilinders — komt dus onveranderd van
+ * papier.
  *
  * Nooit een andere kiosk als terugval gebruiken wanneer de eigen papieren
  * Standaard bekend is. Dat is eerder wél gebeurd — bij elf combinaties werd een
@@ -268,7 +270,9 @@ const LATEST_DRINK_OVERRIDES: Record<string, Record<string, number>> = {
     radler: 7,
     'stelz-icetea': 15,
     'bacardi-lemon': 10,
-    'jack-daniels': 6,
+    // Een eerdere versie van de handmatige lijst zei hier 6. De nieuwste zegt 8
+    // en die is leidend; het papier zegt 5 en blijft de basis eronder.
+    'jack-daniels': 8,
     redbull: 10,
     'bacardi-cola': 30,
   },
@@ -356,8 +360,168 @@ const MANUAL_CUP_OVERRIDES: Record<string, Record<string, number>> = {
  * Bij de bekerlijst stonden ook drie opmerkingen over waar de bekers liggen —
  * "1 doos achter in kiosk". Die zeggen niets over de norm (401 blijft 5 en
  * wordt geen 7) en horen op het scherm van de vuller; ze staan daarom in
- * `src/lib/storageNotes.ts`.
+ * `src/lib/storageNotes.ts`. Hetzelfde geldt voor de plaatsingsregels bij de
+ * chips en de Post-mix.
  */
+
+/** De drie chipssmaken, in de volgorde waarin ze op de lijst staan. */
+export const CHIP_PRODUCT_IDS = ['chips-blauw', 'chips-rood', 'chips-oranje'] as const
+
+/**
+ * De nieuwste handmatige chipslijst.
+ *
+ * Twintig locaties, elk met de drie smaken. Wat er niet op staat — 403, 422 en
+ * Ziggo Platform — houdt zijn papieren norm; zie `chipsSourceWarning` voor
+ * waarom 403 ontbreekt.
+ *
+ * Anders dan bij de bekers staat hier nergens een 0: de lijst noemt overal een
+ * echt aantal, dus er wordt hier niets uitgezet.
+ */
+const MANUAL_CHIP_OVERRIDES: Record<string, Record<string, number>> = {
+  'kiosk-401': { 'chips-blauw': 6, 'chips-rood': 6, 'chips-oranje': 6 },
+  'kiosk-402': { 'chips-blauw': 2, 'chips-rood': 2, 'chips-oranje': 2 },
+  // 403 ontbreekt bewust — zie chipsSourceWarning.
+  'kiosk-404': { 'chips-blauw': 4, 'chips-rood': 4, 'chips-oranje': 4 },
+  'kiosk-406': { 'chips-blauw': 5, 'chips-rood': 4, 'chips-oranje': 4 },
+  'kiosk-406-nieuw': { 'chips-blauw': 5, 'chips-rood': 4, 'chips-oranje': 4 },
+  'kiosk-407': { 'chips-blauw': 5, 'chips-rood': 4, 'chips-oranje': 4 },
+  'kiosk-409': { 'chips-blauw': 2, 'chips-rood': 2, 'chips-oranje': 2 },
+  'kiosk-410': { 'chips-blauw': 8, 'chips-rood': 6, 'chips-oranje': 6 },
+  'kiosk-412': { 'chips-blauw': 3, 'chips-rood': 3, 'chips-oranje': 3 },
+  'kiosk-414': { 'chips-blauw': 3, 'chips-rood': 3, 'chips-oranje': 3 },
+  'kiosk-416': { 'chips-blauw': 7, 'chips-rood': 6, 'chips-oranje': 6 },
+  'kiosk-417': { 'chips-blauw': 5, 'chips-rood': 4, 'chips-oranje': 4 },
+  'kiosk-419': { 'chips-blauw': 7, 'chips-rood': 5, 'chips-oranje': 5 },
+  'kiosk-420': { 'chips-blauw': 6, 'chips-rood': 6, 'chips-oranje': 6 },
+  'kiosk-420-bar': { 'chips-blauw': 10, 'chips-rood': 10, 'chips-oranje': 10 },
+  'kiosk-423': { 'chips-blauw': 8, 'chips-rood': 6, 'chips-oranje': 6 },
+  'kiosk-424': { 'chips-blauw': 2, 'chips-rood': 2, 'chips-oranje': 2 },
+  'kiosk-426': { 'chips-blauw': 6, 'chips-rood': 6, 'chips-oranje': 6 },
+  'kiosk-427': { 'chips-blauw': 3, 'chips-rood': 3, 'chips-oranje': 3 },
+  'kiosk-429': { 'chips-blauw': 3, 'chips-rood': 3, 'chips-oranje': 3 },
+}
+
+export interface SourceWarning {
+  /** Waar in de bron het misgaat, in gewone taal. */
+  source: string
+  message: string
+  /** Wat er nodig is om dit op te lossen. */
+  resolution: string
+}
+
+/**
+ * Onopgeloste dubbelzinnigheid in de chipslijst.
+ *
+ * De bron noemt na kiosk 402 (2/2/2) een tweede blok dat óók "402" heet, met
+ * 8/8/6, en gaat daarna verder met 404. Kiosk 403 komt op de hele lijst niet
+ * voor. Dat ziet er sterk uit als een verschrijving voor 403 — maar "ziet eruit
+ * als" is geen bron.
+ *
+ * Waarom dit niet stilzwijgend wordt aangenomen: 8/8/6 op 403 zetten kost bij
+ * een vergissing elk evenement drie dozen chips die niemand heeft besteld, en
+ * het is achteraf niet meer te zien dat het geraden was. 403 houdt daarom zijn
+ * papieren 6/5/5 tot iemand de lijst naleest.
+ */
+export const chipsSourceWarning: SourceWarning = {
+  source: 'handmatige chipslijst',
+  message:
+    'De lijst noemt twee keer kiosk 402: eerst 2/2/2, verderop 8/8/6. ' +
+    'Kiosk 403 ontbreekt volledig.',
+  resolution:
+    'Laat nakijken of het tweede blok 403 hoort te zijn. Tot die tijd houdt 403 ' +
+    'zijn papieren norm (6/5/5) en blijft 402 op 2/2/2 staan.',
+}
+
+/** De bronwaarschuwingen die nog openstaan. */
+export const sourceWarnings: ReadonlyArray<SourceWarning> = [chipsSourceWarning]
+
+/**
+ * De Post-mixproducten die in pakken geteld worden.
+ *
+ * Koolzuur staat er nadrukkelijk niet bij: dat is een cilinder en komt op de
+ * nieuwe pakkenlijst nergens voor. Zie `MANUAL_POSTMIX_OVERRIDES`.
+ */
+export const POSTMIX_PACKAGE_PRODUCT_IDS = [
+  'cola',
+  'cola-zero',
+  'fanta',
+  'sprite',
+  'fuze-tea-peach-hibiscus',
+] as const
+
+/**
+ * Hoe Post-mix geteld hoort te worden.
+ *
+ * De norm hieronder gaat over **reservepakken buiten het rek**. Het pak dat
+ * aangesloten zit telt niet mee. Norm 8 met één pak aan de tap en zes volle
+ * pakken ernaast levert dus een telling van 6 op, niet 7.
+ *
+ * De procedure van de bron, in volgorde:
+ *
+ *   1. Vervang eerst de lege pakken.
+ *   2. Staat een aangesloten pak onder de 25%, behandel het dan als leeg en
+ *      vervang het ook — vóór er geteld wordt.
+ *   3. Tel daarna pas de reservepakken.
+ *   4. Vullen gaat altijd FIFO: het oudste pak eerst.
+ *
+ * Die 25% gaat over het pak aan de tap en over niets anders. Hij verandert de
+ * invoer in de app niet: Post-mix wordt in hele pakken geteld
+ * (`inputStep = ONE`, `allowPartialPackage = false`), en de globale
+ * kwart-/halvepakkenlogica blijft ongemoeid.
+ *
+ * Staat als telinstructie op het telscherm; zie `src/lib/countingHints.ts`.
+ */
+export const POSTMIX_COUNTING_RULE = {
+  countsReservePackagesOnly: true,
+  /** Onder dit percentage geldt een aangesloten pak als leeg. */
+  connectedPackageEmptyBelowPct: 25,
+  refillOrder: 'FIFO',
+} as const
+
+/**
+ * De nieuwe handmatige Post-mixlijst: reservepakken buiten het rek.
+ *
+ * Leidend voor de BIB-pakken van de genoemde locaties. Kiosken die hier niet
+ * staan houden wat ze hadden, ook als ze nu een Post-mixnorm voeren — een lijst
+ * die over negen locaties gaat zegt niets over de tiende.
+ *
+ * Twee dingen die deze lijst bewust níet aanraakt:
+ *
+ *   1. `koolzuur`. Dat is een cilinder, geen pak, en komt op deze lijst
+ *      nergens voor. Hij staat daarom niet tussen de sleutels hieronder en
+ *      blijft dus gewoon uit de papieren config komen.
+ *   2. Andere kiosken. 419 voert geen Post-mix en houdt dat.
+ *
+ * De satelliet-drankuitzondering geldt hier niet: Post-mix wordt bij een
+ * satelliet volstrekt normaal vanuit het magazijn aangevuld. Zie
+ * `shouldGenerateCentralRestock`.
+ *
+ * "420 Hok" van de bron is de voorraadruimte van kiosk 420 en geen eigen
+ * telpunt — er bestaat in de stamdata ook geen aparte locatie met die naam.
+ * Het gaat dus naar `kiosk-420`; "420 Bar" (4201) is wél een eigen telpunt en
+ * staat apart op de lijst.
+ */
+const MANUAL_POSTMIX_OVERRIDES: Record<string, Record<string, number>> = {
+  'kiosk-401': { cola: 4, 'cola-zero': 8, fanta: 4, sprite: 4 },
+  'kiosk-404': { cola: 2, 'cola-zero': 4, fanta: 2, sprite: 2 },
+  // 406 Oud; de voorraad staat in het hok links van de kiosk, zie storageNotes.
+  'kiosk-406': { cola: 2, 'cola-zero': 4, fanta: 2, sprite: 2 },
+  'kiosk-407': {
+    cola: 1,
+    'cola-zero': 2,
+    // Fanta staat niet op de nieuwe 407-lijst terwijl die de reservepakken van
+    // 407 expliciet opsomt. Een 0 zet de norm dus uit in plaats van hem op nul.
+    fanta: 0,
+    sprite: 2,
+    'fuze-tea-peach-hibiscus': 2,
+  },
+  'kiosk-410': { cola: 4, 'cola-zero': 8, fanta: 4, sprite: 4 },
+  'kiosk-416': { cola: 2, 'cola-zero': 6, fanta: 3, sprite: 3 },
+  // "420 Hok": de voorraadruimte van kiosk 420, niet een eigen telpunt.
+  'kiosk-420': { cola: 4, 'cola-zero': 8, fanta: 4, sprite: 4 },
+  'kiosk-420-bar': { cola: 4, 'cola-zero': 6, fanta: 3, sprite: 3 },
+  'kiosk-426': { cola: 4, 'cola-zero': 8, fanta: 4, sprite: 4 },
+}
 
 /**
  * Legt een handmatige lijst op de papieren basis.
@@ -393,10 +557,22 @@ export function paperDrinksFor(kioskKey: string): Record<string, number> {
   return { ...(PAPER_DRINKS[kioskKey] ?? {}) }
 }
 
-/** De nieuwste handmatige waarden van één locatie: drank én bekers. */
+/**
+ * De nieuwste handmatige waarden van één locatie: drank, bekers, chips en
+ * Post-mix.
+ *
+ * De vier lijsten gaan over vier verschillende productgroepen en overlappen
+ * dus nergens; de volgorde van samenvoegen maakt hier niets uit. Ze staan apart
+ * omdat het vier aparte rondes langs de kiosken waren, en omdat bij een fout in
+ * één lijst zichtbaar moet blijven welke dat was.
+ */
 export function latestOverridesFor(kioskKey: string): Record<string, number> {
-  // Drank en bekers overlappen niet, dus de volgorde maakt hier niets uit.
-  return { ...LATEST_DRINK_OVERRIDES[kioskKey], ...MANUAL_CUP_OVERRIDES[kioskKey] }
+  return {
+    ...LATEST_DRINK_OVERRIDES[kioskKey],
+    ...MANUAL_CUP_OVERRIDES[kioskKey],
+    ...MANUAL_CHIP_OVERRIDES[kioskKey],
+    ...MANUAL_POSTMIX_OVERRIDES[kioskKey],
+  }
 }
 
 /**
@@ -1012,13 +1188,19 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
   },
 ]
 
+/** De papieren normen van één locatie, zonder de latere handmatige lijsten. */
+export function paperStandardsFor(kioskKey: string): Record<string, number> {
+  return { ...PAPER_STANDARDS.find((config) => config.kioskKey === kioskKey)?.standards }
+}
+
 /**
  * De normen zoals ze werkelijk gelden.
  *
  * De papieren lijst met daarop de nieuwste handmatige waarden: drank uit de
- * bijgewerkte stocklijst, bekers uit de bekerlijst. Producten die op geen van
- * beide lijsten staan houden hun papieren norm; een beker die op de lijst een
- * 0 heeft, verdwijnt hier uit de actieve normen.
+ * bijgewerkte stocklijst, bekers uit de bekerlijst, chips uit de chipslijst en
+ * de reservepakken uit de Post-mixlijst. Producten die op geen van die vier
+ * lijsten staan houden hun papieren norm; een product dat op een lijst een 0
+ * heeft, verdwijnt hier uit de actieve normen.
  */
 export const secondRingStandards: KioskStandardConfig[] = PAPER_STANDARDS.map((config) => ({
   ...config,

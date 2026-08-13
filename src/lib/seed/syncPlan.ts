@@ -174,7 +174,8 @@ export const EXPECTED_DRINK_MATRIX: Record<string, number[]> = {
   'kiosk-407': [20, 6, 21, 7, 7, 29, 10, 8, 8, 15],
   'kiosk-410': [25, 8, 21, 10, 7, 25, 10, 8, 9, 30],
   'kiosk-416': [25, 6, 20, 10, 10, 24, 10, 6, 10, 30],
-  'kiosk-419': [20, 6, 20, 10, 7, 15, 10, 6, 10, 30],
+  // Jack Daniels is 8: de eerdere handmatige lijst zei 6, de nieuwste 8.
+  'kiosk-419': [20, 6, 20, 10, 7, 15, 10, 8, 10, 30],
   'kiosk-420': [25, 8, 25, 15, 10, 25, 12, 8, 10, 20],
   'kiosk-423': [20, 6, 20, 15, 8, 15, 9, 6, 9, 25],
   'kiosk-426': [25, 6, 28, 15, 10, 15, 10, 8, 8, 30],
@@ -213,6 +214,85 @@ export const EXPECTED_CUP_MATRIX: Record<string, Array<number | null>> = {
   'kiosk-426': [5, 4, 2],
   'kiosk-427': [3, 3, null],
   'kiosk-429': [3, 3, null],
+}
+
+/**
+ * De verwachte chipsnormen na de sync, in de volgorde Blauw / Rood / Oranje.
+ *
+ * Kiosk 403 staat hier bewust niet in. De handmatige chipslijst noemt twee keer
+ * "402" en kent 403 helemaal niet; zolang dat niet is nagekeken houdt 403 zijn
+ * papieren norm en valt er dus niets te controleren dat uit deze lijst komt.
+ * Zie `chipsSourceWarning`.
+ *
+ * 422 en Ziggo Platform staan evenmin op de chipslijst.
+ */
+export const EXPECTED_CHIP_MATRIX: Record<string, number[]> = {
+  'kiosk-401': [6, 6, 6],
+  'kiosk-402': [2, 2, 2],
+  'kiosk-404': [4, 4, 4],
+  'kiosk-406': [5, 4, 4],
+  'kiosk-406-nieuw': [5, 4, 4],
+  'kiosk-407': [5, 4, 4],
+  'kiosk-409': [2, 2, 2],
+  'kiosk-410': [8, 6, 6],
+  'kiosk-412': [3, 3, 3],
+  'kiosk-414': [3, 3, 3],
+  'kiosk-416': [7, 6, 6],
+  'kiosk-417': [5, 4, 4],
+  'kiosk-419': [7, 5, 5],
+  'kiosk-420': [6, 6, 6],
+  'kiosk-420-bar': [10, 10, 10],
+  'kiosk-423': [8, 6, 6],
+  'kiosk-424': [2, 2, 2],
+  'kiosk-426': [6, 6, 6],
+  'kiosk-427': [3, 3, 3],
+  'kiosk-429': [3, 3, 3],
+}
+
+/** De papieren chipsnorm van 403, die blijft staan tot de bron is nagekeken. */
+export const EXPECTED_CHIP_PAPER_403: number[] = [6, 5, 5]
+
+/**
+ * De verwachte Post-mixnormen na de sync: reservepakken buiten het rek.
+ *
+ * Volgorde Cola / Cola Zero / Fanta / Sprite / Fuze Tea Peach Hibiscus. `null`
+ * betekent "hoort géén actieve norm te hebben" — dat geldt voor 407 Fanta, dat
+ * op de nieuwe lijst ontbreekt terwijl die lijst 407 verder volledig opsomt, en
+ * voor Fuze Tea Peach Hibiscus overal behalve bij 407.
+ *
+ * Koolzuur staat hier niet in en wordt hier dus ook niet gecontroleerd: dat is
+ * een cilinder die op de pakkenlijst nergens voorkomt en gewoon van papier komt.
+ */
+export const EXPECTED_POSTMIX_MATRIX: Record<string, Array<number | null>> = {
+  'kiosk-401': [4, 8, 4, 4, null],
+  'kiosk-404': [2, 4, 2, 2, null],
+  'kiosk-406': [2, 4, 2, 2, null],
+  'kiosk-407': [1, 2, null, 2, 2],
+  'kiosk-410': [4, 8, 4, 4, null],
+  'kiosk-416': [2, 6, 3, 3, null],
+  'kiosk-420': [4, 8, 4, 4, null],
+  'kiosk-420-bar': [4, 6, 3, 3, null],
+  'kiosk-426': [4, 8, 4, 4, null],
+}
+
+/**
+ * Kiosken die volgens de papieren lijst een koolzuurcilinder voeren.
+ *
+ * Apart gecontroleerd omdat het het makkelijkst mis kan gaan: de Post-mixlijst
+ * gaat over pakken en noemt koolzuur nergens, en een sync die "de Post-mix van
+ * deze kiosk" zou vervangen in plaats van alleen de genoemde producten zou hem
+ * ongemerkt uitzetten.
+ */
+export const EXPECTED_KOOLZUUR: Record<string, number> = {
+  'kiosk-401': 2,
+  'kiosk-404': 2,
+  'kiosk-406': 2,
+  'kiosk-407': 2,
+  'kiosk-410': 2,
+  'kiosk-416': 2,
+  'kiosk-420': 2,
+  'kiosk-420-bar': 2,
+  'kiosk-426': 2,
 }
 
 /** De opslagtypes die na de sync moeten gelden. */
