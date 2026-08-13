@@ -4,7 +4,6 @@ import {
   planKioskChanges,
   planStandardChanges,
   EXPECTED_CHIP_MATRIX,
-  EXPECTED_CHIP_PAPER_403,
   EXPECTED_CUP_MATRIX,
   EXPECTED_DRINK_MATRIX,
   EXPECTED_KOOLZUUR,
@@ -251,18 +250,13 @@ describe('verwachtingen voor de verificatie na afloop', () => {
     }
   })
 
-  it('controleert de twintig chipslocaties en laat 403 op papier staan', () => {
-    expect(Object.keys(EXPECTED_CHIP_MATRIX)).toHaveLength(20)
-    // 403 hoort niet in de nieuwe matrix zolang de dubbele "402" niet is
-    // nagekeken; wel wordt gecontroleerd dat hij zijn papieren norm houdt.
-    expect(EXPECTED_CHIP_MATRIX['kiosk-403']).toBeUndefined()
-
-    const werkelijk = CHIP_PRODUCT_IDS.map(
-      (productId) =>
-        demoStandards.find((s) => s.kioskId === 'kiosk-403' && s.productId === productId)!
-          .targetQuantityQuarters / 4
-    )
-    expect(werkelijk).toEqual(EXPECTED_CHIP_PAPER_403)
+  it('controleert alle eenentwintig chipslocaties', () => {
+    // 422 en Ziggo Platform staan niet op de chipslijst; de rest wel, inclusief
+    // 403 sinds bevestigd is dat het tweede "402"-blok van die kiosk was.
+    expect(Object.keys(EXPECTED_CHIP_MATRIX)).toHaveLength(21)
+    expect(EXPECTED_CHIP_MATRIX['kiosk-403']).toEqual([8, 8, 6])
+    expect(EXPECTED_CHIP_MATRIX['kiosk-422']).toBeUndefined()
+    expect(EXPECTED_CHIP_MATRIX['kiosk-ziggo-platform']).toBeUndefined()
   })
 
   it('komt overeen met de Post-mix in de stamdata', () => {

@@ -394,23 +394,24 @@ describe('verificatie achteraf', () => {
     expect(await verifySecondRing(fakeClient(state))).toEqual(['kiosk-423 chips-blauw: 6 ≠ 8'])
   })
 
-  it('ziet het als 403 stilletjes de dubbele-402-waarde krijgt', async () => {
-    // 8/8/6 op 403 is precies de aanname die niet gemaakt mag worden. Staat hij
-    // er toch, dan hoort de sync te klagen in plaats van het te laten passeren.
+  it('ziet het als 403 op zijn oude papieren chipsnorm blijft staan', async () => {
+    // 403 hoort 8/8/6 te krijgen: het blok dat op de bron "402" heette is
+    // nagevraagd en van 403. Blijft het papieren 6/5/5 staan, dan is de sync
+    // niet aangekomen.
     const state = syncedState()
     for (const [productId, aantal] of [
-      ['chips-blauw', 8],
-      ['chips-rood', 8],
-      ['chips-oranje', 6],
+      ['chips-blauw', 6],
+      ['chips-rood', 5],
+      ['chips-oranje', 5],
     ] as const) {
       state.standards.get(`${kioskDbId(403)}|${productDbId(productId)}`)!.targetQuantityQuarters =
         aantal * 4
     }
 
     expect(await verifySecondRing(fakeClient(state))).toEqual([
-      'kiosk-403 chips-blauw: 8 ≠ 6',
-      'kiosk-403 chips-rood: 8 ≠ 5',
-      'kiosk-403 chips-oranje: 6 ≠ 5',
+      'kiosk-403 chips-blauw: 6 ≠ 8',
+      'kiosk-403 chips-rood: 5 ≠ 8',
+      'kiosk-403 chips-oranje: 5 ≠ 6',
     ])
   })
 

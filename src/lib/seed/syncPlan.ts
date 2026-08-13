@@ -219,16 +219,14 @@ export const EXPECTED_CUP_MATRIX: Record<string, Array<number | null>> = {
 /**
  * De verwachte chipsnormen na de sync, in de volgorde Blauw / Rood / Oranje.
  *
- * Kiosk 403 staat hier bewust niet in. De handmatige chipslijst noemt twee keer
- * "402" en kent 403 helemaal niet; zolang dat niet is nagekeken houdt 403 zijn
- * papieren norm en valt er dus niets te controleren dat uit deze lijst komt.
- * Zie `chipsSourceWarning`.
- *
- * 422 en Ziggo Platform staan evenmin op de chipslijst.
+ * 422 en Ziggo Platform staan niet op de chipslijst en worden hier dus ook niet
+ * gecontroleerd.
  */
 export const EXPECTED_CHIP_MATRIX: Record<string, number[]> = {
   'kiosk-401': [6, 6, 6],
   'kiosk-402': [2, 2, 2],
+  // Het blok dat op de bron ten onrechte "402" heette; bevestigd als 403.
+  'kiosk-403': [8, 8, 6],
   'kiosk-404': [4, 4, 4],
   'kiosk-406': [5, 4, 4],
   'kiosk-406-nieuw': [5, 4, 4],
@@ -248,9 +246,6 @@ export const EXPECTED_CHIP_MATRIX: Record<string, number[]> = {
   'kiosk-427': [3, 3, 3],
   'kiosk-429': [3, 3, 3],
 }
-
-/** De papieren chipsnorm van 403, die blijft staan tot de bron is nagekeken. */
-export const EXPECTED_CHIP_PAPER_403: number[] = [6, 5, 5]
 
 /**
  * De verwachte Post-mixnormen na de sync: reservepakken buiten het rek.

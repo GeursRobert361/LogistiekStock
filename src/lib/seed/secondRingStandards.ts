@@ -370,9 +370,8 @@ export const CHIP_PRODUCT_IDS = ['chips-blauw', 'chips-rood', 'chips-oranje'] as
 /**
  * De nieuwste handmatige chipslijst.
  *
- * Twintig locaties, elk met de drie smaken. Wat er niet op staat — 403, 422 en
- * Ziggo Platform — houdt zijn papieren norm; zie `chipsSourceWarning` voor
- * waarom 403 ontbreekt.
+ * Eenentwintig locaties, elk met de drie smaken. 422 en Ziggo Platform staan er
+ * niet op en houden hun papieren norm.
  *
  * Anders dan bij de bekers staat hier nergens een 0: de lijst noemt overal een
  * echt aantal, dus er wordt hier niets uitgezet.
@@ -380,7 +379,10 @@ export const CHIP_PRODUCT_IDS = ['chips-blauw', 'chips-rood', 'chips-oranje'] as
 const MANUAL_CHIP_OVERRIDES: Record<string, Record<string, number>> = {
   'kiosk-401': { 'chips-blauw': 6, 'chips-rood': 6, 'chips-oranje': 6 },
   'kiosk-402': { 'chips-blauw': 2, 'chips-rood': 2, 'chips-oranje': 2 },
-  // 403 ontbreekt bewust — zie chipsSourceWarning.
+  // Op de bron staat dit blok onder het opschrift "402", direct onder het
+  // échte 402 (2/2/2) en vlak vóór 404. 403 kwam op de lijst verder nergens
+  // voor. Nagevraagd en bevestigd: het tweede "402" is 403.
+  'kiosk-403': { 'chips-blauw': 8, 'chips-rood': 8, 'chips-oranje': 6 },
   'kiosk-404': { 'chips-blauw': 4, 'chips-rood': 4, 'chips-oranje': 4 },
   'kiosk-406': { 'chips-blauw': 5, 'chips-rood': 4, 'chips-oranje': 4 },
   'kiosk-406-nieuw': { 'chips-blauw': 5, 'chips-rood': 4, 'chips-oranje': 4 },
@@ -400,40 +402,6 @@ const MANUAL_CHIP_OVERRIDES: Record<string, Record<string, number>> = {
   'kiosk-427': { 'chips-blauw': 3, 'chips-rood': 3, 'chips-oranje': 3 },
   'kiosk-429': { 'chips-blauw': 3, 'chips-rood': 3, 'chips-oranje': 3 },
 }
-
-export interface SourceWarning {
-  /** Waar in de bron het misgaat, in gewone taal. */
-  source: string
-  message: string
-  /** Wat er nodig is om dit op te lossen. */
-  resolution: string
-}
-
-/**
- * Onopgeloste dubbelzinnigheid in de chipslijst.
- *
- * De bron noemt na kiosk 402 (2/2/2) een tweede blok dat óók "402" heet, met
- * 8/8/6, en gaat daarna verder met 404. Kiosk 403 komt op de hele lijst niet
- * voor. Dat ziet er sterk uit als een verschrijving voor 403 — maar "ziet eruit
- * als" is geen bron.
- *
- * Waarom dit niet stilzwijgend wordt aangenomen: 8/8/6 op 403 zetten kost bij
- * een vergissing elk evenement drie dozen chips die niemand heeft besteld, en
- * het is achteraf niet meer te zien dat het geraden was. 403 houdt daarom zijn
- * papieren 6/5/5 tot iemand de lijst naleest.
- */
-export const chipsSourceWarning: SourceWarning = {
-  source: 'handmatige chipslijst',
-  message:
-    'De lijst noemt twee keer kiosk 402: eerst 2/2/2, verderop 8/8/6. ' +
-    'Kiosk 403 ontbreekt volledig.',
-  resolution:
-    'Laat nakijken of het tweede blok 403 hoort te zijn. Tot die tijd houdt 403 ' +
-    'zijn papieren norm (6/5/5) en blijft 402 op 2/2/2 staan.',
-}
-
-/** De bronwaarschuwingen die nog openstaan. */
-export const sourceWarnings: ReadonlyArray<SourceWarning> = [chipsSourceWarning]
 
 /**
  * De Post-mixproducten die in pakken geteld worden.
@@ -499,7 +467,10 @@ export const POSTMIX_COUNTING_RULE = {
  * "420 Hok" van de bron is de voorraadruimte van kiosk 420 en geen eigen
  * telpunt — er bestaat in de stamdata ook geen aparte locatie met die naam.
  * Het gaat dus naar `kiosk-420`; "420 Bar" (4201) is wél een eigen telpunt en
- * staat apart op de lijst.
+ * staat apart op de lijst. Dat die pakken in het hok links van de kiosk staan
+ * en niet in de kiosk zelf, staat als opslagnotitie in
+ * `src/lib/storageNotes.ts` — anders zoekt een teller bij 420 naar acht pakken
+ * die daar niet staan.
  */
 const MANUAL_POSTMIX_OVERRIDES: Record<string, Record<string, number>> = {
   'kiosk-401': { cola: 4, 'cola-zero': 8, fanta: 4, sprite: 4 },

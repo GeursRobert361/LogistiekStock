@@ -6,15 +6,13 @@ import {
   paperDrinksFor,
   paperStandardsFor,
   latestOverridesFor,
-  chipsSourceWarning,
-  sourceWarnings,
   PAPER_DRINK_PRODUCT_IDS,
   CUP_PRODUCT_IDS,
   CHIP_PRODUCT_IDS,
   POSTMIX_PACKAGE_PRODUCT_IDS,
   POSTMIX_COUNTING_RULE,
 } from '../secondRingStandards'
-import { storageNotes } from '@/lib/storageNotes'
+import { storageNotes, categoryStorageNoteFor } from '@/lib/storageNotes'
 import { demoKiosks, demoStandards } from '../demoData'
 import { demoProducts, CAT_POSTMIX_ID } from '../catalogue'
 import { InputStep } from '@/types'
@@ -251,6 +249,7 @@ describe('definitieve chipsmatrix', () => {
   const MATRIX: Record<string, number[]> = {
     'kiosk-401': [6, 6, 6],
     'kiosk-402': [2, 2, 2],
+    'kiosk-403': [8, 8, 6],
     'kiosk-404': [4, 4, 4],
     'kiosk-406': [5, 4, 4],
     'kiosk-406-nieuw': [5, 4, 4],
@@ -275,46 +274,28 @@ describe('definitieve chipsmatrix', () => {
     expect(chipsOf(kioskKey)).toEqual(verwacht)
   })
 
-  it('noemt de twintig locaties van de lijst en niet meer', () => {
-    expect(Object.keys(MATRIX)).toHaveLength(20)
-    expect(MATRIX['kiosk-403']).toBeUndefined()
+  it('noemt de eenentwintig locaties van de lijst en niet meer', () => {
+    expect(Object.keys(MATRIX)).toHaveLength(21)
   })
 
-  it('laat 403 op de papieren norm staan', () => {
-    // De chipslijst noemt twee keer "402" en kent 403 helemaal niet. Dat tweede
-    // blok stilzwijgend aan 403 toekennen is precies de fout die niemand
-    // achteraf nog terugvindt.
-    expect(chipsOf('kiosk-403')).toEqual([6, 5, 5])
-    expect(paperStandardsFor('kiosk-403')['chips-blauw']).toBe(6)
-  })
-
-  it('houdt 402 op het eerste expliciete blok', () => {
-    // Niet 8/8/6 uit het tweede blok.
+  it('houdt 402 en 403 uit elkaar', () => {
+    // Op de bron stonden deze twee blokken allebei onder het opschrift "402";
+    // nagevraagd en bevestigd dat het tweede 403 is. Ze mogen dus nooit
+    // dezelfde aantallen krijgen.
     expect(chipsOf('kiosk-402')).toEqual([2, 2, 2])
+    expect(chipsOf('kiosk-403')).toEqual([8, 8, 6])
+  })
+
+  it('laat de papieren chipsnorm van 403 onder de handmatige staan', () => {
+    // Het papier zei 6/5/5 en blijft de basis voor als de handmatige waarde
+    // ooit vervalt.
+    const papier = paperStandardsFor('kiosk-403')
+    expect([papier['chips-blauw'], papier['chips-rood'], papier['chips-oranje']]).toEqual([6, 5, 5])
   })
 
   it('laat 422 en Ziggo Platform zoals ze waren', () => {
     expect(chipsOf('kiosk-422')).toEqual([undefined, undefined, undefined])
     expect(chipsOf('kiosk-ziggo-platform')).toEqual([2, 2, 2])
-  })
-})
-
-describe('de bronwaarschuwing van de chipslijst', () => {
-  it('legt de dubbele 402 vast als onopgelost', () => {
-    expect(sourceWarnings).toContain(chipsSourceWarning)
-    expect(chipsSourceWarning.message).toMatch(/402/)
-    expect(chipsSourceWarning.message).toMatch(/8\/8\/6/)
-    expect(chipsSourceWarning.resolution).toMatch(/403/)
-  })
-
-  it('staat er zolang 403 niet op de handmatige lijst staat', () => {
-    // Zodra iemand de bron naleest en 403 erbij komt, hoort deze waarschuwing
-    // weg. Deze test dwingt af dat die twee samen bewegen.
-    const handmatig = latestOverridesFor('kiosk-403')
-    const heeftHandmatigeChips = CHIP_PRODUCT_IDS.some((id) => id in handmatig)
-
-    expect(heeftHandmatigeChips).toBe(false)
-    expect(sourceWarnings).toContain(chipsSourceWarning)
   })
 })
 
@@ -364,6 +345,14 @@ describe('definitieve Post-mixmatrix', () => {
 
     // 420 Bar is wél een eigen telpunt, met eigen aantallen.
     expect(postmixOf('kiosk-420-bar')).toEqual([4, 6, 3, 3, undefined])
+  })
+
+  it('vertelt bij 420 dat de pakken in het hok staan', () => {
+    // Zonder die regel zoekt een teller bij 420 naar acht pakken Cola Zero die
+    // niet in de kiosk zelf staan, en telt er dus te weinig.
+    expect(categoryStorageNoteFor({ number: 420 }, 'Post-mix')).toBe(
+      'In het hok links van de kiosk'
+    )
   })
 
   it('laat kiosken buiten de lijst hun bestaande Post-mix houden', () => {

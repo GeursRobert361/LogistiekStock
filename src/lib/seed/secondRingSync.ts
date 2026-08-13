@@ -11,7 +11,6 @@ import { assertSchemaReady, resolveKioskIds, resolveProductIds, type SqlClient }
 import {
   buildSyncPlan,
   EXPECTED_CHIP_MATRIX,
-  EXPECTED_CHIP_PAPER_403,
   EXPECTED_CUP_MATRIX,
   EXPECTED_DRINK_MATRIX,
   EXPECTED_KOOLZUUR,
@@ -349,8 +348,7 @@ async function applyChanges(client: SqlClient): Promise<void> {
  * sync die je op zijn woord moet geloven. Controleert de vier normmatrices —
  * drank, bekers, chips en Post-mix — inclusief de regels die géén actieve norm
  * horen te hebben, plus de koolzuurnormen die de Post-mixlijst niet mocht
- * wissen, de papieren chipsnorm van 403 en de opslagtypes. Geeft de problemen
- * terug; leeg betekent goed.
+ * wissen, en de opslagtypes. Geeft de problemen terug; leeg betekent goed.
  */
 export async function verifySecondRing(client: SqlClient): Promise<string[]> {
   const problemen: string[] = []
@@ -413,11 +411,6 @@ export async function verifySecondRing(client: SqlClient): Promise<string[]> {
   await checkMatrix(EXPECTED_CUP_MATRIX, CUP_PRODUCT_IDS)
   await checkMatrix(EXPECTED_CHIP_MATRIX, CHIP_PRODUCT_IDS)
   await checkMatrix(EXPECTED_POSTMIX_MATRIX, POSTMIX_PACKAGE_PRODUCT_IDS)
-
-  // 403 staat niet op de handmatige chipslijst — die noemt twee keer "402" —
-  // en houdt dus zijn papieren norm. Expliciet gecontroleerd, want stil
-  // overnemen van dat tweede blok is precies wat hier niet mag gebeuren.
-  await checkMatrix({ 'kiosk-403': EXPECTED_CHIP_PAPER_403 }, CHIP_PRODUCT_IDS)
 
   // Koolzuur komt op de Post-mixlijst nergens voor en moet daar dus ook niet
   // door verdwijnen.

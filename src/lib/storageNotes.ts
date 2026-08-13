@@ -66,6 +66,10 @@ export const categoryStorageNotes: readonly CategoryStorageNote[] = [
   // Post-mix — waar de reservepakken staan. FIFO staat als telinstructie bij de
   // categorie zelf; hier alleen waar het spul ligt.
   { kioskNumber: 406, categoryName: 'Post-mix', note: 'In het hok links van de kiosk' },
+  // Op de bron heet dit telpunt "420 Hok". Dat is geen aparte kiosk maar de
+  // bergruimte van 420; zonder deze regel zou een teller bij 420 naar acht
+  // pakken Cola Zero zoeken die niet in de kiosk zelf staan.
+  { kioskNumber: 420, categoryName: 'Post-mix', note: 'In het hok links van de kiosk' },
 ]
 
 /** De opmerking bij dit product op deze kiosk, als die er is. */
