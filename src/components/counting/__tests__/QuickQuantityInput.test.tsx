@@ -325,6 +325,72 @@ describe('door de bestaande telflow heen', () => {
     expect(screen.queryByRole('button', { name: /^Tel 4 / })).toBeNull()
   })
 
+  describe('met producten zoals productie ze teruggeeft', () => {
+    /*
+     * In productie is `product.id` een UUID uit de database en niet de leesbare
+     * seed-sleutel. Deze tests draaien daarom met producten waarvan het id is
+     * vervangen door een UUID: alles blijft gelijk behalve juist datgene waarop
+     * quick-count zou kunnen misgaan.
+     */
+    const uuid = (n: number) => `3e5785de-e06a-40f7-8d93-4b1e7c7d577${n}`
+    const productie = (seedId: string, n: number) => ({
+      ...demoProducts.find((p) => p.id === seedId)!,
+      id: uuid(n),
+    })
+
+    it('toont snelknoppen voor Koffie', () => {
+      renderRow(productie('koffie', 1), undefined, 8)
+
+      for (const n of [0, 1, 2, 3, 4, 5]) {
+        expect(knop(n), `knop ${n}`).toBeVisible()
+      }
+      expect(screen.getByRole('button', { name: 'Meer invoeren' })).toBeVisible()
+      expect(screen.queryByRole('textbox')).toBeNull()
+    })
+
+    it('toont snelknoppen voor Cacao Zak, Melk, Suiker en Roerstaafjes', () => {
+      for (const [index, seedId] of ['cacao-zak', 'melk', 'suiker', 'roerstaafjes'].entries()) {
+        const { unmount } = render(
+          <ProductCountRow
+            product={productie(seedId, index)}
+            targetQuantityQuarters={8}
+            countedQuantityQuarters={undefined}
+            onCountChange={noop}
+            onCountClear={noop}
+          />
+        )
+
+        expect(knop(5), seedId).toBeVisible()
+        unmount()
+      }
+    })
+
+    it('toont voor Chips Oranje zeven knoppen plus een halve', () => {
+      renderRow(productie('chips-oranje', 2), undefined, 24)
+
+      for (const n of [0, 1, 2, 3, 4, 5, 6]) {
+        expect(knop(n), `knop ${n}`).toBeVisible()
+      }
+      expect(screen.getByRole('button', { name: 'Halve verpakking toevoegen' })).toBeVisible()
+    })
+
+    it('laat Water Blauw ook dan het gewone invoerveld houden', () => {
+      renderRow(productie('chaudfontaine-blauw', 3), undefined, 100)
+
+      expect(screen.getByRole('textbox')).toBeVisible()
+      expect(screen.queryByRole('button', { name: /^Tel 4 / })).toBeNull()
+    })
+
+    it('slaat een tik nog steeds op via dezelfde flow', async () => {
+      const { onCountChange, user } = renderRow(productie('vuilniszakken', 4), undefined, 20)
+
+      await user.click(knop(4))
+
+      // Op het UUID, want dat is waar de telling in productie aan hangt.
+      expect(onCountChange).toHaveBeenCalledWith(uuid(4), 16)
+    })
+  })
+
   it('rekent het bijvuladvies uit alsof er getypt was', async () => {
     // Norm 6, geteld 4,5. De invoermethode mag daar niets aan veranderen.
     const { onCountChange, user } = renderRow(chips, 16, 24)

@@ -93,6 +93,49 @@ test.describe('Telflow', () => {
     await expect(page.locator(WATER).getByText('Vol', { exact: true })).toBeVisible()
   })
 
+  test('klein spul heeft snelknoppen, grote drank het gewone veld', async ({ page }) => {
+    await startCountAt(page, KIOSK)
+
+    // Koffie: nul tot een handvol, dus knoppen tot vijf en geen invoerveld.
+    const koffie = page.locator('#product-koffie')
+    for (const aantal of [0, 1, 2, 3, 4, 5]) {
+      await expect(koffie.getByRole('button', { name: new RegExp(`^Tel ${aantal} `) })).toBeVisible()
+    }
+    await expect(koffie.getByRole('button', { name: 'Meer invoeren' })).toBeVisible()
+    await expect(koffie.locator('input[inputmode="decimal"]')).toHaveCount(0)
+
+    // Chips: zeven knoppen plus de halve doos.
+    const chips = page.locator('#product-chips-oranje')
+    await expect(chips.getByRole('button', { name: /^Tel 6 / })).toBeVisible()
+    await expect(chips.getByRole('button', { name: 'Halve verpakking toevoegen' })).toBeVisible()
+
+    // Water Blauw loopt tot dertig; daar blijft het gewone veld staan.
+    await expect(inputFor(page, WATER)).toBeVisible()
+    await expect(page.locator(WATER).getByRole('button', { name: /^Tel 4 / })).toHaveCount(0)
+  })
+
+  test('een snelknop telt, en wissen zet terug op niet-geteld', async ({ page }) => {
+    await startCountAt(page, KIOSK)
+    const koffie = page.locator('#product-koffie')
+
+    await expect(koffie.getByText('Nog tellen')).toBeVisible()
+
+    // Nul is een echte telling: het product is daarna niet meer "nog tellen".
+    await koffie.getByRole('button', { name: /^Tel 0 / }).click()
+    await expect(koffie.getByText('Nog tellen')).toHaveCount(0)
+    await expect(koffie.getByRole('button', { name: /^Tel 0 / })).toHaveAttribute(
+      'aria-pressed',
+      'true'
+    )
+
+    await koffie.getByRole('button', { name: /^Tel 4 / }).click()
+    await expect(koffie.getByText(/aanwezig/)).toContainText('4')
+
+    // En wissen brengt hem terug naar nooit geteld — niet naar nul.
+    await koffie.getByRole('button', { name: 'Wissen' }).click()
+    await expect(koffie.getByText('Nog tellen')).toBeVisible()
+  })
+
   test('afronden kan niet zolang er producten ontbreken', async ({ page }) => {
     await startCountAt(page, KIOSK)
 

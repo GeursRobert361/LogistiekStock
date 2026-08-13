@@ -18,6 +18,21 @@
  * dranken — daar lopen de aantallen tot dertig, en een rij van dertig knoppen
  * is geen versnelling maar een zoekplaatje.
  *
+ * ── Waarom de sleutel de productnaam is en niet het id ──────────────────────
+ *
+ * In productie hebben producten een UUID uit de database; de leesbare sleutels
+ * uit `catalogue.ts` bestaan daar niet. Een config op `product.id` matcht
+ * daardoor alleen in de demo-modus en nooit op de vloer — en dat is precies
+ * hoe deze lijst een keer volledig groen getest kon zijn terwijl er in de app
+ * geen enkele knop verscheen. De naam is wat de app in beide modi werkelijk in
+ * handen heeft. Zie ook `storageNotes.ts` en `countingHints.ts`, die op
+ * dezelfde grond op naam koppelen, en `dbIds.ts`, dat aan de serverkant seed-id
+ * en UUID via de naam aan elkaar knoopt.
+ *
+ * Namen zijn uniek in de catalogus; een test bewaakt dat elke sleutel hier bij
+ * een bestaand product hoort, zodat een typefout of een hernoeming opvalt in
+ * plaats van stil de snelknoppen weg te nemen.
+ *
  * Dit is nog geen stamdata. Geen databasekolom, geen beheerscherm: eerst
  * uitproberen of de tel-UX hiermee werkelijk sneller wordt. Blijkt van wel,
  * dan is dit het moment om er kolommen bij te bedenken.
@@ -39,7 +54,7 @@ const INTEGER = (max: number): QuickCountConfig => ({ mode: 'INTEGER', max })
 const HALF = (max: number): QuickCountConfig => ({ mode: 'HALF', max })
 
 /**
- * Product-id → snelteller.
+ * Productnaam → snelteller.
  *
  * De maxima zijn gekozen op wat er werkelijk in een kiosk ligt, niet op de
  * hoogste norm die ergens voorkomt. Een enkele uitschieter hoort via "Meer…"
@@ -50,68 +65,76 @@ export const QUICK_COUNT_CONFIG: Record<string, QuickCountConfig> = {
   // ── Bierbekers ─────────────────────────────────────────────────────────
   // Halve rollen komen voor; die staan al als `inputStep: HALF` in de
   // catalogus.
-  'bierbeker-05': HALF(5),
-  'bierbeker-04': HALF(5),
-  'bierbeker-03': HALF(5),
+  'Bierbekers 0,5': HALF(5),
+  'Bierbekers 0,4': HALF(5),
+  'Bierbekers 0,3': HALF(5),
 
   // ── Chips ──────────────────────────────────────────────────────────────
   // Een halve doos chips is operationeel een echt aantal. De meeste voorraden
   // liggen tussen 0 en 6; 420 Bar telt er tien en gaat dus via Vol (10).
-  'chips-blauw': HALF(6),
-  'chips-rood': HALF(6),
-  'chips-oranje': HALF(6),
+  'Chips Blauw': HALF(6),
+  'Chips Rood': HALF(6),
+  'Chips Oranje': HALF(6),
 
   // ── Post-mix ───────────────────────────────────────────────────────────
   // Reservepakken buiten het rek, in hele pakken — geen halve. De hoogste norm
   // is acht (Cola Zero bij de grote koelingen).
-  cola: INTEGER(8),
-  'cola-zero': INTEGER(8),
-  fanta: INTEGER(8),
-  sprite: INTEGER(8),
-  'fuze-tea-peach-hibiscus': INTEGER(8),
+  'Coca-Cola': INTEGER(8),
+  'Coca-Cola Zero': INTEGER(8),
+  Fanta: INTEGER(8),
+  Sprite: INTEGER(8),
+  // Het Post-mixpak, nadrukkelijk niet de gekoelde "Fuze Tea" uit de drankkast.
+  'Fuze Tea Peach Hibiscus': INTEGER(8),
   // Cilinders, nooit meer dan een paar.
-  koolzuur: INTEGER(3),
+  Koolzuur: INTEGER(3),
 
   // ── Koffie en thee ─────────────────────────────────────────────────────
-  koffie: INTEGER(5),
-  'cacao-zak': INTEGER(5),
-  melk: INTEGER(5),
-  suiker: INTEGER(5),
-  roerstaafjes: INTEGER(5),
-  'thee-earl-grey': INTEGER(5),
-  'thee-lemon': INTEGER(5),
-  opschuimmelk: INTEGER(5),
-  latiz: INTEGER(5),
-  'lavazza-cupjes': INTEGER(5),
-  'lavazza-bekers': INTEGER(5),
+  Koffie: INTEGER(5),
+  'Cacao Zak': INTEGER(5),
+  Melk: INTEGER(5),
+  Suiker: INTEGER(5),
+  Roerstaafjes: INTEGER(5),
+  'Thee Earl Grey': INTEGER(5),
+  'Thee Lemon': INTEGER(5),
+  Opschuimmelk: INTEGER(5),
+  Latiz: INTEGER(5),
+  'Lavazza Cupjes': INTEGER(5),
+  'Lavazza Bekers': INTEGER(5),
   // Sleeves; de norm is acht op vrijwel elke lijst.
-  koffiebekers: INTEGER(8),
+  'Koffie Bekers': INTEGER(8),
 
   // ── Verpakkingen ───────────────────────────────────────────────────────
-  'rectangular-bakjes': INTEGER(5),
-  'square-bakjes': INTEGER(5),
-  'patat-bakjes': INTEGER(5),
-  'patat-vorkjes': INTEGER(5),
-  sixpacks: INTEGER(5),
-  'arena-blaadjes': INTEGER(5),
-  'kassa-bonnen': INTEGER(5),
-  servetten: INTEGER(6),
+  'Rectangular Bakjes': INTEGER(5),
+  'Square Bakjes': INTEGER(5),
+  'Patat Bakjes': INTEGER(5),
+  'Patat Vorkjes': INTEGER(5),
+  Sixpacks: INTEGER(5),
+  'Arena Blaadjes': INTEGER(5),
+  'Kassa Bonnen': INTEGER(5),
+  Servetten: INTEGER(6),
 
   // ── Schoonmaak ─────────────────────────────────────────────────────────
-  vuilniszakken: INTEGER(5),
-  'tork-rol': INTEGER(6),
-  theedoeken: INTEGER(5),
+  Vuilniszakken: INTEGER(5),
+  'Tork Rol': INTEGER(6),
+  Theedoeken: INTEGER(5),
 
   // ── Sauzen ─────────────────────────────────────────────────────────────
   // Alleen de emmers. Normen zijn hier 5 (tweede ring) en 1 tot 2 (eerste
   // ring), dus zes knoppen dekken het.
-  'mayo-emmers': INTEGER(5),
-  'ketchup-emmers': INTEGER(5),
+  'Mayo Emmers': INTEGER(5),
+  'Ketchup Emmers': INTEGER(5),
   // Sausflessen staan hier bewust niet in: die tellen per fles en de normen
   // liggen rond de vijftien. Vijftien knoppen is trager dan typen.
 }
 
-/** De snelteller van dit product, of `undefined` voor de gewone invoer. */
-export function getQuickCountConfig(productId: string): QuickCountConfig | undefined {
-  return QUICK_COUNT_CONFIG[productId]
+/**
+ * De snelteller van dit product, of `undefined` voor de gewone invoer.
+ *
+ * Op naam, niet op id — zie de toelichting boven `QUICK_COUNT_CONFIG`.
+ */
+export function getQuickCountConfig(
+  productName: string | null | undefined
+): QuickCountConfig | undefined {
+  if (!productName) return undefined
+  return QUICK_COUNT_CONFIG[productName]
 }

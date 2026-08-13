@@ -33,7 +33,9 @@ export function ProductCountRow({
   const targetQty = fromQuarterUnits(targetQuantityQuarters)
   const isCounted = countedQuantityQuarters !== undefined
   const countedQty = isCounted ? fromQuarterUnits(countedQuantityQuarters) : undefined
-  const quickConfig = getQuickCountConfig(product.id)
+  // Op naam en niet op id: in productie is `product.id` een database-UUID en
+  // bestaan de leesbare sleutels uit de catalogus niet.
+  const quickConfig = getQuickCountConfig(product.name)
 
   // Zolang er niet geteld is, bestaat er geen bijvuladvies. Een ontbrekende
   // waarde is nadrukkelijk niet hetzelfde als 0.
