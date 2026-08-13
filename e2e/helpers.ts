@@ -36,14 +36,35 @@ export async function resetAppData(page: Page): Promise<void> {
   })
 }
 
-/** Vult elk zichtbaar telveld op deze kiosk met `value`. */
+/**
+ * Telt elk product op deze kiosk op `value`.
+ *
+ * Loopt over de productregels en niet over de invoervelden, want die zijn er
+ * niet overal: klein spul heeft snelknoppen en geen veld. Per regel dus eerst
+ * de knop, dan het veld, en desnoods "Meer…" om er alsnog een te krijgen — dat
+ * dekt elk product, ongeacht welke invoer het toevallig heeft.
+ */
 export async function fillAllCounts(page: Page, value: string): Promise<void> {
-  const inputs = page.locator('input[inputmode="decimal"]')
-  // Wachten tot het scherm klaar is met laden; anders vullen we nul velden.
-  await inputs.first().waitFor({ state: 'visible' })
-  const count = await inputs.count()
+  const rows = page.locator('[id^="product-"]')
+  // Wachten tot het scherm klaar is met laden; anders tellen we nul producten.
+  await rows.first().waitFor({ state: 'visible' })
+
+  const count = await rows.count()
   for (let index = 0; index < count; index++) {
-    const input = inputs.nth(index)
+    const row = rows.nth(index)
+
+    const quickButton = row.getByRole('button', { name: new RegExp(`^Tel ${value} `) })
+    if ((await quickButton.count()) > 0) {
+      await quickButton.click()
+      continue
+    }
+
+    // Geen snelknop voor dit getal: het handmatige veld, dat bij een product
+    // met snelknoppen eerst opengeklapt moet worden.
+    const input = row.locator('input[inputmode="decimal"]')
+    if ((await input.count()) === 0) {
+      await row.getByRole('button', { name: 'Meer invoeren' }).click()
+    }
     await input.fill(value)
     await input.blur()
   }

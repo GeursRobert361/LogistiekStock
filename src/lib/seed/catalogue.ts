@@ -173,9 +173,22 @@ export const demoProducts: Product[] = [
   }),
 
   // ── Chips ──────────────────────────────────────────────────────────────
-  product('chips-blauw', CAT_CHIPS_ID, 'Chips Blauw', 'Chips Blauw', 'zak', 'dozen', 30, SMALL),
-  product('chips-rood', CAT_CHIPS_ID, 'Chips Rood', 'Chips Rood', 'zak', 'dozen', 31, SMALL),
-  product('chips-oranje', CAT_CHIPS_ID, 'Chips Oranje', 'Chips Oranje', 'zak', 'dozen', 32, SMALL),
+  // Een halve doos is hier een echt aantal: een aangebroken doos onder het
+  // luik komt in elke kiosk voor. Vandaar halve stappen, met dezelfde betekenis
+  // als bij de bekers en de dranken — `calculateRestockQuantity` doet er
+  // niets bijzonders mee.
+  product('chips-blauw', CAT_CHIPS_ID, 'Chips Blauw', 'Chips Blauw', 'zak', 'dozen', 30, {
+    ...SMALL,
+    ...HALF_STEP,
+  }),
+  product('chips-rood', CAT_CHIPS_ID, 'Chips Rood', 'Chips Rood', 'zak', 'dozen', 31, {
+    ...SMALL,
+    ...HALF_STEP,
+  }),
+  product('chips-oranje', CAT_CHIPS_ID, 'Chips Oranje', 'Chips Oranje', 'zak', 'dozen', 32, {
+    ...SMALL,
+    ...HALF_STEP,
+  }),
 
   // ── Post-mix ───────────────────────────────────────────────────────────
   // Geteld worden de reservepakken buiten het rek; het pak dat aangesloten zit

@@ -1,7 +1,9 @@
 'use client'
 
 import { QuarterQuantityInput } from './QuarterQuantityInput'
+import { QuickQuantityInput } from './QuickQuantityInput'
 import { calculateRestockQuantity } from '@/domain/counting/calculateRestock'
+import { getQuickCountConfig } from '@/lib/counting/quickCountConfig'
 import { fromQuarterUnits, formatQuantity } from '@/lib/quarterUnits'
 import { cn } from '@/lib/utils'
 import type { Product } from '@/types'
@@ -31,6 +33,7 @@ export function ProductCountRow({
   const targetQty = fromQuarterUnits(targetQuantityQuarters)
   const isCounted = countedQuantityQuarters !== undefined
   const countedQty = isCounted ? fromQuarterUnits(countedQuantityQuarters) : undefined
+  const quickConfig = getQuickCountConfig(product.id)
 
   // Zolang er niet geteld is, bestaat er geen bijvuladvies. Een ontbrekende
   // waarde is nadrukkelijk niet hetzelfde als 0.
@@ -92,13 +95,31 @@ export function ProductCountRow({
         </p>
       )}
 
-      <QuarterQuantityInput
-        value={countedQty}
-        onChange={(val) => onCountChange(product.id, Math.round(val * 4))}
-        onClear={() => onCountClear(product.id)}
-        step={product.inputStep as 1 | 0.5 | 0.25}
-        targetQuantity={targetQty}
-      />
+      {/*
+        Snelknoppen waar dat helpt, het gewone veld waar dat niet zo is. Beide
+        krijgen exact dezelfde `onChange`: de invoermethode mag nooit invloed
+        hebben op wat er opgeslagen wordt of op het bijvuladvies.
+      */}
+      {quickConfig ? (
+        <QuickQuantityInput
+          value={countedQty}
+          onChange={(val) => onCountChange(product.id, Math.round(val * 4))}
+          onClear={() => onCountClear(product.id)}
+          mode={quickConfig.mode}
+          max={quickConfig.max}
+          targetQuantity={targetQty}
+          step={product.inputStep as 1 | 0.5 | 0.25}
+          packagingUnit={product.packagingUnit}
+        />
+      ) : (
+        <QuarterQuantityInput
+          value={countedQty}
+          onChange={(val) => onCountChange(product.id, Math.round(val * 4))}
+          onClear={() => onCountClear(product.id)}
+          step={product.inputStep as 1 | 0.5 | 0.25}
+          targetQuantity={targetQty}
+        />
+      )}
 
       {isCounted && result !== null && !isFull && (
         <p className="mt-1.5 text-xs text-ink-muted">
