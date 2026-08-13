@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { storageNoteFor } from '@/lib/storageNotes'
+import { categoryStorageNoteFor, storageNoteFor } from '@/lib/storageNotes'
+import { countingHintFor } from '@/lib/countingHints'
 import { ProductCountRow } from './ProductCountRow'
 import type { Product, Kiosk, KioskProductStandard } from '@/types'
 
@@ -33,6 +34,12 @@ export function CategoryAccordion({
   focusProductId = null,
 }: CategoryAccordionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
+
+  // Twee soorten uitleg boven de categorie, en ze zeggen iets anders: de hint
+  // gaat over hóe er geteld wordt en geldt overal, de opmerking over waar het
+  // spul bij déze kiosk ligt.
+  const hint = countingHintFor(categoryName)
+  const categoryNote = categoryStorageNoteFor(kiosk, categoryName)
 
   const containsFocus =
     focusProductId !== null && products.some((p) => p.id === focusProductId)
@@ -70,6 +77,28 @@ export function CategoryAccordion({
           {isOpen ? '▲' : '▼'}
         </span>
       </button>
+
+      {isOpen && (hint || categoryNote) && (
+        <div className="space-y-2 border-b border-concrete-line bg-plate px-4 py-3">
+          {hint && (
+            <div className="rounded-lg bg-sky-50 px-3 py-2 text-xs text-sky-900">
+              <p className="mb-1 font-semibold">Zo tel je {categoryName.toLowerCase()}</p>
+              <ul className="list-inside list-disc space-y-0.5">
+                {hint.lines.map((line) => (
+                  <li key={line}>{line}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {categoryNote && (
+            <p className="flex items-start gap-1.5 rounded-lg bg-amber-50 px-3 py-2 text-xs font-medium text-amber-900">
+              <span aria-hidden="true">📦</span>
+              <span>{categoryNote}</span>
+            </p>
+          )}
+        </div>
+      )}
 
       {isOpen && (
         <div className="divide-y divide-concrete-line bg-plate">

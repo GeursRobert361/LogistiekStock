@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest'
-import { storageNotes, storageNoteFor } from '../storageNotes'
+import {
+  storageNotes,
+  storageNoteFor,
+  categoryStorageNotes,
+  categoryStorageNoteFor,
+} from '../storageNotes'
 import { demoKiosks, demoStandards } from '@/lib/seed/demoData'
-import { demoProducts } from '@/lib/seed/catalogue'
+import { demoProducts, demoCategories } from '@/lib/seed/catalogue'
 
 /**
  * De opmerkingen over waar voorraad ligt.
@@ -74,5 +79,82 @@ describe('de opmerkingen zelf', () => {
     expect(norm('kiosk-401')).toBe(5 * 4)
     expect(norm('kiosk-410')).toBe(4 * 4)
     expect(norm('kiosk-426')).toBe(5 * 4)
+  })
+})
+
+describe('categoryStorageNoteFor', () => {
+  it('vindt de opmerking van deze categorie bij deze kiosk', () => {
+    expect(categoryStorageNoteFor({ number: 426 }, 'Chips')).toBe(
+      '3 op de plank, onder elk luik 1 doos'
+    )
+    expect(categoryStorageNoteFor({ number: 427 }, 'Chips')).toBe('Onder de balie, 3 per vakje')
+    expect(categoryStorageNoteFor({ number: 406 }, 'Post-mix')).toBe(
+      'In het hok links van de kiosk'
+    )
+  })
+
+  it('houdt de categorieën uit elkaar', () => {
+    // 406 Oud heeft een opmerking bij de Post-mix, niet bij de chips van
+    // datzelfde nummer — daar staat een andere.
+    expect(categoryStorageNoteFor({ number: 406 }, 'Chips')).toBe(
+      '3 dozen op het kratje, rest onder de balie'
+    )
+    expect(categoryStorageNoteFor({ number: 426 }, 'Post-mix')).toBeUndefined()
+  })
+
+  it('zwijgt bij een kiosk of categorie zonder opmerking', () => {
+    expect(categoryStorageNoteFor({ number: 402 }, 'Chips')).toBeUndefined()
+    expect(categoryStorageNoteFor({ number: 426 }, 'Bierbekers')).toBeUndefined()
+    expect(categoryStorageNoteFor(null, 'Chips')).toBeUndefined()
+    expect(categoryStorageNoteFor({ number: 426 }, undefined)).toBeUndefined()
+  })
+})
+
+describe('de categorie-opmerkingen zelf', () => {
+  it('verwijzen naar bestaande kiosken', () => {
+    const nummers = new Set(demoKiosks.map((k) => k.number))
+    for (const note of categoryStorageNotes) {
+      expect(nummers.has(note.kioskNumber), String(note.kioskNumber)).toBe(true)
+    }
+  })
+
+  it('verwijzen naar bestaande categorienamen', () => {
+    const namen = new Set(demoCategories.map((c) => c.name))
+    for (const note of categoryStorageNotes) {
+      expect(namen.has(note.categoryName), note.categoryName).toBe(true)
+    }
+  })
+
+  it('horen bij een categorie die die kiosk ook werkelijk voert', () => {
+    // Een opmerking bij een categorie zonder normen zou nooit op het scherm
+    // komen.
+    const categorieVanProduct = new Map(demoProducts.map((p) => [p.id, p.categoryId]))
+    const naamVanCategorie = new Map(demoCategories.map((c) => [c.id, c.name]))
+
+    for (const note of categoryStorageNotes) {
+      const kiosk = demoKiosks.find((k) => k.number === note.kioskNumber)!
+      const categorieën = new Set(
+        demoStandards
+          .filter((s) => s.kioskId === kiosk.id)
+          .map((s) => naamVanCategorie.get(categorieVanProduct.get(s.productId) ?? ''))
+      )
+
+      expect(
+        categorieën.has(note.categoryName),
+        `${note.kioskNumber} ${note.categoryName}`
+      ).toBe(true)
+    }
+  })
+
+  it('veranderen de norm niet', () => {
+    // "onder elk luik 1 doos" zegt waar de dozen liggen, niet dat er dozen bij
+    // moeten. 426 Chips Blauw blijft dus 6.
+    const norm = (kioskId: string, productId: string) =>
+      demoStandards.find((s) => s.kioskId === kioskId && s.productId === productId)
+        ?.targetQuantityQuarters
+
+    expect(norm('kiosk-426', 'chips-blauw')).toBe(6 * 4)
+    expect(norm('kiosk-401', 'chips-blauw')).toBe(6 * 4)
+    expect(norm('kiosk-406', 'cola-zero')).toBe(4 * 4)
   })
 })

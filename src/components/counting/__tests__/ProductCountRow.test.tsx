@@ -15,6 +15,9 @@ import type { KioskProductStandard } from '@/types'
 
 const beker = demoProducts.find((p) => p.id === 'bierbeker-05')!
 const chips = demoProducts.find((p) => p.id === 'chips-blauw')!
+const chipsRood = demoProducts.find((p) => p.id === 'chips-rood')!
+const chipsOranje = demoProducts.find((p) => p.id === 'chips-oranje')!
+const cola = demoProducts.find((p) => p.id === 'cola')!
 
 function noop() {}
 
@@ -117,5 +120,64 @@ describe('CategoryAccordion', () => {
     )
 
     expect(screen.queryByText(/achter in de kiosk/)).toBeNull()
+  })
+
+  it('toont de opmerking over een hele categorie één keer', () => {
+    render(
+      <CategoryAccordion
+        categoryName="Chips"
+        products={[chips, chipsRood, chipsOranje]}
+        kiosk={{ number: 426 }}
+        standards={
+          new Map([
+            [chips.id, standard(chips.id, 24)],
+            [chipsRood.id, standard(chipsRood.id, 24)],
+            [chipsOranje.id, standard(chipsOranje.id, 24)],
+          ])
+        }
+        counts={new Map()}
+        onCountChange={noop}
+        onCountClear={noop}
+      />
+    )
+
+    // Eén keer boven de categorie, en niet drie keer onder elke smaak.
+    expect(screen.getAllByText('3 op de plank, onder elk luik 1 doos')).toHaveLength(1)
+  })
+
+  it('toont bij Post-mix hoe er geteld moet worden', () => {
+    // De reservepakken buiten het rek, niet het pak aan de tap. Wie dat niet
+    // weet telt er bij elke Post-mixkiosk structureel één te veel.
+    render(
+      <CategoryAccordion
+        categoryName="Post-mix"
+        products={[cola]}
+        kiosk={{ number: 401 }}
+        standards={new Map([[cola.id, standard(cola.id, 16)]])}
+        counts={new Map()}
+        onCountChange={noop}
+        onCountClear={noop}
+      />
+    )
+
+    expect(screen.getByText(/reservepakken buiten het rek/)).toBeVisible()
+    expect(screen.getByText(/25%/)).toBeVisible()
+    expect(screen.getByText(/FIFO/)).toBeVisible()
+  })
+
+  it('laat de telinstructie weg bij een categorie die er geen heeft', () => {
+    render(
+      <CategoryAccordion
+        categoryName="Chips"
+        products={[chips]}
+        kiosk={{ number: 402 }}
+        standards={new Map([[chips.id, standard(chips.id, 8)]])}
+        counts={new Map()}
+        onCountChange={noop}
+        onCountClear={noop}
+      />
+    )
+
+    expect(screen.queryByText(/Zo tel je/)).toBeNull()
   })
 })

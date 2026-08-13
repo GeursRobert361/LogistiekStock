@@ -2,7 +2,7 @@
 
 import { use, useCallback, useEffect, useState } from 'react'
 import { kioskLabel } from '@/lib/kiosk'
-import { storageNoteFor } from '@/lib/storageNotes'
+import { categoryStorageNoteFor, storageNoteFor } from '@/lib/storageNotes'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Button } from '@/components/ui/Button'
@@ -32,6 +32,8 @@ export default function RestockStopPage({
 
   const [stopPlan, setStopPlan] = useState<StopPlan | null>(null)
   const [products, setProducts] = useState<Map<string, Product>>(new Map())
+  /** Categorie-id → naam; nodig voor de opmerkingen die over een hele categorie gaan. */
+  const [categoryNames, setCategoryNames] = useState<Map<string, string>>(new Map())
   const [kiosk, setKiosk] = useState<Kiosk | null>(null)
   const [notes, setNotes] = useState('')
   const [isLoading, setIsLoading] = useState(true)
@@ -41,12 +43,14 @@ export default function RestockStopPage({
   const load = useCallback(async () => {
     setIsLoading(true)
     const plan = await getStopPlan(roundId, stopId)
-    const [productList, kioskData] = await Promise.all([
+    const [productList, categoryList, kioskData] = await Promise.all([
       repositories.product().getProducts({ activeOnly: false }),
+      repositories.product().getCategories({ includeInactive: true }),
       repositories.kiosk().getKioskById(plan.stop.kioskId),
     ])
     setStopPlan(plan)
     setProducts(new Map(productList.map((p) => [p.id, p])))
+    setCategoryNames(new Map(categoryList.map((c) => [c.id, c.name])))
     setKiosk(kioskData)
     setNotes(plan.stop.notes ?? '')
     setIsLoading(false)
@@ -147,15 +151,23 @@ export default function RestockStopPage({
           </p>
         )}
 
-        {stopPlan.products.map((item) => (
-          <DeliveryProductRow
-            key={item.productId}
-            product={products.get(item.productId)}
-            plan={item}
-            storageNote={storageNoteFor(kiosk, products.get(item.productId))}
-            onSubmit={handleDelivery}
-          />
-        ))}
+        {stopPlan.products.map((item) => {
+          const product = products.get(item.productId)
+          return (
+            <DeliveryProductRow
+              key={item.productId}
+              product={product}
+              plan={item}
+              // Een opmerking bij het product zelf gaat vóór die van de hele
+              // categorie: hij is specifieker.
+              storageNote={
+                storageNoteFor(kiosk, product) ??
+                categoryStorageNoteFor(kiosk, product && categoryNames.get(product.categoryId))
+              }
+              onSubmit={handleDelivery}
+            />
+          )
+        })}
 
         {/* Wat er hierna nog volgt. Staat er straks niets meer op de pallet,
             dan is dit precies de lijst voor het magazijn. */}
