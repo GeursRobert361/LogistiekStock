@@ -269,8 +269,9 @@ async function applyChanges(client: SqlClient): Promise<void> {
       await client.query(
         `update products set name = $1, short_name = $2, count_unit = $3, packaging_unit = $4,
                 supplied_from_large_cooler_for_satellite = $5,
-                input_step = $6, allow_partial_package = $7
-          where id = $8`,
+                input_step = $6, allow_partial_package = $7,
+                collected_after_event = $8
+          where id = $9`,
         [
           product.name,
           product.shortName,
@@ -279,6 +280,7 @@ async function applyChanges(client: SqlClient): Promise<void> {
           product.suppliedFromLargeCoolerForSatellite,
           String(product.inputStep),
           product.allowPartialPackage,
+          product.collectedAfterEvent,
           id,
         ]
       )
@@ -295,8 +297,9 @@ async function applyChanges(client: SqlClient): Promise<void> {
                                sort_order, is_active, input_step, allow_partial_package,
                                round_type, product_size, estimated_pallet_load,
                                own_round_threshold, priority, refrigerated,
-                               supplied_from_large_cooler_for_satellite)
-         values ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12,$13,$14,$15)`,
+                               supplied_from_large_cooler_for_satellite,
+                               collected_after_event)
+         values ($1,$2,$3,$4,$5,$6,true,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16)`,
         [
           categoryId,
           product.name,
@@ -313,6 +316,7 @@ async function applyChanges(client: SqlClient): Promise<void> {
           product.priority,
           product.refrigerated,
           product.suppliedFromLargeCoolerForSatellite,
+          product.collectedAfterEvent,
         ]
       )
     }

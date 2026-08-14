@@ -134,6 +134,21 @@ export interface Product {
    * koeling.
    */
   suppliedFromLargeCoolerForSatellite: boolean
+  /**
+   * Wordt dit na elk evenement bij de kiosk opgehaald?
+   *
+   * Zo ja, dan begint de kiosk elke keer met niets en heeft tellen geen zin:
+   * het antwoord is altijd nul en de behoefte altijd de volle norm. Zulke
+   * producten staan daarom **niet op de tellijst en altijd op de vullijst**.
+   *
+   * Dat is geen bijzonder geval van "tekort berekenen" maar een andere manier
+   * van werken: er wordt niets geteld, dus er is ook geen telregel om een
+   * behoefte uit af te leiden. `buildRestockRequirements` zet die behoefte er
+   * apart bij, op de norm van de kiosk.
+   *
+   * De GFT-bakken zijn het geval waarvoor dit bestaat.
+   */
+  collectedAfterEvent: boolean
   notes?: string
   /**
    * Verwijderd: het product verdwijnt uit alle lijsten, maar de rij blijft

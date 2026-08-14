@@ -16,7 +16,18 @@ const fakeKiosks: Array<{
   drinkStorageType: string
   keepsOwnDrinkStock: boolean
 }> = []
-const fakeProducts: Array<{ id: string; suppliedFromLargeCoolerForSatellite: boolean }> = []
+const fakeProducts: Array<{
+  id: string
+  suppliedFromLargeCoolerForSatellite: boolean
+  isActive?: boolean
+  collectedAfterEvent?: boolean
+}> = []
+
+/** productId → kioskId → norm. Alleen gevuld waar een test hem nodig heeft. */
+const fakeStandardMatrix: Record<
+  string,
+  Record<string, { kioskId: string; productId: string; targetQuantityQuarters: number; isActive: boolean }>
+> = {}
 
 vi.mock('@/repositories', () => ({
   repositories: {
@@ -24,7 +35,10 @@ vi.mock('@/repositories', () => ({
     restock: () => fakeRestockRepo,
     event: () => ({ updateEventStatus }),
     kiosk: () => ({ getKiosks: async () => fakeKiosks }),
-    product: () => ({ getProducts: async () => fakeProducts }),
+    product: () => ({
+      getProducts: async () => fakeProducts,
+      getStandardMatrix: async () => ({ products: [], kiosks: [], standards: fakeStandardMatrix }),
+    }),
   },
 }))
 
@@ -470,6 +484,81 @@ describe('drank bij een telpunt met eigen voorraad', () => {
       productId: 'prod-water',
       requiredPackages: 11,
     })
+  })
+})
+
+describe('wat na elk evenement wordt opgehaald', () => {
+  const route = ROUTE.slice(0, 1)
+  const KIOSK = route[0]!
+
+  /**
+   * De GFT-bak: opgehaald na afloop, dus niet geteld en toch elke ronde te
+   * brengen. Er is geen telregel voor, dus de behoefte moet uit de norm komen.
+   */
+  beforeEach(() => {
+    fakeProducts.push({
+      id: 'prod-gft',
+      suppliedFromLargeCoolerForSatellite: false,
+      isActive: true,
+      collectedAfterEvent: true,
+    })
+    fakeStandardMatrix['prod-gft'] = {
+      [KIOSK]: {
+        kioskId: KIOSK,
+        productId: 'prod-gft',
+        targetQuantityQuarters: 4,
+        isActive: true,
+      },
+    }
+  })
+
+  afterEach(() => {
+    fakeProducts.length = 0
+    for (const key of Object.keys(fakeStandardMatrix)) delete fakeStandardMatrix[key]
+  })
+
+  async function telEnKeurGoed() {
+    const session = makeSession({ kioskRoute: route })
+    await saveCountSessionLocally(session)
+    await countKiosk(KIOSK)
+    await flushPendingCountWrites()
+    await syncService.flush()
+    return approveSession(session)
+  }
+
+  it('levert de bak zonder dat hij geteld is', async () => {
+    const result = await telEnKeurGoed()
+
+    // Water uit de telling plus de GFT-bak uit de norm.
+    expect(result.requirementCount).toBe(2)
+    const gft = fakeRestockRepo.requirements.find((r) => r.productId === 'prod-gft')
+    expect(gft).toMatchObject({ kioskId: KIOSK, requiredPackages: 1 })
+  })
+
+  it('doet niets met een uitgeschakelde norm', async () => {
+    fakeStandardMatrix['prod-gft']![KIOSK]!.isActive = false
+
+    const result = await telEnKeurGoed()
+
+    expect(result.requirementCount).toBe(1)
+    expect(fakeRestockRepo.requirements.some((r) => r.productId === 'prod-gft')).toBe(false)
+  })
+
+  it('doet niets wanneer het product niet meer actief is', async () => {
+    fakeProducts[0]!.isActive = false
+
+    const result = await telEnKeurGoed()
+
+    expect(result.requirementCount).toBe(1)
+  })
+
+  it('levert bij twee keer goedkeuren geen dubbele bak', async () => {
+    await telEnKeurGoed()
+    const stored = await getOfflineDb().countSessions.get(SESSION_ID)
+    await syncService.flush()
+    await approveSession(stored!)
+
+    expect(fakeRestockRepo.requirements.filter((r) => r.productId === 'prod-gft')).toHaveLength(1)
   })
 })
 

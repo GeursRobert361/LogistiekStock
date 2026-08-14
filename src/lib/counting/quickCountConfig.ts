@@ -120,8 +120,9 @@ export const QUICK_COUNT_CONFIG: Record<string, QuickCountConfig> = {
   Vuilniszakken: INTEGER(5),
   'Tork Rol': INTEGER(6),
   Theedoeken: INTEGER(5),
-  // Hele bakken; de norm is overal één en meer dan een paar staan er nergens.
-  'GFT Bak': INTEGER(3),
+  // GFT Bak staat hier bewust niet in: die wordt na elk evenement opgehaald en
+  // komt daarom helemaal niet op de tellijst. Snelknoppen voor een product dat
+  // nooit geteld wordt zijn dode configuratie.
 
   // ── Sauzen ─────────────────────────────────────────────────────────────
   // Alleen de emmers. Normen zijn hier 5 (tweede ring) en 1 tot 2 (eerste

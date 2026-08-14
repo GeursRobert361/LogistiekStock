@@ -62,6 +62,7 @@ export function ProductForm({
     storageLocation: initial?.storageLocation ?? '',
     refrigerated: initial?.refrigerated ?? false,
     suppliedFromLargeCoolerForSatellite: initial?.suppliedFromLargeCoolerForSatellite ?? false,
+    collectedAfterEvent: initial?.collectedAfterEvent ?? false,
     notes: initial?.notes ?? '',
   })
   const [isSaving, setIsSaving] = useState(false)
@@ -212,6 +213,15 @@ export function ProductForm({
           checked={values.suppliedFromLargeCoolerForSatellite}
           onChange={(checked) => set('suppliedFromLargeCoolerForSatellite', checked)}
         />
+        <Toggle
+          label="Wordt na elk evenement opgehaald"
+          checked={values.collectedAfterEvent}
+          onChange={(checked) => set('collectedAfterEvent', checked)}
+        />
+        <p className="px-1 text-xs text-gray-600">
+          Zoals de GFT-bakken. Zo&apos;n product staat niet op de tellijst — de kiosk begint leeg,
+          dus het antwoord is altijd nul — en gaat elke ronde volledig mee op de vullijst.
+        </p>
         <Toggle
           label="Deelverpakking toegestaan"
           checked={values.allowPartialPackage}

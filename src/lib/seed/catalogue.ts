@@ -63,6 +63,7 @@ function product(
     priority: 0,
     refrigerated: false,
     suppliedFromLargeCoolerForSatellite: false,
+    collectedAfterEvent: false,
     createdAt: '2026-01-01T00:00:00Z',
     updatedAt: '2026-01-01T00:00:00Z',
     ...overrides,
@@ -298,13 +299,20 @@ export const demoProducts: Product[] = [
   product('tork-rol', CAT_SCHOONMAAK_ID, 'Tork Rol', 'Tork', 'rol', 'rollen', 90, SMALL),
   product('vuilniszakken', CAT_SCHOONMAAK_ID, 'Vuilniszakken', 'Vuilniszakken', 'rol', 'rollen', 91, SMALL),
   product('theedoeken', CAT_SCHOONMAAK_ID, 'Theedoeken', 'Theedoeken', 'stuk', 'pakken', 92, SMALL),
-  // De GFT-bak: hele bakken, geen halve. Een bak staat er of staat er niet, en
-  // "een halve GFT-bak" is geen aantal dat iemand kan aanwijzen. Vandaar
-  // `inputStep = ONE` en geen deelverpakkingen — de standaardwaarden van
-  // `product()`, hier expliciet gelaten omdat het de kern van dit product is.
+  // De GFT-bak wordt na elk evenement opgehaald. De kiosk begint dus elke keer
+  // met niets, en dan is tellen zinloos: het antwoord is altijd nul en er moet
+  // altijd één bak gebracht worden. Vandaar `collectedAfterEvent` — niet op de
+  // tellijst, wel elke ronde op de vullijst.
   //
-  // Bij Schoonmaak/afval, want daar hoort het en daar kijkt de teller ernaar.
-  // Achteraan in de sorteervolgorde: de sync werkt `sort_order` bewust niet bij,
-  // dus ertussen schuiven zou lokaal en in productie uit elkaar lopen.
-  product('gft-bak', CAT_SCHOONMAAK_ID, 'GFT Bak', 'GFT', 'bak', 'bakken', 93, SMALL),
+  // Hele bakken, geen halve: "een halve GFT-bak" is geen aantal dat iemand kan
+  // aanwijzen. Dat zijn de standaardwaarden van `product()` en die blijven
+  // staan, ook al wordt er niet geteld — de vuller ziet ze terug als norm.
+  //
+  // Bij Schoonmaak/afval, want daar hoort het. Achteraan in de sorteervolgorde:
+  // de sync werkt `sort_order` bewust niet bij, dus ertussen schuiven zou
+  // lokaal en in productie uit elkaar lopen.
+  product('gft-bak', CAT_SCHOONMAAK_ID, 'GFT Bak', 'GFT', 'bak', 'bakken', 93, {
+    ...SMALL,
+    collectedAfterEvent: true,
+  }),
 ]

@@ -171,13 +171,22 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
     [kioskCount, profileId]
   )
 
+  /**
+   * Wat er op deze kiosk geteld wordt.
+   *
+   * Een norm voor deze kiosk is de voorwaarde, met één uitzondering: wat na elk
+   * evenement wordt opgehaald staat er niet bij. De GFT-bakken zijn weg, dus de
+   * teller zou telkens een nul invullen die niemand nodig heeft — en zolang hij
+   * dat vergeet blijft de kiosk onafgerond. Die norm blijft wel bestaan; hij
+   * hoort thuis op de vullijst, waar hij elke ronde volledig meegaat.
+   */
   const categoriesWithProducts = useMemo(
     () =>
       categories
         .map((cat) => ({
           ...cat,
           products: products
-            .filter((p) => p.categoryId === cat.id && standards.has(p.id))
+            .filter((p) => p.categoryId === cat.id && standards.has(p.id) && !p.collectedAfterEvent)
             .sort((a, b) => a.sortOrder - b.sortOrder),
         }))
         .filter((cat) => cat.products.length > 0),

@@ -79,6 +79,7 @@ export async function assertSchemaReady(client: SqlClient): Promise<void> {
     ['kiosks', 'drink_source_kiosk_id'],
     ['kiosks', 'keeps_own_drink_stock'],
     ['products', 'supplied_from_large_cooler_for_satellite'],
+    ['products', 'collected_after_event'],
   ]
 
   const { rows } = await client.query<{ table_name: string; column_name: string }>(

@@ -141,6 +141,7 @@ function handle(
       { table_name: 'kiosks', column_name: 'drink_source_kiosk_id' },
       { table_name: 'kiosks', column_name: 'keeps_own_drink_stock' },
       { table_name: 'products', column_name: 'supplied_from_large_cooler_for_satellite' },
+      { table_name: 'products', column_name: 'collected_after_event' },
     ]
   }
 

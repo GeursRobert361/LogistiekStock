@@ -25,6 +25,7 @@ import {
 import type { RequirementDraft } from '@/domain/restocking/buildRequirements'
 import { getLocalEntries, forgetSessionLocally, forgetKioskCountLocally } from '@/lib/db/offlineDb'
 import { getPendingOutboxEntries } from '@/lib/db/offlineDb'
+import { fromQuarterUnits } from '@/lib/quarterUnits'
 
 /** Status van één kiosk binnen een telronde. */
 export type RouteKioskStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
@@ -281,6 +282,45 @@ export class RequirementInUseError extends Error {
 }
 
 /**
+ * De normen van producten die na elk evenement worden opgehaald.
+ *
+ * Die staan niet op de tellijst — de kiosk begint elke keer met niets, dus het
+ * antwoord zou altijd nul zijn — maar horen wel elke ronde op de vullijst, op
+ * de volle norm. Er is dus geen telregel om dat uit af te leiden en moet het
+ * hier vandaan komen.
+ *
+ * Eén matrixquery voor de hele ring in plaats van een normenlijst per kiosk, en
+ * alleen wanneer er zulke producten zijn: bij een ring zonder GFT-bakken kost
+ * dit niets.
+ */
+async function alwaysRestockedStandardsFor(
+  ringId: string,
+  productIds: readonly string[],
+  kioskIds: ReadonlySet<string>
+): Promise<Array<{ kioskId: string; productId: string; packages: number }>> {
+  if (productIds.length === 0) return []
+
+  const matrix = await repositories.product().getStandardMatrix(ringId)
+  const result: Array<{ kioskId: string; productId: string; packages: number }> = []
+
+  for (const productId of productIds) {
+    for (const standard of Object.values(matrix.standards[productId] ?? {})) {
+      // De matrix levert ook uitgeschakelde normen; die horen nergens meer.
+      if (!standard.isActive) continue
+      if (!kioskIds.has(standard.kioskId)) continue
+
+      result.push({
+        kioskId: standard.kioskId,
+        productId,
+        packages: fromQuarterUnits(standard.targetQuantityQuarters),
+      })
+    }
+  }
+
+  return result
+}
+
+/**
  * Keurt een telronde goed en trekt de bijvulbehoeften gelijk.
  *
  * Twee keer goedkeuren levert dezelfde behoeften op, zonder duplicaten en
@@ -320,6 +360,12 @@ export async function approveSession(session: CountSession): Promise<ApprovalRes
     entriesByKioskCount,
     existing: await restock.getRequirements(fresh.eventId),
     scopeKioskIds: fresh.kioskRoute,
+    // Wat na elk evenement is opgehaald moet er weer heen, zonder telling.
+    alwaysRestockedStandards: await alwaysRestockedStandardsFor(
+      fresh.ringId,
+      products.filter((product) => product.isActive && product.collectedAfterEvent).map((p) => p.id),
+      new Set(fresh.kioskRoute)
+    ),
     kioskStorage: new Map(kiosks.map((kiosk) => [kiosk.id, kiosk.drinkStorageType])),
     // Telpunten met een eigen stocklijst voor drank, zoals Ziggo Platform. Hun
     // tekorten moeten wél in de vulplanning komen; zonder dit worden ze geteld

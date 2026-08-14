@@ -230,6 +230,7 @@ async function seedProducts(): Promise<void> {
       priority: product.priority,
       refrigerated: product.refrigerated,
       supplied_from_large_cooler_for_satellite: product.suppliedFromLargeCoolerForSatellite,
+      collected_after_event: product.collectedAfterEvent,
     })),
     { hasSoftDelete: true }
   )

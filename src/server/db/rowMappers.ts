@@ -267,6 +267,7 @@ export function mapProduct(row: Row): Product {
     storageLocation: optStr(row.storage_location),
     refrigerated: bool(row.refrigerated),
     suppliedFromLargeCoolerForSatellite: bool(row.supplied_from_large_cooler_for_satellite),
+    collectedAfterEvent: bool(row.collected_after_event),
     notes: optStr(row.notes),
     deletedAt: optStr(row.deleted_at),
     createdAt: str(row.created_at),
@@ -295,6 +296,9 @@ export function productToRow(data: Partial<Product>): Row {
   if (data.refrigerated !== undefined) row.refrigerated = data.refrigerated
   if (data.suppliedFromLargeCoolerForSatellite !== undefined) {
     row.supplied_from_large_cooler_for_satellite = data.suppliedFromLargeCoolerForSatellite
+  }
+  if (data.collectedAfterEvent !== undefined) {
+    row.collected_after_event = data.collectedAfterEvent
   }
   if (data.notes !== undefined) row.notes = data.notes
   return row

@@ -180,18 +180,19 @@ describe('de volledige Disposable-matrix', () => {
 
 // ─── GFT ──────────────────────────────────────────────────────────────────
 
-describe('de GFT-lijst', () => {
-  const MET_GFT = [
-    'kiosk-401',
-    'kiosk-403',
-    'kiosk-407',
-    'kiosk-410',
-    'kiosk-416',
-    'kiosk-419',
-    'kiosk-420',
-    'kiosk-423',
-  ]
+/** De acht locaties die de GFT-lijst noemt. */
+const MET_GFT = [
+  'kiosk-401',
+  'kiosk-403',
+  'kiosk-407',
+  'kiosk-410',
+  'kiosk-416',
+  'kiosk-419',
+  'kiosk-420',
+  'kiosk-423',
+]
 
+describe('de GFT-lijst', () => {
   it.each(MET_GFT)('%s heeft één GFT-bak', (kioskKey) => {
     expect(norm(kioskKey, 'gft-bak')).toBe(1)
   })
@@ -237,10 +238,37 @@ describe('de GFT-lijst', () => {
   })
 
   it('telt in hele bakken', () => {
-    // Een halve GFT-bak is geen aantal dat iemand kan aanwijzen.
+    // Een halve GFT-bak is geen aantal dat iemand kan aanwijzen. De norm blijft
+    // zichtbaar voor de vuller, ook al wordt er niet geteld.
     const product = demoProducts.find((p) => p.id === 'gft-bak')
     expect(product?.inputStep).toBe(InputStep.ONE)
     expect(product?.allowPartialPackage).toBe(false)
+  })
+
+  it('wordt na elk evenement opgehaald en staat dus niet op de tellijst', () => {
+    // De kiosk begint elke keer leeg; tellen zou altijd nul opleveren en
+    // ondertussen het afronden blokkeren bij een teller die niets kan vinden.
+    expect(demoProducts.find((p) => p.id === 'gft-bak')?.collectedAfterEvent).toBe(true)
+  })
+
+  it('is het enige product met dat kenmerk', () => {
+    // Het haalt een product van de tellijst af; dat hoort nergens per ongeluk
+    // aan te staan.
+    const met = demoProducts.filter((p) => p.collectedAfterEvent).map((p) => p.id)
+    expect(met).toEqual(['gft-bak'])
+  })
+
+  it('houdt zijn norm, want die is de vulopdracht', () => {
+    // Niet tellen betekent niet "geen norm": de norm ís precies wat er elke
+    // ronde gebracht moet worden.
+    for (const kioskKey of MET_GFT) {
+      expect(norm(kioskKey, 'gft-bak'), kioskKey).toBe(1)
+    }
+  })
+
+  it('heeft geen snelknoppen, want er wordt niet geteld', async () => {
+    const { QUICK_COUNT_CONFIG } = await import('@/lib/counting/quickCountConfig')
+    expect(QUICK_COUNT_CONFIG['GFT Bak']).toBeUndefined()
   })
 
   it('valt niet onder de satelliet-drankuitzondering', () => {

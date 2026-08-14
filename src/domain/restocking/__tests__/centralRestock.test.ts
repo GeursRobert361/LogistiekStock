@@ -260,3 +260,106 @@ describe('behoeften van een satelliet', () => {
     expect(result).toHaveLength(1)
   })
 })
+
+describe('wat na elk evenement wordt opgehaald', () => {
+  const GFT = [{ kioskId: 'kiosk-416', productId: 'gft-bak', packages: 1 }]
+
+  function metGft(params: {
+    status?: KioskCountStatus
+    regels?: CountEntry[]
+    bestaand?: Parameters<typeof buildRestockRequirements>[0]['existing']
+  } = {}) {
+    const kc = { ...kioskCount('kc-1', 'kiosk-416'), status: params.status ?? KioskCountStatus.COMPLETED }
+    return buildRestockRequirements({
+      eventId: 'event-1',
+      kioskCounts: [kc],
+      entriesByKioskCount: new Map([['kc-1', params.regels ?? []]]),
+      existing: params.bestaand,
+      alwaysRestockedStandards: GFT,
+    })
+  }
+
+  it('levert de hele norm zonder dat er iets geteld is', () => {
+    // De bak is opgehaald, dus de kiosk staat leeg. Er is geen telregel, en
+    // toch moet er één bak heen.
+    const result = metGft()
+
+    expect(result).toEqual([
+      {
+        eventId: 'event-1',
+        kioskId: 'kiosk-416',
+        productId: 'gft-bak',
+        requiredPackages: 1,
+        reservedPackages: 0,
+        deliveredPackages: 0,
+      },
+    ])
+  })
+
+  it('komt bovenop de gewone tekorten van dezelfde kiosk', () => {
+    const result = metGft({ regels: [entry('kc-1', 'tork-rol', 3)] })
+
+    expect(result.map((r) => [r.productId, r.requiredPackages])).toEqual([
+      ['gft-bak', 1],
+      ['tork-rol', 3],
+    ])
+  })
+
+  it('slaat een kiosk over die niet geteld is', () => {
+    // Een overgeslagen kiosk is niet bezocht; daar hoort geen vulopdracht bij.
+    expect(metGft({ status: KioskCountStatus.SKIPPED })).toEqual([])
+  })
+
+  it('doet niets bij een kiosk zonder zo\'n norm', () => {
+    const kc = kioskCount('kc-1', 'kiosk-417')
+    const result = buildRestockRequirements({
+      eventId: 'event-1',
+      kioskCounts: [kc],
+      entriesByKioskCount: new Map([['kc-1', []]]),
+      alwaysRestockedStandards: GFT,
+    })
+
+    expect(result).toEqual([])
+  })
+
+  it('houdt wat er al geleverd of gereserveerd is', () => {
+    // Opnieuw goedkeuren mag een al gebrachte bak niet vergeten.
+    const result = metGft({
+      bestaand: [
+        {
+          id: 'req-1',
+          eventId: 'event-1',
+          kioskId: 'kiosk-416',
+          productId: 'gft-bak',
+          requiredPackages: 1,
+          reservedPackages: 1,
+          deliveredPackages: 1,
+          createdAt: '',
+          updatedAt: '',
+        },
+      ],
+    })
+
+    expect(result[0]).toMatchObject({ reservedPackages: 1, deliveredPackages: 1 })
+  })
+
+  it('zet er geen tweede regel bij als er tóch een telling ligt', () => {
+    // Bijvoorbeeld een telling van vóór dit product van de tellijst ging: dan
+    // telt die en komt er geen dubbele opdracht.
+    const result = metGft({ regels: [entry('kc-1', 'gft-bak', 1)] })
+
+    expect(result).toHaveLength(1)
+  })
+
+  it('blijft weg zolang er niets is opgegeven', () => {
+    // Zonder zulke producten verandert er niets aan de oude werking.
+    const kc = kioskCount('kc-1', 'kiosk-416')
+    const result = buildRestockRequirements({
+      eventId: 'event-1',
+      kioskCounts: [kc],
+      entriesByKioskCount: new Map([['kc-1', [entry('kc-1', 'tork-rol', 3)]]]),
+    })
+
+    expect(result.map((r) => r.productId)).toEqual(['tork-rol'])
+  })
+})

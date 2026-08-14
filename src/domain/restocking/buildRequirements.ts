@@ -31,6 +31,22 @@ export interface BuildRequirementsInput {
    * generieke regel op het opslagtype.
    */
   localDrinkStockKioskIds?: ReadonlySet<string>
+  /**
+   * Normen die zonder telling volledig geleverd worden.
+   *
+   * Voor producten die na elk evenement worden opgehaald — de GFT-bakken. Die
+   * staan niet op de tellijst, dus er is geen telregel om een tekort uit af te
+   * leiden; de kiosk begint met niets en de behoefte is per definitie de hele
+   * norm.
+   *
+   * Alleen voor kiosken die werkelijk geteld zijn: een overgeslagen kiosk is
+   * niet bezocht en levert ook hier geen opdracht op.
+   */
+  alwaysRestockedStandards?: ReadonlyArray<{
+    kioskId: string
+    productId: string
+    packages: number
+  }>
 }
 
 /**
@@ -53,6 +69,7 @@ export function buildRestockRequirements(input: BuildRequirementsInput): Require
     kioskStorage,
     satelliteSuppliedProductIds,
     localDrinkStockKioskIds,
+    alwaysRestockedStandards = [],
   } = input
 
   const existingByKey = new Map(
@@ -100,6 +117,31 @@ export function buildRestockRequirements(input: BuildRequirementsInput): Require
         deliveredPackages: previous?.deliveredPackages ?? 0,
       })
     }
+  }
+
+  // Wat na elk evenement wordt opgehaald, gaat er elke ronde weer heen. Geen
+  // telling, geen tekortberekening: de kiosk staat leeg, dus de hele norm moet
+  // mee. Alleen bij de kiosken die deze ronde ook werkelijk geteld zijn.
+  const alDrafts = new Set(drafts.map((draft) => `${draft.kioskId}:${draft.productId}`))
+  for (const standard of alwaysRestockedStandards) {
+    if (!newestByKiosk.has(standard.kioskId)) continue
+    if (standard.packages <= 0) continue
+
+    const key = `${standard.kioskId}:${standard.productId}`
+    // Mocht er ooit tóch een telregel voor zijn — bijvoorbeeld uit een oudere
+    // telling van voordat dit product van de tellijst ging — dan telt die en
+    // komt er geen tweede regel bij.
+    if (alDrafts.has(key)) continue
+
+    const previous = existingByKey.get(key)
+    drafts.push({
+      eventId,
+      kioskId: standard.kioskId,
+      productId: standard.productId,
+      requiredPackages: standard.packages,
+      reservedPackages: previous?.reservedPackages ?? 0,
+      deliveredPackages: previous?.deliveredPackages ?? 0,
+    })
   }
 
   // Stabiele volgorde maakt het resultaat vergelijkbaar tussen twee runs.

@@ -278,15 +278,24 @@ test.describe('Assortiment per kiosk', () => {
     await expect(page.locator('#product-sixpacks')).toBeVisible()
   })
 
-  test('een GFT-bak staat alleen bij de kiosken die er een hebben', async ({ page }) => {
+  test('een GFT-bak staat op geen enkele tellijst', async ({ page }) => {
+    // 416 heeft wél een GFT-norm, maar de bak is na het vorige evenement
+    // opgehaald: er staat niets om te tellen. Hij hoort thuis op de vullijst.
     await startSecondRingCountAt(page, 'Kiosk 416', 'kiosk-416')
-    await expect(page.locator('#product-gft-bak')).toBeVisible()
-    await expect(page.locator('#product-gft-bak')).toContainText('bak')
+    await expect(page.locator('#product-gft-bak')).toHaveCount(0)
+
+    // De rest van de schoonmaak staat er gewoon.
+    await expect(page.locator('#product-tork-rol')).toBeVisible()
+    await expect(page.locator('#product-vuilniszakken')).toBeVisible()
   })
 
-  test('een kiosk zonder GFT telt hem niet', async ({ page }) => {
-    await startSecondRingCountAt(page, 'Kiosk 417', 'kiosk-417')
-    await expect(page.locator('#product-gft-bak')).toHaveCount(0)
+  test('een GFT-norm houdt het afronden niet tegen', async ({ page }) => {
+    // Zolang de bak op de tellijst zou staan, blijft de kiosk onafgerond bij
+    // een teller die hem niet kan vinden.
+    await startSecondRingCountAt(page, 'Kiosk 416', 'kiosk-416')
+    await fillAllCounts(page, '2')
+
+    await expect(page.getByRole('button', { name: /Kiosk afronden/ })).toBeEnabled()
   })
 })
 

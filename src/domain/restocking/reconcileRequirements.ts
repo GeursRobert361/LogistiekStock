@@ -30,6 +30,12 @@ export interface ReconcileRequirementsInput {
   kioskStorage?: Map<string, DrinkStorageType>
   satelliteSuppliedProductIds?: ReadonlySet<string>
   localDrinkStockKioskIds?: ReadonlySet<string>
+  /** Zie `buildRestockRequirements`: wat zonder telling volledig mee moet. */
+  alwaysRestockedStandards?: ReadonlyArray<{
+    kioskId: string
+    productId: string
+    packages: number
+  }>
 }
 
 export interface RequirementReconciliation {
@@ -68,6 +74,7 @@ export function reconcileRestockRequirements(
     kioskStorage,
     satelliteSuppliedProductIds,
     localDrinkStockKioskIds,
+    alwaysRestockedStandards,
   } = input
   const scope = new Set(scopeKioskIds)
 
@@ -79,6 +86,7 @@ export function reconcileRestockRequirements(
     kioskStorage,
     satelliteSuppliedProductIds,
     localDrinkStockKioskIds,
+    alwaysRestockedStandards,
   }).filter((draft) => scope.has(draft.kioskId))
 
   const desiredByKey = new Map(

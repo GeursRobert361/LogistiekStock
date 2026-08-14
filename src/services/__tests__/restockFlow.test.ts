@@ -120,6 +120,7 @@ function product(id: string, overrides: Partial<Product> = {}): Product {
     priority: 0,
     refrigerated: false,
     suppliedFromLargeCoolerForSatellite: false,
+    collectedAfterEvent: false,
     createdAt: '',
     updatedAt: '',
     ...overrides,
