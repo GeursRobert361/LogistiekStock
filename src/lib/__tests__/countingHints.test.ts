@@ -43,6 +43,17 @@ describe('de instructies zelf', () => {
     expect(regels).toMatch(/FIFO/)
   })
 
+  it('zeggen bij FIFO wat de vuller moet doen, niet wat het betekent', () => {
+    // "Het oudste pak eerst" klinkt duidelijk maar beschrijft de uitkomst, niet
+    // de handeling. Wie nieuwe voorraad bovenop legt draait de volgorde juist
+    // om; daarom staat er waar het pak heen moet.
+    const regels = countingHintFor('Post-mix')!.lines.join(' ')
+
+    expect(regels).toMatch(/bovenop/i)
+    expect(regels).toMatch(/voorkant/i)
+    expect(regels).toMatch(/eerst komende datum/i)
+  })
+
   it('zeggen hetzelfde als de regel bij de stamdata', () => {
     // De instructie op het scherm en de regel in de seedcode horen niet uit
     // elkaar te lopen; twee versies van dezelfde afspraak worden er vroeg of

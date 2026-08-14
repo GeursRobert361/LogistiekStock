@@ -1,4 +1,5 @@
 import { assortmentForKiosk } from './assortment'
+import { effectiveStandards } from './standardPolicies'
 import { secondRingStandards, authoritativeKioskKeys } from './secondRingStandards'
 import type {
   AgendaEntry,
@@ -315,6 +316,14 @@ function standard(
  *
  * Wat níet in de config staat krijgt dus geen norm bij die kiosk. Een leeg vak
  * op de lijst betekent "geen actieve norm", niet "norm 0".
+ *
+ * Hier bovenop komt `effectiveStandards`: een handvol afspraken die boven elke
+ * bron uit gaat — een vaste norm voor opschuimmelk, een ondergrens voor
+ * vuilniszakken, en koffie alleen waar een koeling staat. Dat gebeurt op deze
+ * ene plek, waar beide bronnen samenkomen, en niet in allebei apart — twee
+ * uitvoeringen van dezelfde regel worden er vroeg of laat twee die uit elkaar
+ * lopen. De bronnen zelf blijven daardoor zeggen wat er op papier stond; wat er
+ * werkelijk moet liggen staat hier.
  */
 const standardsByKioskKey = new Map(
   secondRingStandards.map((config) => [config.kioskKey, config.standards])
@@ -322,12 +331,11 @@ const standardsByKioskKey = new Map(
 
 export const demoStandards: KioskProductStandard[] = demoKiosks.flatMap((kiosk) => {
   const explicit = standardsByKioskKey.get(kiosk.id)
-  if (explicit) {
-    return Object.entries(explicit).map(([productId, target]) =>
-      standard(kiosk.id, productId, target)
-    )
-  }
-  return assortmentForKiosk(kiosk.number).map((item) =>
+  const bron = explicit
+    ? Object.entries(explicit).map(([productId, target]) => ({ productId, target }))
+    : assortmentForKiosk(kiosk.number)
+
+  return effectiveStandards(kiosk, bron).map((item) =>
     standard(kiosk.id, item.productId, item.target)
   )
 })

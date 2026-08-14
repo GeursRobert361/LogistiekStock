@@ -79,6 +79,15 @@ export function calculateRestockQuantity(
     // wijkt af; de 80%-regel hieronder blijft voor al het andere gelden.
     effectiveQU = countedQU - 2
     appliedFractionRule = FractionRule.HALF_DOWN
+  } else if (fractionStrategy === FractionStrategy.HALF_COUNTS_FULL) {
+    // .50 telt hier juist wél mee. Een aangebroken doosje opschuimmelk gaat
+    // gewoon door; pas onder de helft komt er een nieuw doosje bij.
+    //
+    // Dit kan niet via de 80%-drempel: die vergelijkt het aantal héle
+    // verpakkingen met de norm, en bij een norm van één is dat aantal nul, dus
+    // rondt hij altijd omlaag — ongeacht het percentage.
+    effectiveQU = countedQU + 2
+    appliedFractionRule = FractionRule.HALF_UP
   } else {
     // .50 → 80%-rule based on the whole-package count.
     //

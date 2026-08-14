@@ -17,8 +17,10 @@ import {
   EXPECTED_DISPOSABLE_MATRIX,
   EXPECTED_DRINK_MATRIX,
   EXPECTED_GFT,
+  EXPECTED_KOFFIE,
   EXPECTED_KOOLZUUR,
   EXPECTED_LOCAL_DRINK_STOCK,
+  EXPECTED_OPSCHUIMMELK,
   EXPECTED_POSTMIX_MATRIX,
   EXPECTED_STORAGE_TYPES,
   EXPECTED_VUILNISZAKKEN,
@@ -446,6 +448,8 @@ export async function verifySecondRing(client: SqlClient): Promise<string[]> {
   await checkMatrix(EXPECTED_DISPOSABLE_MATRIX, DISPOSABLE_PRODUCT_IDS)
   await checkMatrix(EXPECTED_GFT, ['gft-bak'])
   await checkMatrix(EXPECTED_VUILNISZAKKEN, ['vuilniszakken'])
+  await checkMatrix(EXPECTED_OPSCHUIMMELK, ['opschuimmelk'])
+  await checkMatrix(EXPECTED_KOFFIE, ['koffie'])
 
   // Koolzuur komt op de Post-mixlijst nergens voor en moet daar dus ook niet
   // door verdwijnen. Hetzelfde geldt voor de nieuwe Ziggo-lijst, die koolzuur

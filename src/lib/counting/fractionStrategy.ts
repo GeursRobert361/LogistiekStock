@@ -30,6 +30,9 @@ import { FractionStrategy } from '@/types/enums'
  */
 const STRATEGY_BY_PRODUCT_NAME: Record<string, FractionStrategy> = {
   Biertrays: FractionStrategy.BREAK_AT_THREE_QUARTER,
+  // De andere kant op: de norm is één doosje en een aangebroken doosje gaat
+  // gewoon door. Pas onder de helft komt er een nieuw doosje bij.
+  Opschuimmelk: FractionStrategy.HALF_COUNTS_FULL,
 }
 
 /** De afrondstrategie van dit product; standaard de algemene regel. */

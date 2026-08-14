@@ -8,8 +8,10 @@ import {
   EXPECTED_DISPOSABLE_MATRIX,
   EXPECTED_DRINK_MATRIX,
   EXPECTED_GFT,
+  EXPECTED_KOFFIE,
   EXPECTED_KOOLZUUR,
   EXPECTED_LOCAL_DRINK_STOCK,
+  EXPECTED_OPSCHUIMMELK,
   EXPECTED_POSTMIX_MATRIX,
   EXPECTED_STORAGE_TYPES,
   EXPECTED_VUILNISZAKKEN,
@@ -371,6 +373,34 @@ describe('verwachtingen voor de verificatie na afloop', () => {
         (s) => s.kioskId === kioskKey && s.productId === 'vuilniszakken'
       )
       expect(standard ? standard.targetQuantityQuarters / 4 : null, kioskKey).toBe(verwacht[0])
+    }
+  })
+
+  it('komt overeen met de opschuimmelk in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_OPSCHUIMMELK)) {
+      const standard = demoStandards.find(
+        (s) => s.kioskId === kioskKey && s.productId === 'opschuimmelk'
+      )
+      expect(standard ? standard.targetQuantityQuarters / 4 : null, kioskKey).toBe(verwacht[0])
+    }
+  })
+
+  it('komt overeen met de koffie in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_KOFFIE)) {
+      const standard = demoStandards.find(
+        (s) => s.kioskId === kioskKey && s.productId === 'koffie'
+      )
+      expect(standard ? standard.targetQuantityQuarters / 4 : null, kioskKey).toBe(verwacht[0])
+    }
+  })
+
+  it('controleert elke tweede-ringlocatie op koffie en opschuimmelk', () => {
+    // Allebei zijn het wijzigingen die normen wegnemen of verlagen; dan wil je
+    // niet dat er één locatie buiten de controle valt.
+    for (const key of authoritativeKioskKeys) {
+      expect(EXPECTED_KOFFIE[key], key).toBeDefined()
+      expect(EXPECTED_OPSCHUIMMELK[key], key).toBeDefined()
+      expect(EXPECTED_VUILNISZAKKEN[key], key).toBeDefined()
     }
   })
 

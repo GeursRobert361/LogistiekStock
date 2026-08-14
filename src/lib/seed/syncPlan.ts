@@ -403,12 +403,112 @@ export const EXPECTED_GFT: Record<string, Array<number | null>> = {
   'kiosk-ziggo-platform': [null],
 }
 
-/** Vuilniszakken: de Ziggo-lijst zet die daar op 3, elders blijft het 1. */
+/**
+ * Vuilniszakken: overal minstens drie rollen.
+ *
+ * Het papier zegt bij elke tweede-ringlocatie één rol, maar er geldt een
+ * ondergrens van drie — zie `minimumStandards.ts`. Ziggo Platform had er via
+ * zijn eigen stocklijst al drie en verandert dus niet.
+ *
+ * Alle locaties staan erin en niet een steekproef: dit is precies het soort
+ * wijziging dat op één kiosk kan blijven hangen.
+ */
 export const EXPECTED_VUILNISZAKKEN: Record<string, Array<number | null>> = {
+  'kiosk-401': [3],
+  'kiosk-402': [3],
+  'kiosk-403': [3],
+  'kiosk-404': [3],
+  'kiosk-406': [3],
+  'kiosk-406-nieuw': [3],
+  'kiosk-407': [3],
+  'kiosk-409': [3],
+  'kiosk-410': [3],
+  'kiosk-412': [3],
+  'kiosk-414': [3],
+  'kiosk-416': [3],
+  'kiosk-417': [3],
+  'kiosk-419': [3],
+  'kiosk-420': [3],
+  'kiosk-420-bar': [3],
+  'kiosk-422': [3],
+  'kiosk-423': [3],
+  'kiosk-424': [3],
+  'kiosk-426': [3],
+  'kiosk-427': [3],
+  'kiosk-429': [3],
   'kiosk-ziggo-platform': [3],
+}
+
+/**
+ * Opschuimmelk: overal één doosje, of helemaal niet.
+ *
+ * Een vaste norm en geen ondergrens — waar een lijst er twee zei wordt het er
+ * één. `null` voor de locaties die het niet voeren; die krijgen er geen doosje
+ * bij.
+ */
+export const EXPECTED_OPSCHUIMMELK: Record<string, Array<number | null>> = {
   'kiosk-401': [1],
-  'kiosk-420-bar': [1],
-  'kiosk-422': [1],
+  'kiosk-402': [1],
+  'kiosk-403': [1],
+  'kiosk-404': [1],
+  'kiosk-406': [1],
+  'kiosk-406-nieuw': [1],
+  'kiosk-407': [1],
+  'kiosk-409': [1],
+  'kiosk-410': [1],
+  'kiosk-412': [1],
+  'kiosk-414': [1],
+  'kiosk-416': [1],
+  'kiosk-417': [1],
+  'kiosk-419': [1],
+  'kiosk-420': [1],
+  'kiosk-423': [1],
+  'kiosk-424': [1],
+  'kiosk-426': [1],
+  'kiosk-427': [1],
+  'kiosk-429': [1],
+
+  // Voeren het niet en krijgen het er niet bij.
+  'kiosk-420-bar': [null],
+  'kiosk-422': [null],
+  'kiosk-ziggo-platform': [null],
+}
+
+/**
+ * Koffie: alleen waar een koeling staat.
+ *
+ * De negen grote koelingen van de tweede ring houden hun twee pakken. Overal
+ * anders hoort géén actieve norm te staan — ook waar de papieren lijst er wel
+ * een noemde, want koffie bederft op een plek zonder koeling.
+ *
+ * Juist de `null`-regels zijn hier het punt: dit is een wijziging die normen
+ * wegneemt, en die moet na de sync ook echt weg zijn.
+ */
+export const EXPECTED_KOFFIE: Record<string, Array<number | null>> = {
+  'kiosk-401': [2],
+  'kiosk-403': [2],
+  'kiosk-407': [2],
+  'kiosk-410': [2],
+  'kiosk-416': [2],
+  'kiosk-419': [2],
+  'kiosk-420': [2],
+  'kiosk-423': [2],
+  'kiosk-426': [2],
+
+  'kiosk-402': [null],
+  'kiosk-404': [null],
+  'kiosk-406': [null],
+  'kiosk-406-nieuw': [null],
+  'kiosk-409': [null],
+  'kiosk-412': [null],
+  'kiosk-414': [null],
+  'kiosk-417': [null],
+  'kiosk-420-bar': [null],
+  'kiosk-422': [null],
+  'kiosk-424': [null],
+  'kiosk-427': [null],
+  'kiosk-429': [null],
+  'kiosk-ziggo-platform': [null],
 }
 
 /**

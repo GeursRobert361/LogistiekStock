@@ -250,8 +250,23 @@ test.describe('Assortiment per kiosk', () => {
 
     await expect(page.locator('#product-bierbeker-05')).toBeVisible()
     await expect(page.locator('#product-chips-blauw')).toBeVisible()
-    await expect(page.locator('#product-koffie')).toBeVisible()
+    await expect(page.locator('#product-koffiebekers')).toBeVisible()
     await expect(page.locator('#product-tork-rol')).toBeVisible()
+  })
+
+  test('koffie staat alleen waar een koeling is', async ({ page }) => {
+    // Koffie hoort gekoeld te staan. 402 heeft geen koeling en telt hem dus
+    // niet meer, ook al noemde de papieren lijst hem daar wel.
+    await startSecondRingCountAt(page, 'Kiosk 402', 'kiosk-402')
+    await expect(page.locator('#product-koffie')).toHaveCount(0)
+    // De rest van de koffiehoek blijft er gewoon staan.
+    await expect(page.locator('#product-melk')).toBeVisible()
+    await expect(page.locator('#product-thee-earl-grey')).toBeVisible()
+  })
+
+  test('een kiosk met koeling telt koffie wel', async ({ page }) => {
+    await startSecondRingCountAt(page, 'Kiosk 416', 'kiosk-416')
+    await expect(page.locator('#product-koffie')).toBeVisible()
   })
 
   test('toont de eenheid waarin er werkelijk geteld wordt', async ({ page }) => {

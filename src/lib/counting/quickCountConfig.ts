@@ -96,7 +96,9 @@ export const QUICK_COUNT_CONFIG: Record<string, QuickCountConfig> = {
   Roerstaafjes: INTEGER(5),
   'Thee Earl Grey': INTEGER(5),
   'Thee Lemon': INTEGER(5),
-  Opschuimmelk: INTEGER(5),
+  // Norm is één doosje, en een half doosje is hier een echt aantal: pas onder
+  // de helft komt er een nieuw doosje bij. Vandaar de halve-knop.
+  Opschuimmelk: HALF(3),
   Latiz: INTEGER(5),
   'Lavazza Cupjes': INTEGER(5),
   'Lavazza Bekers': INTEGER(5),

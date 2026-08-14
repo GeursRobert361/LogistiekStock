@@ -161,7 +161,9 @@ describe('de volledige Disposable-matrix', () => {
     expect(norm('kiosk-401', 'chips-blauw')).toBe(6)
     expect(norm('kiosk-401', 'koffie')).toBe(2)
     expect(norm('kiosk-401', 'tork-rol')).toBe(6)
-    expect(norm('kiosk-401', 'vuilniszakken')).toBe(1)
+    // Drie en niet één: de Disposable-lijst laat vuilniszakken met rust, maar
+    // er geldt een afgesproken ondergrens. Zie minimumStandards.
+    expect(norm('kiosk-401', 'vuilniszakken')).toBe(3)
     expect(norm('kiosk-401', 'chaudfontaine-blauw')).toBe(25)
     expect(norm('kiosk-401', 'bierbeker-05')).toBe(5)
     expect(norm('kiosk-401', 'ketchup-flessen')).toBe(15)

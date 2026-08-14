@@ -32,8 +32,8 @@ export const countingHints: readonly CountingHint[] = [
     lines: [
       'Tel alleen de reservepakken buiten het rek.',
       'Vervang eerst de lege pakken.',
-      'Pak onder de 25%? Behandel het als leeg en vervang het eerst.',
-      'Vul altijd FIFO: het oudste pak eerst.',
+      'Pak onder de 25%? Behandel het als leeg.',
+      'Vul altijd FIFO: eerst komende datum bovenop en aan de voorkant.',
     ],
   },
 ]

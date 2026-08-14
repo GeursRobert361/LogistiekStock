@@ -109,7 +109,6 @@ describe('welke producten meedoen', () => {
       'roerstaafjes',
       'thee-earl-grey',
       'thee-lemon',
-      'opschuimmelk',
       'latiz',
       'lavazza-cupjes',
       'lavazza-bekers',
@@ -132,6 +131,9 @@ describe('welke producten meedoen', () => {
     for (const id of ['servetten', 'tork-rol']) {
       expect(getQuickCountConfig(naam(id)), id).toEqual({ mode: 'INTEGER', max: 6 })
     }
+    // Opschuimmelk telt per half doosje sinds de norm overal één is: pas onder
+    // de helft komt er een nieuw doosje bij, dus die helft moet in te voeren zijn.
+    expect(getQuickCountConfig(naam('opschuimmelk'))).toEqual({ mode: 'HALF', max: 3 })
     expect(getQuickCountConfig(naam('koffiebekers'))).toEqual({ mode: 'INTEGER', max: 8 })
   })
 

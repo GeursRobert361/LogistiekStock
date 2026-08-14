@@ -141,6 +141,17 @@ export enum FractionStrategy {
    * met lege handen.
    */
   BREAK_AT_THREE_QUARTER = 'BREAK_AT_THREE_QUARTER',
+  /**
+   * Aangebroken telt als vol: .25 omlaag, .50 en .75 omhoog.
+   *
+   * Het spiegelbeeld van hierboven, voor voorraad waar een aangebroken
+   * verpakking gewoon meegaat en niet vervangen hoeft te worden. Opschuimmelk
+   * met een norm van één doosje: pas onder de helft komt er een nieuw doosje
+   * bij. Onder de algemene 80%-regel zou een half doosje bij norm 1 altijd
+   * omlaag afronden — nul hele verpakkingen haalt die drempel nooit — en dan
+   * krijgt elke kiosk elke ronde een doosje dat hij niet nodig heeft.
+   */
+  HALF_COUNTS_FULL = 'HALF_COUNTS_FULL',
 }
 
 export enum SyncStatus {

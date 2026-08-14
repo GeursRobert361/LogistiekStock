@@ -497,10 +497,12 @@ export const POSTMIX_PACKAGE_PRODUCT_IDS = [
  * De procedure van de bron, in volgorde:
  *
  *   1. Vervang eerst de lege pakken.
- *   2. Staat een aangesloten pak onder de 25%, behandel het dan als leeg en
- *      vervang het ook — vóór er geteld wordt.
+ *   2. Staat een aangesloten pak onder de 25%, behandel het dan als leeg.
  *   3. Tel daarna pas de reservepakken.
- *   4. Vullen gaat altijd FIFO: het oudste pak eerst.
+ *   4. Vullen gaat altijd FIFO, en dat is hier een handeling en geen boekhouding:
+ *      het pak met de eerst komende datum gaat bovenop en aan de voorkant. Wie
+ *      alleen "het oudste eerst" leest legt de nieuwe voorraad er bovenop en
+ *      krijgt precies de omgekeerde volgorde.
  *
  * Die 25% gaat over het pak aan de tap en over niets anders. Hij verandert de
  * invoer in de app niet: Post-mix wordt in hele pakken geteld

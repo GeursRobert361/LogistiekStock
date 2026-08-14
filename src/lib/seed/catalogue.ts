@@ -247,7 +247,13 @@ export const demoProducts: Product[] = [
   product('mars', CAT_SNOEP_ID, 'Mars', 'Mars', 'reep', 'dozen', 53, SMALL),
 
   // ── Koffie en thee ─────────────────────────────────────────────────────
-  product('koffie', CAT_KOFFIE_ID, 'Koffie', 'Koffie', 'pak', 'pakken', 60, SMALL),
+  // Koffie hoort gekoeld te staan en kan dus alleen bij een telpunt met een
+  // koeling. Welke telpunten dat zijn staat in `standardPolicies.ts`; die haalt
+  // koffie weg bij de rest, ook waar een oudere lijst hem nog noemt.
+  product('koffie', CAT_KOFFIE_ID, 'Koffie', 'Koffie', 'pak', 'pakken', 60, {
+    ...SMALL,
+    refrigerated: true,
+  }),
   product('cacao-zak', CAT_KOFFIE_ID, 'Cacao Zak', 'Cacao', 'zak', 'zakken', 61, SMALL),
   product('melk', CAT_KOFFIE_ID, 'Melk', 'Melk', 'pak', 'pakken', 62, { ...SMALL, refrigerated: true }),
   product('suiker', CAT_KOFFIE_ID, 'Suiker', 'Suiker', 'doos', 'dozen', 63, SMALL),
@@ -257,8 +263,13 @@ export const demoProducts: Product[] = [
   }),
   product('thee-earl-grey', CAT_KOFFIE_ID, 'Thee Earl Grey', 'Earl Grey', 'doos', 'dozen', 66, SMALL),
   product('thee-lemon', CAT_KOFFIE_ID, 'Thee Lemon', 'Thee Lemon', 'doos', 'dozen', 67, SMALL),
-  product('opschuimmelk', CAT_KOFFIE_ID, 'Opschuimmelk', 'Opschuimmelk', 'pak', 'pakken', 68, {
+  // Eén doosje is de norm, overal. Een aangebroken doosje gaat gewoon door en
+  // hoeft niet vervangen te worden; pas onder de helft komt er een nieuw doosje
+  // bij. Vandaar halve stappen — anders is "een half doosje" niet in te voeren —
+  // en `FractionStrategy.HALF_COUNTS_FULL`, zodat die helft ook als vol telt.
+  product('opschuimmelk', CAT_KOFFIE_ID, 'Opschuimmelk', 'Opschuimmelk', 'doosje', 'doosjes', 68, {
     ...SMALL,
+    ...HALF_STEP,
     refrigerated: true,
   }),
   product('latiz', CAT_KOFFIE_ID, 'Latiz', 'Latiz', 'pak', 'pakken', 69, SMALL),

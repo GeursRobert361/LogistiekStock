@@ -548,9 +548,14 @@ describe('een kiosk zonder drank raakt niet leeg', () => {
   it('laat 402 zijn overige voorraad houden', () => {
     expect(norm('kiosk-402', 'bierbeker-05')).toBe(1)
     expect(norm('kiosk-402', 'chips-blauw')).toBe(2)
-    expect(norm('kiosk-402', 'koffie')).toBe(2)
     expect(norm('kiosk-402', 'tork-rol')).toBe(6)
-    expect(norm('kiosk-402', 'vuilniszakken')).toBe(1)
+    // Papier zei één rol; de ondergrens maakt er drie van.
+    expect(norm('kiosk-402', 'vuilniszakken')).toBe(3)
+    // De rest van de koffiehoek blijft; alleen koffie zelf is weg, want die
+    // hoort gekoeld en hier staat geen koeling.
+    expect(norm('kiosk-402', 'koffiebekers')).toBe(8)
+    expect(norm('kiosk-402', 'thee-earl-grey')).toBe(2)
+    expect(norm('kiosk-402', 'koffie')).toBeUndefined()
   })
 
   it('laat 404 zijn Post-mix houden', () => {
@@ -733,12 +738,17 @@ describe('er is nog maar één bron voor de echte normen', () => {
     const richtaantallen = assortmentForKiosk(405)
     expect(richtaantallen.length).toBeGreaterThan(0)
 
+    // Eén regel minder: 405 heeft geen koeling en voert dus geen koffie. De
+    // afspraken uit standardPolicies gaan ook over de afgeleide normen.
     const uitStamdata = demoStandards.filter((s) => s.kioskId === 'kiosk-405')
-    expect(uitStamdata).toHaveLength(richtaantallen.length)
+    expect(uitStamdata).toHaveLength(richtaantallen.length - 1)
+    expect(richtaantallen.some((item) => item.productId === 'koffie')).toBe(true)
+    expect(uitStamdata.some((s) => s.productId === 'koffie')).toBe(false)
   })
 
   it('laat de eerste ring ongewijzigd', async () => {
     const { assortmentForKiosk } = await import('../assortment')
+    // 110 voert sowieso geen koffie, dus hier verandert er niets aan het aantal.
     const kiosk110 = assortmentForKiosk(110)
     const uitStamdata = demoStandards.filter((s) => s.kioskId === 'kiosk-110')
     expect(uitStamdata).toHaveLength(kiosk110.length)
