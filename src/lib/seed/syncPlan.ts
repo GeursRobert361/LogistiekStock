@@ -16,12 +16,15 @@ export interface DesiredKiosk {
   number: number
   label?: string
   drinkStorageType: DrinkStorageType
+  /** Houdt dit telpunt eigen drankvoorraad ondanks zijn opslagtype? */
+  keepsOwnDrinkStock: boolean
 }
 
 export interface CurrentKiosk {
   number: number
   label: string | null
   drinkStorageType: DrinkStorageType
+  keepsOwnDrinkStock: boolean
 }
 
 export interface DesiredStandard {
@@ -88,6 +91,12 @@ export function planKioskChanges(
     }
     if (existing.drinkStorageType !== kiosk.drinkStorageType) {
       details.push(`drankopslag ${existing.drinkStorageType} → ${kiosk.drinkStorageType}`)
+    }
+    if (existing.keepsOwnDrinkStock !== kiosk.keepsOwnDrinkStock) {
+      details.push(
+        `eigen drankvoorraad ${existing.keepsOwnDrinkStock ? 'ja' : 'nee'} → ` +
+          `${kiosk.keepsOwnDrinkStock ? 'ja' : 'nee'}`
+      )
     }
 
     if (details.length > 0) {
@@ -167,8 +176,45 @@ export function buildSyncPlan(params: {
   return { kiosks, standards, isEmpty: kiosks.length === 0 && standards.length === 0 }
 }
 
+/**
+ * Telpunten die géén enkele normale dranknorm horen te hebben.
+ *
+ * Tien keer `null` in de matrix hieronder: geen koeling, dus geen voorraad, dus
+ * geen norm. Dit is een uitkomst om te controleren en niet om over te slaan —
+ * het is precies het geval dat eerder mis was, met bij elke satelliet elk
+ * drankproduct op norm 1.
+ */
+const GEEN_DRANKNORMEN: Array<number | null> = [
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+  null,
+]
+
+const ZONDER_DRANKVOORRAAD = [
+  'kiosk-402',
+  'kiosk-404',
+  'kiosk-406',
+  'kiosk-406-nieuw',
+  'kiosk-409',
+  'kiosk-412',
+  'kiosk-414',
+  'kiosk-417',
+  'kiosk-420-bar',
+  'kiosk-422',
+  'kiosk-424',
+  'kiosk-427',
+  'kiosk-429',
+]
+
 /** De verwachte dranknormen na de sync, om achteraf te controleren. */
-export const EXPECTED_DRINK_MATRIX: Record<string, number[]> = {
+export const EXPECTED_DRINK_MATRIX: Record<string, Array<number | null>> = {
   'kiosk-401': [25, 6, 25, 12, 8, 30, 10, 6, 8, 30],
   'kiosk-403': [25, 6, 15, 10, 8, 20, 10, 6, 8, 25],
   'kiosk-407': [20, 6, 21, 7, 7, 29, 10, 8, 8, 15],
@@ -179,6 +225,14 @@ export const EXPECTED_DRINK_MATRIX: Record<string, number[]> = {
   'kiosk-420': [25, 8, 25, 15, 10, 25, 12, 8, 10, 20],
   'kiosk-423': [20, 6, 20, 15, 8, 15, 9, 6, 9, 25],
   'kiosk-426': [25, 6, 28, 15, 10, 15, 10, 8, 8, 30],
+
+  // Geen grote koeling, maar wél een eigen stocklijst met echte aantallen. De
+  // enige locatie met `keeps_own_drink_stock`; deze tien normen moeten na de
+  // sync actief staan én bij een tekort in de vulplanning kunnen komen.
+  'kiosk-ziggo-platform': [1, 2, 2, 1, 1, 2, 1, 1, 1, 2],
+
+  // Alle overige tweede-ringlocaties: nul dranknormen.
+  ...Object.fromEntries(ZONDER_DRANKVOORRAAD.map((key) => [key, GEEN_DRANKNORMEN])),
 }
 
 /**
@@ -189,8 +243,9 @@ export const EXPECTED_DRINK_MATRIX: Record<string, number[]> = {
  * beker die na de sync nog actief op nul staat is precies het geval dat de
  * handmatige lijst wilde uitsluiten.
  *
- * 422 en Ziggo Platform staan niet op de bekerlijst en worden hier dus ook niet
- * gecontroleerd.
+ * 422 staat niet op de bekerlijst en wordt hier dus ook niet gecontroleerd.
+ * Ziggo Platform stond er eerder ook niet op, maar heeft inmiddels een eigen
+ * lijst die alle drie de formaten op 1 doos zet.
  */
 export const EXPECTED_CUP_MATRIX: Record<string, Array<number | null>> = {
   'kiosk-401': [5, 4, 2],
@@ -214,13 +269,15 @@ export const EXPECTED_CUP_MATRIX: Record<string, Array<number | null>> = {
   'kiosk-426': [5, 4, 2],
   'kiosk-427': [3, 3, null],
   'kiosk-429': [3, 3, null],
+  // Uit de specifieke Ziggo-lijst: "1x heineken small / medium / large".
+  'kiosk-ziggo-platform': [1, 1, 1],
 }
 
 /**
  * De verwachte chipsnormen na de sync, in de volgorde Blauw / Rood / Oranje.
  *
- * 422 en Ziggo Platform staan niet op de chipslijst en worden hier dus ook niet
- * gecontroleerd.
+ * 422 staat niet op de chipslijst en wordt hier dus ook niet gecontroleerd. De
+ * Ziggo-waarden komen uit de specifieke Ziggo-lijst, niet uit de chipslijst.
  */
 export const EXPECTED_CHIP_MATRIX: Record<string, number[]> = {
   'kiosk-401': [6, 6, 6],
@@ -245,6 +302,7 @@ export const EXPECTED_CHIP_MATRIX: Record<string, number[]> = {
   'kiosk-426': [6, 6, 6],
   'kiosk-427': [3, 3, 3],
   'kiosk-429': [3, 3, 3],
+  'kiosk-ziggo-platform': [2, 2, 2],
 }
 
 /**
@@ -268,6 +326,89 @@ export const EXPECTED_POSTMIX_MATRIX: Record<string, Array<number | null>> = {
   'kiosk-420': [4, 8, 4, 4, null],
   'kiosk-420-bar': [4, 6, 3, 3, null],
   'kiosk-426': [4, 8, 4, 4, null],
+  // Uit de specifieke Ziggo-lijst; overschrijft de papieren 2/2/2/2.
+  'kiosk-ziggo-platform': [10, 10, 6, 6, null],
+}
+
+/**
+ * De verwachte normen van de Disposable-lijst, in de kolomvolgorde van de bron:
+ * Rectangular / Square / Patat / Servetten / Biertrays / Patat vorkjes /
+ * Arena blaadjes.
+ *
+ * `null` betekent "hoort géén actieve norm te hebben" — dat is wat een 0 op die
+ * lijst wil zeggen. Juist die regels wil je hier controleren: een norm die na
+ * de sync nog actief op nul staat is precies wat de 0 moest uitsluiten.
+ *
+ * Ziggo Biertrays staat hier op 1 en niet op 3: de specifieke Ziggo-lijst wint
+ * van de algemene Disposable-lijst. 422 staat niet op de lijst en wordt hier
+ * dus ook niet gecontroleerd.
+ */
+export const EXPECTED_DISPOSABLE_MATRIX: Record<string, Array<number | null>> = {
+  'kiosk-401': [2, null, null, 5, 3, null, 1],
+  'kiosk-402': [null, null, null, null, 1, null, null],
+  'kiosk-403': [null, 2, 3, 5, 3, 1, null],
+  'kiosk-404': [2, null, null, 5, 3, 1, 1],
+  'kiosk-406': [2, null, null, 5, 3, null, 1],
+  'kiosk-406-nieuw': [2, 2, null, 5, 3, null, 1],
+  'kiosk-407': [null, 2, 3, 5, 3, 1, 1],
+  'kiosk-409': [null, null, null, null, 1, null, null],
+  'kiosk-410': [3, null, null, 5, 3, 1, 1],
+  'kiosk-412': [2, 2, null, 5, 3, null, null],
+  'kiosk-414': [2, 2, null, 5, 3, null, null],
+  'kiosk-416': [3, null, null, 5, 3, null, 1],
+  'kiosk-417': [2, null, null, 5, 3, null, 1],
+  'kiosk-419': [null, 2, 2, 5, 3, 1, 1],
+  'kiosk-420': [3, 3, 1, 5, 3, null, 1],
+  'kiosk-420-bar': [null, null, null, null, 4, null, null],
+  'kiosk-423': [null, 2, 3, 5, 3, 1, null],
+  'kiosk-424': [null, null, null, null, 1, null, null],
+  'kiosk-426': [2, null, null, 5, 3, null, 1],
+  'kiosk-427': [2, 2, null, 5, 3, null, null],
+  'kiosk-429': [2, 2, null, 5, 3, null, null],
+  'kiosk-ziggo-platform': [null, null, null, null, 1, null, null],
+}
+
+/**
+ * De verwachte GFT-normen: één bak bij de acht locaties die de GFT-lijst noemt,
+ * en nergens anders.
+ *
+ * De `null`-regels staan er net zo hard in als de enen. Een GFT-bak die er niet
+ * staat maar wel geteld moet worden levert elke ronde een tekort van één op dat
+ * niemand kan oplossen.
+ */
+export const EXPECTED_GFT: Record<string, Array<number | null>> = {
+  'kiosk-401': [1],
+  'kiosk-403': [1],
+  'kiosk-407': [1],
+  'kiosk-410': [1],
+  'kiosk-416': [1],
+  'kiosk-419': [1],
+  'kiosk-420': [1],
+  'kiosk-423': [1],
+
+  'kiosk-402': [null],
+  'kiosk-404': [null],
+  'kiosk-406': [null],
+  'kiosk-406-nieuw': [null],
+  'kiosk-409': [null],
+  'kiosk-412': [null],
+  'kiosk-414': [null],
+  'kiosk-417': [null],
+  'kiosk-420-bar': [null],
+  'kiosk-422': [null],
+  'kiosk-424': [null],
+  'kiosk-426': [null],
+  'kiosk-427': [null],
+  'kiosk-429': [null],
+  'kiosk-ziggo-platform': [null],
+}
+
+/** Vuilniszakken: de Ziggo-lijst zet die daar op 3, elders blijft het 1. */
+export const EXPECTED_VUILNISZAKKEN: Record<string, Array<number | null>> = {
+  'kiosk-ziggo-platform': [3],
+  'kiosk-401': [1],
+  'kiosk-420-bar': [1],
+  'kiosk-422': [1],
 }
 
 /**
@@ -315,4 +456,38 @@ export const EXPECTED_STORAGE_TYPES: Record<string, DrinkStorageType> = {
   'kiosk-ziggo-platform': DrinkStorageType.SATELLITE,
   'kiosk-420-bar': DrinkStorageType.SMALL_BAR,
   'kiosk-422': DrinkStorageType.NONE,
+}
+
+/**
+ * Welke telpunten na de sync een eigen drankvoorraad hebben.
+ *
+ * Precies één, en de rest staat er nadrukkelijk met `false` bij: dit kenmerk
+ * schakelt de bescherming uit die voorkomt dat satellietdrank in de centrale
+ * bijvullijst belandt. Waar het per ongeluk aan staat, krijgt het magazijn werk
+ * dat niemand uitvoert.
+ */
+export const EXPECTED_LOCAL_DRINK_STOCK: Record<string, boolean> = {
+  'kiosk-ziggo-platform': true,
+  'kiosk-401': false,
+  'kiosk-402': false,
+  'kiosk-403': false,
+  'kiosk-404': false,
+  'kiosk-406': false,
+  'kiosk-406-nieuw': false,
+  'kiosk-407': false,
+  'kiosk-409': false,
+  'kiosk-410': false,
+  'kiosk-412': false,
+  'kiosk-414': false,
+  'kiosk-416': false,
+  'kiosk-417': false,
+  'kiosk-419': false,
+  'kiosk-420': false,
+  'kiosk-420-bar': false,
+  'kiosk-422': false,
+  'kiosk-423': false,
+  'kiosk-424': false,
+  'kiosk-426': false,
+  'kiosk-427': false,
+  'kiosk-429': false,
 }

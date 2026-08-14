@@ -7,9 +7,11 @@ import {
   paperStandardsFor,
   latestOverridesFor,
   countsChilledDrinks,
+  LOCAL_DRINK_STOCK_KIOSK_KEYS,
   PAPER_DRINK_PRODUCT_IDS,
   CUP_PRODUCT_IDS,
   CHIP_PRODUCT_IDS,
+  DISPOSABLE_PRODUCT_IDS,
   POSTMIX_PACKAGE_PRODUCT_IDS,
   POSTMIX_COUNTING_RULE,
 } from '../secondRingStandards'
@@ -150,19 +152,19 @@ describe('bronprioriteit', () => {
   })
 
   it('laat een override de rest van de lijst met rust', () => {
-    // De handmatige lijsten noemen voor 412 de bekers en de chips. De
-    // koffiehoek, de verpakkingen en de sauzen van diezelfde kiosk komen van
+    // De handmatige lijsten noemen voor 412 de bekers, de chips en de
+    // disposables. De koffiehoek en de sauzen van diezelfde kiosk komen van
     // papier en blijven staan.
     expect(norm('kiosk-412', 'ketchup-flessen')).toBe(15)
     expect(norm('kiosk-412', 'koffiebekers')).toBe(8)
-    expect(norm('kiosk-412', 'square-bakjes')).toBe(3)
+    expect(norm('kiosk-412', 'mayo-flessen')).toBe(15)
   })
 
-  it('raakt producten buiten de vier handmatige lijsten niet aan', () => {
-    // 419 staat op drie lijsten — drank, bekers en chips — maar voert geen
-    // Post-mix, en de verpakkingen en sauzen komen onveranderd van papier.
-    expect(norm('kiosk-419', 'patat-bakjes')).toBe(3)
+  it('raakt producten buiten de handmatige lijsten niet aan', () => {
+    // 419 staat op vier lijsten — drank, bekers, chips en disposables — maar
+    // voert geen Post-mix, en de sauzen komen onveranderd van papier.
     expect(norm('kiosk-419', 'mayo-emmers')).toBe(5)
+    expect(norm('kiosk-419', 'ketchup-flessen')).toBe(15)
     expect(norm('kiosk-419', 'cola')).toBeUndefined()
   })
 })
@@ -237,11 +239,17 @@ describe('definitieve bekermatrix', () => {
     expect(norm('kiosk-426', 'bierbeker-05')).toBe(5)
   })
 
-  it('laat 422 en Ziggo Platform zoals ze waren', () => {
-    // Die staan niet op de nieuwe bekerlijst; er valt dus niets over te zeggen
+  it('laat 422 zoals het was', () => {
+    // 422 staat niet op de nieuwe bekerlijst; er valt dus niets over te zeggen
     // en dan verzinnen we ook niets.
     expect(cupsOf('kiosk-422')).toEqual([undefined, undefined, undefined])
-    expect(cupsOf('kiosk-ziggo-platform')).toEqual([1, 1, undefined])
+  })
+
+  it('geeft Ziggo Platform alle drie de formaten uit zijn eigen lijst', () => {
+    // Papier kende hier alleen 0,5 en 0,4. De specifieke Ziggo-lijst zegt
+    // "1x heineken small / medium / large", dus alle drie op één doos.
+    expect(cupsOf('kiosk-ziggo-platform')).toEqual([1, 1, 1])
+    expect(paperStandardsFor('kiosk-ziggo-platform')['bierbeker-03']).toBeUndefined()
   })
 })
 
@@ -357,11 +365,16 @@ describe('definitieve Post-mixmatrix', () => {
   })
 
   it('laat kiosken buiten de lijst hun bestaande Post-mix houden', () => {
-    // Ziggo Platform staat niet op de nieuwe lijst en houdt dus zijn papieren
-    // normen — ook al voert het Post-mix.
-    expect(postmixOf('kiosk-ziggo-platform')).toEqual([2, 2, 2, 2, undefined])
     // 419 voerde geen Post-mix en krijgt hem er niet bij.
     expect(postmixOf('kiosk-419')).toEqual([undefined, undefined, undefined, undefined, undefined])
+  })
+
+  it('volgt bij Ziggo Platform de nieuwste eigen lijst', () => {
+    // Papier zei 2/2/2/2; de specifieke Ziggo-lijst zegt 10/10/6/6.
+    expect(postmixOf('kiosk-ziggo-platform')).toEqual([10, 10, 6, 6, undefined])
+
+    const papier = paperStandardsFor('kiosk-ziggo-platform')
+    expect([papier.cola, papier['cola-zero'], papier.fanta, papier.sprite]).toEqual([2, 2, 2, 2])
   })
 
   it('telt Post-mix in hele pakken', () => {
@@ -427,7 +440,11 @@ describe('alleen een grote koeling telt drank', () => {
 
   it.each(
     secondRingStandards
-      .filter((config) => config.drinkStorageType !== DrinkStorageType.LARGE_COOLER)
+      .filter(
+        (config) =>
+          config.drinkStorageType !== DrinkStorageType.LARGE_COOLER &&
+          !LOCAL_DRINK_STOCK_KIOSK_KEYS.has(config.kioskKey)
+      )
       .map((config) => [config.kioskKey, config.drinkStorageType] as const)
   )('%s (%s) voert geen enkel drankproduct', (kioskKey) => {
     // Een norm hoort te zeggen hoeveel er moet liggen. Zonder koeling ligt er
@@ -437,6 +454,24 @@ describe('alleen een grote koeling telt drank', () => {
       .map((s) => s.productId)
 
     expect(drank).toEqual([])
+  })
+
+  it('kent precies één uitzondering, en die staat als zodanig vastgelegd', () => {
+    // De uitzondering hoort uit de lijst te komen en niet uit de data: een
+    // locatie die stilletjes dranknormen krijgt zonder in deze set te staan is
+    // een fout, geen nieuwe regel.
+    expect([...LOCAL_DRINK_STOCK_KIOSK_KEYS]).toEqual(['kiosk-ziggo-platform'])
+
+    const metDrank = secondRingStandards
+      .filter((config) => config.drinkStorageType !== DrinkStorageType.LARGE_COOLER)
+      .filter((config) =>
+        demoStandards.some(
+          (s) => s.kioskId === config.kioskKey && drankProductIds.has(s.productId)
+        )
+      )
+      .map((config) => config.kioskKey)
+
+    expect(metDrank).toEqual([...LOCAL_DRINK_STOCK_KIOSK_KEYS])
   })
 
   it('laat 402 helemaal geen drank meer zien', () => {
@@ -452,10 +487,39 @@ describe('alleen een grote koeling telt drank', () => {
     }
   })
 
-  it('laat Ziggo Platform geen drank meer zien, ook geen Caprisun', () => {
-    for (const productId of ['chaudfontaine-blauw', 'fuze-tea', 'caprisun']) {
-      expect(norm('kiosk-ziggo-platform', productId), productId).toBeUndefined()
-    }
+  it('laat Ziggo Platform wél drank zien, want daar is een eigen lijst voor', () => {
+    // De uitzondering. Dit zijn echte aantallen uit een aangeleverde
+    // stocklijst, geen assortimentsindicatie van 1 zoals de twaalf satellieten
+    // die hadden.
+    expect(norm('kiosk-ziggo-platform', 'chaudfontaine-blauw')).toBe(1)
+    expect(norm('kiosk-ziggo-platform', 'fuze-tea')).toBe(2)
+
+    // Caprisun staat niet op die lijst en krijgt dus geen norm terug.
+    expect(norm('kiosk-ziggo-platform', 'caprisun')).toBeUndefined()
+  })
+
+  it('houdt de uitzondering bij Ziggo en trekt hem niet naar de buren', () => {
+    // Zonder deze grens zou de nieuwe uitzondering de eerdere correctie stil
+    // terugdraaien bij twaalf locaties.
+    expect(norm('kiosk-402', 'fuze-tea')).toBeUndefined()
+    expect(norm('kiosk-404', 'chaudfontaine-blauw')).toBeUndefined()
+    expect(norm('kiosk-420-bar', 'redbull')).toBeUndefined()
+
+    expect(norm('kiosk-ziggo-platform', 'fuze-tea')).toBe(2)
+    expect(norm('kiosk-ziggo-platform', 'redbull')).toBe(1)
+  })
+
+  it('lost de uitzondering niet op met een verzonnen opslagtype', () => {
+    // Er staat bij Ziggo geen grote koeling. Dat opslagtype stuurt ook de
+    // indeling van de drankronde; hem laten liegen zou dáár weer misgaan.
+    const config = secondRingStandards.find((c) => c.kioskKey === 'kiosk-ziggo-platform')
+    expect(config?.drinkStorageType).toBe(DrinkStorageType.SATELLITE)
+    expect(config?.keepsOwnDrinkStock).toBe(true)
+
+    expect(countsChilledDrinks(DrinkStorageType.SATELLITE)).toBe(false)
+    expect(
+      countsChilledDrinks(DrinkStorageType.SATELLITE, { hasExplicitLocalStock: true })
+    ).toBe(true)
   })
 
   it('houdt de negen grote koelingen ongewijzigd', () => {
@@ -510,13 +574,16 @@ describe('een kiosk zonder drank raakt niet leeg', () => {
     expect(norm('kiosk-420-bar', 'chips-blauw')).toBe(10)
     expect(norm('kiosk-420-bar', 'cola')).toBe(4)
     expect(norm('kiosk-420-bar', 'koolzuur')).toBe(2)
-    expect(norm('kiosk-420-bar', 'sixpacks')).toBe(3)
+    // De Disposable-lijst zet de biertrays hier van 3 naar 4.
+    expect(norm('kiosk-420-bar', 'sixpacks')).toBe(4)
   })
 
   it('laat Ziggo Platform zijn overige voorraad houden', () => {
     expect(norm('kiosk-ziggo-platform', 'bierbeker-05')).toBe(1)
     expect(norm('kiosk-ziggo-platform', 'chips-blauw')).toBe(2)
-    expect(norm('kiosk-ziggo-platform', 'cola')).toBe(2)
+    expect(norm('kiosk-ziggo-platform', 'cola')).toBe(10)
+    // Niet op de nieuwe Ziggo-lijst, dus onveranderd van papier.
+    expect(norm('kiosk-ziggo-platform', 'tork-rol')).toBe(6)
   })
 })
 
@@ -618,15 +685,19 @@ describe('de nieuwste handmatige lijst', () => {
     expect(dranken.sort()).toEqual([...PRODUCT_VOLGORDE].sort())
   })
 
-  it('raakt alleen de producten van de vier lijsten aan', () => {
-    // Drank, bekers, chips en de Post-mixpakken — en verder niets. Koolzuur,
-    // de koffiehoek, de verpakkingen en de sauzen komen van papier en horen
-    // hier dus niet tussen te staan.
+  it('raakt alleen de producten van de aangeleverde lijsten aan', () => {
+    // Drank, bekers, chips, de Post-mixpakken, de zeven disposables, GFT en de
+    // vuilniszakken van de Ziggo-lijst — en verder niets. Koolzuur, de
+    // koffiehoek, Tork en de sauzen komen van papier en horen hier dus niet
+    // tussen te staan.
     const handmatigeProducten = new Set<string>([
       ...PRODUCT_VOLGORDE,
       ...CUP_PRODUCT_IDS,
       ...CHIP_PRODUCT_IDS,
       ...POSTMIX_PACKAGE_PRODUCT_IDS,
+      ...DISPOSABLE_PRODUCT_IDS,
+      'gft-bak',
+      'vuilniszakken',
     ])
 
     for (const config of secondRingStandards) {

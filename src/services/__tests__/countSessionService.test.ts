@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest'
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
 import { FakeCountRepository } from './fakeCountRepository'
 import { FakeRestockRepository } from './fakeRestockRepository'
 
@@ -11,7 +11,11 @@ const updateEventStatus = vi.fn(async () => undefined)
  * magazijn moet aanvullen. Hier zonder bijzonderheden: geen satellieten, dus
  * elke behoefte telt gewoon mee.
  */
-const fakeKiosks: Array<{ id: string; drinkStorageType: string }> = []
+const fakeKiosks: Array<{
+  id: string
+  drinkStorageType: string
+  keepsOwnDrinkStock: boolean
+}> = []
 const fakeProducts: Array<{ id: string; suppliedFromLargeCoolerForSatellite: boolean }> = []
 
 vi.mock('@/repositories', () => ({
@@ -409,6 +413,63 @@ describe('goedkeuren', () => {
     } finally {
       flushSpy.mockRestore()
     }
+  })
+})
+
+describe('drank bij een telpunt met eigen voorraad', () => {
+  const route = ROUTE.slice(0, 1)
+  const KIOSK = route[0]!
+
+  /**
+   * `prod-water` is hier de gekoelde drank die een satelliet normaal uit een
+   * grote kiosk bijhaalt. Bij zo'n satelliet hoort een tekort níet in de
+   * centrale vullijst; bij een telpunt met een eigen stocklijst wél.
+   */
+  beforeEach(() => {
+    fakeProducts.push({ id: 'prod-water', suppliedFromLargeCoolerForSatellite: true })
+  })
+
+  afterEach(() => {
+    fakeKiosks.length = 0
+    fakeProducts.length = 0
+  })
+
+  async function keurGoed(kiosk: (typeof fakeKiosks)[number]) {
+    fakeKiosks.push(kiosk)
+    const session = makeSession({ kioskRoute: route })
+    await saveCountSessionLocally(session)
+    await countKiosk(KIOSK)
+    await flushPendingCountWrites()
+    await syncService.flush()
+    return approveSession(session)
+  }
+
+  it('slaat een gewone satelliet over', async () => {
+    const result = await keurGoed({
+      id: KIOSK,
+      drinkStorageType: 'SATELLITE',
+      keepsOwnDrinkStock: false,
+    })
+
+    expect(result.requirementCount).toBe(0)
+    expect(fakeRestockRepo.requirements).toHaveLength(0)
+  })
+
+  it('vult wél aan bij een satelliet met een eigen stocklijst', async () => {
+    // Ziggo Platform. Zonder dit wordt de drank daar wel geteld en nooit
+    // aangevuld, en dat merk je pas als het platform droogstaat.
+    const result = await keurGoed({
+      id: KIOSK,
+      drinkStorageType: 'SATELLITE',
+      keepsOwnDrinkStock: true,
+    })
+
+    expect(result.requirementCount).toBe(1)
+    expect(fakeRestockRepo.requirements[0]).toMatchObject({
+      kioskId: KIOSK,
+      productId: 'prod-water',
+      requiredPackages: 11,
+    })
   })
 })
 

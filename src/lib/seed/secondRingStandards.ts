@@ -26,23 +26,37 @@ export interface KioskStandardConfig {
   /** Sleutel van de kiosk in de seed, zoals `kiosk-401`. */
   kioskKey: string
   drinkStorageType: DrinkStorageType
+  /**
+   * Heeft dit telpunt een eigen drankvoorraad, ook zonder grote koeling?
+   *
+   * Zie `LOCAL_DRINK_STOCK_KIOSK_KEYS`. Wordt afgeleid en hoeft in
+   * `PAPER_STANDARDS` niet ingevuld te worden.
+   */
+  keepsOwnDrinkStock?: boolean
   /** Product-id → norm in hele verpakkingen. */
   standards: Record<string, number>
 }
 
 /**
- * Bronprioriteit voor een voorraadnorm:
+ * Bronprioriteit voor een voorraadnorm, van sterk naar zwak:
  *
- *   1. De nieuwste handmatige lijst, maar uitsluitend voor de combinaties
- *      kiosk + product die daarin met name genoemd worden. Er zijn er vier:
- *      de bijgewerkte drankstocklijst, de bekerlijst, de chipslijst en de
- *      Post-mixlijst.
- *   2. De kolom "Standaard" van de papieren bestellijst van diezelfde kiosk.
- *   3. Geen actieve norm.
+ *   1. De specifieke Ziggo Platform-lijst, uitsluitend voor de producten die
+ *      daar met name op staan. De meest specifieke bron wint, ook van de
+ *      algemene Disposable-lijst — zie `LATEST_ZIGGO_PLATFORM_OVERRIDES`.
+ *   2. De nieuwste Disposable-stocklijst, voor de zeven producten uit
+ *      `DISPOSABLE_PRODUCT_IDS`.
+ *   3. De nieuwste GFT-lijst, die bij acht locaties één GFT-bak neerzet.
+ *   4. De eerdere nieuwste handmatige lijsten: drank, bekers, chips, Post-mix.
+ *   5. De kolom "Standaard" van de papieren bestellijst van diezelfde kiosk.
+ *   6. Geen actieve norm.
  *
- * Alles wat op geen enkele handmatige lijst staat — koffie, verpakkingen,
- * sauzen, schoonmaak, en de koolzuurcilinders — komt dus onveranderd van
- * papier.
+ * Alles wat op geen enkele handmatige lijst staat — koffie, sauzen, Tork, en
+ * de koolzuurcilinders — komt dus onveranderd van papier.
+ *
+ * Elke laag overschrijft alleen de combinaties kiosk + product die hij zélf
+ * noemt. Een locatie die op een nieuwe lijst ontbreekt houdt wat hij had: een
+ * lijst die over tweeëntwintig locaties gaat zegt niets over de drieëntwintigste.
+ * Weglating is geen deactivering; alleen een expliciete 0 zet een norm uit.
  *
  * Nooit een andere kiosk als terugval gebruiken wanneer de eigen papieren
  * Standaard bekend is. Dat is eerder wél gebeurd — bij elf combinaties werd een
@@ -175,11 +189,36 @@ const PAPER_DRINKS: Record<string, Record<string, number>> = {
 }
 
 /**
+ * Telpunten met een eigen drankvoorraad zonder grote koeling.
+ *
+ * De algemene regel hieronder is een vuistregel op het opslagtype, en die is
+ * goed zolang niemand het beter weet. Soms weet iemand het beter: voor Ziggo
+ * Platform is een eigen stocklijst aangeleverd met echte aantallen per
+ * drankproduct. Dat is voorraad die geteld en aangevuld moet worden, geen
+ * assortimentsindicatie.
+ *
+ * Dat wordt hier vastgelegd als een eigen kenmerk, en nadrukkelijk niet
+ * opgelost door Ziggo maar `LARGE_COOLER` te noemen: er staat daar geen grote
+ * koeling, en een opslagtype dat liegt over de vloer neemt later een andere
+ * beslissing mee de verkeerde kant op — de vulronde-indeling bijvoorbeeld, die
+ * `isLargeCoolerDrinkStock` gebruikt.
+ *
+ * Een expliciete lokale stocklijst wint dus van de generieke regel op het
+ * opslagtype. Komt er een tweede locatie bij, dan is dat één sleutel erbij.
+ *
+ * Gaat mee naar de database als `kiosks.keeps_own_drink_stock`, want de
+ * bijvulregel draait in productie op wat daar staat en niet op deze seed.
+ */
+export const LOCAL_DRINK_STOCK_KIOSK_KEYS: ReadonlySet<string> = new Set([
+  'kiosk-ziggo-platform',
+])
+
+/**
  * Wie telt de gekoelde drank?
  *
- * Alleen een telpunt met een grote koeling. Nergens anders staat drank als
- * voorraad: een satelliet, een kleine bar en een koffiehoek verkopen hem wel,
- * maar hebben niets om hem in te bewaren.
+ * In beginsel alleen een telpunt met een grote koeling. Nergens anders staat
+ * drank als voorraad: een satelliet, een kleine bar en een koffiehoek verkopen
+ * hem wel, maar hebben niets om hem in te bewaren.
  *
  * Hiervóór stond bij twaalf satellieten elk drankproduct op norm 1 en bij
  * 420 Bar op 2, bedoeld als "het staat in het assortiment". Dat leverde een
@@ -187,11 +226,18 @@ const PAPER_DRINKS: Record<string, Record<string, number>> = {
  * en het magazijn een reeks tekorten van één. Een norm hoort te zeggen hoeveel
  * er moet liggen; als dat nergens is, is er geen norm.
  *
+ * Daarop is één uitzondering, en die komt niet uit een regel maar uit een
+ * lijst: `hasExplicitLocalStock`. Zie `LOCAL_DRINK_STOCK_KIOSK_KEYS`.
+ *
  * Dit gaat uitsluitend over de categorie Drank. Post-mix, bekers, chips,
  * koffie, verpakkingen, sauzen en schoonmaak worden overal geteld waar ze op de
  * lijst staan.
  */
-export function countsChilledDrinks(storage: DrinkStorageType): boolean {
+export function countsChilledDrinks(
+  storage: DrinkStorageType,
+  options: { hasExplicitLocalStock?: boolean } = {}
+): boolean {
+  if (options.hasExplicitLocalStock === true) return true
   return storage === DrinkStorageType.LARGE_COOLER
 }
 
@@ -352,6 +398,8 @@ export const CUP_PRODUCT_IDS = ['bierbeker-05', 'bierbeker-04', 'bierbeker-03'] 
  * regel vergeten is.
  *
  * 422 en Ziggo Platform staan niet op deze lijst en houden dus wat ze hadden.
+ * Ziggo heeft inmiddels een eigen, nieuwere lijst met alle drie de formaten;
+ * die staat apart in `LATEST_ZIGGO_PLATFORM_OVERRIDES`.
  */
 const MANUAL_CUP_OVERRIDES: Record<string, Record<string, number>> = {
   'kiosk-401': { 'bierbeker-05': 5, 'bierbeker-04': 4, 'bierbeker-03': 2 },
@@ -392,7 +440,8 @@ export const CHIP_PRODUCT_IDS = ['chips-blauw', 'chips-rood', 'chips-oranje'] as
  * De nieuwste handmatige chipslijst.
  *
  * Eenentwintig locaties, elk met de drie smaken. 422 en Ziggo Platform staan er
- * niet op en houden hun papieren norm.
+ * niet op en houden hun papieren norm; voor Ziggo is er inmiddels een eigen,
+ * nieuwere lijst die daar 2/2/2 bevestigt.
  *
  * Anders dan bij de bekers staat hier nergens een 0: de lijst noemt overal een
  * echt aantal, dus er wordt hier niets uitgezet.
@@ -516,6 +565,160 @@ const MANUAL_POSTMIX_OVERRIDES: Record<string, Record<string, number>> = {
 }
 
 /**
+ * De zeven producten van de nieuwste Disposable-stocklijst, in de
+ * kolomvolgorde van die lijst.
+ *
+ * `sixpacks` is het interne id van Biertrays. Het product heet op het scherm en
+ * in de database "Biertrays" sinds c83cf53 en migratie 010; het seed-id bleef
+ * `sixpacks` zodat elke eerdere telling naar dezelfde rij blijft wijzen. Hier
+ * dus geen nieuwe Biertrays-rij.
+ */
+export const DISPOSABLE_PRODUCT_IDS = [
+  'rectangular-bakjes',
+  'square-bakjes',
+  'patat-bakjes',
+  'servetten',
+  'sixpacks',
+  'patat-vorkjes',
+  'arena-blaadjes',
+] as const
+
+/**
+ * Eén regel van de Disposable-lijst, in de kolomvolgorde van de bron.
+ *
+ * Zeven vaste posities in plaats van zeven sleutels per regel: dan staat een
+ * regel hieronder er net zo bij als op het papier, en is hij regel voor regel
+ * na te lopen. De tuple dwingt af dat er ook echt zeven getallen staan — een
+ * kolom overslaan schuift anders alle volgende een plaats op.
+ */
+function disposableRow(
+  ...aantallen: [number, number, number, number, number, number, number]
+): Record<string, number> {
+  return Object.fromEntries(DISPOSABLE_PRODUCT_IDS.map((id, index) => [id, aantallen[index]!]))
+}
+
+/**
+ * De nieuwste Disposable-stocklijst.
+ *
+ * Leidend voor deze zeven producten, en voor niets anders. Chips, koffie, Tork,
+ * vuilniszakken, drank, bekers en sauzen staan er niet op en veranderen hier
+ * dus nergens door — ook niet bij een kiosk die verder wél op deze lijst staat.
+ *
+ * **Een 0 betekent geen actieve voorraadnorm**, niet norm nul. Rectangular = 0
+ * bij 423 wil zeggen dat 423 geen rectangular bakjes voert; `applyStandardOverrides`
+ * haalt het product daarmee uit de actieve normen in plaats van er een
+ * streefwaarde van niets van te maken. De nullen blijven hier staan omdat ze de
+ * bron zijn: zo is te zien dat iemand ernaar gekeken heeft en "niet voeren"
+ * bedoelde, in plaats van dat de regel vergeten is.
+ *
+ * De volgorde van de sleutels is die van de bron en niet die van het
+ * kiosknummer. Naast elkaar leggen met het papier is het enige wat een
+ * overtypfout in tweeëntwintig regels van zeven getallen echt vindt.
+ *
+ * 422 staat niet op deze lijst en houdt dus wat het had. 426 staat er wel op,
+ * met exact zijn bestaande waarden.
+ */
+const LATEST_DISPOSABLE_OVERRIDES: Record<string, Record<string, number>> = {
+  //                              Rect  Sq  Patat  Servet  Trays  Vorkjes  Arena
+  'kiosk-423': /*        423 */ disposableRow(0, 2, 3, 5, 3, 1, 0),
+  'kiosk-424': /*        424 */ disposableRow(0, 0, 0, 0, 1, 0, 0),
+  'kiosk-426': /*        426 */ disposableRow(2, 0, 0, 5, 3, 0, 1),
+  'kiosk-427': /*        427 */ disposableRow(2, 2, 0, 5, 3, 0, 0),
+  'kiosk-429': /*        429 */ disposableRow(2, 2, 0, 5, 3, 0, 0),
+  'kiosk-401': /*        401 */ disposableRow(2, 0, 0, 5, 3, 0, 1),
+  'kiosk-402': /*        402 */ disposableRow(0, 0, 0, 0, 1, 0, 0),
+  'kiosk-403': /*        403 */ disposableRow(0, 2, 3, 5, 3, 1, 0),
+  'kiosk-404': /*        404 */ disposableRow(2, 0, 0, 5, 3, 1, 1),
+  'kiosk-406': /*   406 Oud */ disposableRow(2, 0, 0, 5, 3, 0, 1),
+  'kiosk-406-nieuw': /* 406 N */ disposableRow(2, 2, 0, 5, 3, 0, 1),
+  'kiosk-407': /*        407 */ disposableRow(0, 2, 3, 5, 3, 1, 1),
+  'kiosk-409': /*        409 */ disposableRow(0, 0, 0, 0, 1, 0, 0),
+  'kiosk-410': /*        410 */ disposableRow(3, 0, 0, 5, 3, 1, 1),
+  'kiosk-412': /*        412 */ disposableRow(2, 2, 0, 5, 3, 0, 0),
+  'kiosk-414': /*        414 */ disposableRow(2, 2, 0, 5, 3, 0, 0),
+  'kiosk-416': /*        416 */ disposableRow(3, 0, 0, 5, 3, 0, 1),
+  'kiosk-417': /*        417 */ disposableRow(2, 0, 0, 5, 3, 0, 1),
+  'kiosk-419': /*        419 */ disposableRow(0, 2, 2, 5, 3, 1, 1),
+  // Biertrays 3 wordt hieronder door de specifieke Ziggo-lijst op 1 gezet.
+  'kiosk-ziggo-platform': /* Ziggo */ disposableRow(0, 0, 0, 0, 3, 0, 0),
+  'kiosk-420-bar': /* 420 Bar */ disposableRow(0, 0, 0, 0, 4, 0, 0),
+  'kiosk-420': /*        420 */ disposableRow(3, 3, 1, 5, 3, 0, 1),
+}
+
+/**
+ * De nieuwste GFT-lijst.
+ *
+ * Acht locaties, één bak per stuk. De bron noemt alleen deze acht, dus krijgt
+ * verder niemand een GFT-norm — ook niet een kiosk die er qua assortiment op
+ * lijkt. Geteld in hele bakken; zie het product `gft-bak` in de catalogus.
+ */
+const LATEST_GFT_OVERRIDES: Record<string, Record<string, number>> = {
+  'kiosk-401': { 'gft-bak': 1 },
+  'kiosk-403': { 'gft-bak': 1 },
+  'kiosk-407': { 'gft-bak': 1 },
+  'kiosk-410': { 'gft-bak': 1 },
+  'kiosk-416': { 'gft-bak': 1 },
+  'kiosk-419': { 'gft-bak': 1 },
+  'kiosk-420': { 'gft-bak': 1 },
+  'kiosk-423': { 'gft-bak': 1 },
+}
+
+/**
+ * De specifieke stocklijst van Ziggo Platform ("Voorraad 420Ziggo").
+ *
+ * Hoort bij de bestaande locatie `kiosk-ziggo-platform`; "420 Ziggo" is hoe de
+ * bron hem noemt en geen nieuw telpunt.
+ *
+ * De meest specifieke en nieuwste bron die er voor deze locatie is, en daarmee
+ * de sterkste: hij wordt als laatste toegepast en wint dus ook van de algemene
+ * Disposable-lijst. Dat verschil is echt en bewust — Disposable zegt hier
+ * Biertrays 3, deze lijst zegt 1. Eén doos, want het is een klein platform.
+ *
+ * Wat deze lijst níet noemt, verandert hij ook niet: Tork en de koffiehoek
+ * blijven van papier komen. Weglating is geen deactivering.
+ *
+ * De tien dranken hieronder zijn echte lokale voorraad en geen
+ * assortimentsindicatie van 1. Zie `LOCAL_DRINK_STOCK_KIOSK_KEYS` voor waarom
+ * dit telpunt drank voert zonder grote koeling.
+ */
+const LATEST_ZIGGO_PLATFORM_OVERRIDES: Record<string, Record<string, number>> = {
+  'kiosk-ziggo-platform': {
+    // "1x heineken small / medium / large" — de drie bierbekerformaten, in
+    // dozen.
+    'bierbeker-03': 1,
+    'bierbeker-04': 1,
+    'bierbeker-05': 1,
+
+    'chips-blauw': 2,
+    'chips-rood': 2,
+    'chips-oranje': 2,
+
+    vuilniszakken: 3,
+
+    // Wint van de Disposable-lijst, die hier 3 zegt.
+    sixpacks: 1,
+
+    // Echte lokale drankvoorraad, geteld en aangevuld als elke andere.
+    'chaudfontaine-blauw': 1,
+    'chaudfontaine-rood': 2,
+    'fuze-tea': 2,
+    'heineken-00': 1,
+    radler: 1,
+    'stelz-icetea': 2,
+    'bacardi-lemon': 1,
+    'jack-daniels': 1,
+    redbull: 1,
+    'bacardi-cola': 2,
+
+    // Post-mix: reservepakken buiten het rek, in hele pakken.
+    cola: 10,
+    'cola-zero': 10,
+    fanta: 6,
+    sprite: 6,
+  },
+}
+
+/**
  * Legt een handmatige lijst op de papieren basis.
  *
  * Alleen exact dezelfde combinatie kiosk + product wordt overschreven; de rest
@@ -550,13 +753,24 @@ export function paperDrinksFor(kioskKey: string): Record<string, number> {
 }
 
 /**
- * De nieuwste handmatige waarden van één locatie: drank, bekers, chips en
- * Post-mix.
+ * De nieuwste handmatige waarden van één locatie.
  *
- * De vier lijsten gaan over vier verschillende productgroepen en overlappen
- * dus nergens; de volgorde van samenvoegen maakt hier niets uit. Ze staan apart
- * omdat het vier aparte rondes langs de kiosken waren, en omdat bij een fout in
- * één lijst zichtbaar moet blijven welke dat was.
+ * Zeven aparte bronlagen, want het waren zeven aparte rondes langs de kiosken.
+ * Ze blijven los zodat bij een fout zichtbaar is wélke lijst hem maakte, en
+ * zodat later nog na te lezen valt: papier zei X, de eerdere stocklijst Y, de
+ * nieuwste Z.
+ *
+ * **De volgorde hieronder is de bronprioriteit en is niet vrijblijvend.** De
+ * eerste vier gaan over vier verschillende productgroepen en overlappen
+ * nergens; GFT staat sowieso alleen. De laatste twee overlappen wél:
+ *
+ *   · Disposable en de Ziggo-lijst noemen allebei Biertrays bij Ziggo — 3
+ *     tegenover 1. De specifiekere lijst staat achteraan en wint dus.
+ *   · De Ziggo-lijst noemt ook bekers, chips en Post-mix, en wint daar van de
+ *     eerdere algemene lijsten.
+ *
+ * Een test legt die 3-tegen-1 vast, zodat een latere herschikking van deze
+ * volgorde niet stilletjes 3 teruggeeft.
  */
 export function latestOverridesFor(kioskKey: string): Record<string, number> {
   return {
@@ -564,6 +778,9 @@ export function latestOverridesFor(kioskKey: string): Record<string, number> {
     ...MANUAL_CUP_OVERRIDES[kioskKey],
     ...MANUAL_CHIP_OVERRIDES[kioskKey],
     ...MANUAL_POSTMIX_OVERRIDES[kioskKey],
+    ...LATEST_GFT_OVERRIDES[kioskKey],
+    ...LATEST_DISPOSABLE_OVERRIDES[kioskKey],
+    ...LATEST_ZIGGO_PLATFORM_OVERRIDES[kioskKey],
   }
 }
 
@@ -1119,7 +1336,12 @@ const PAPER_STANDARDS: KioskStandardConfig[] = [
   },
   {
     // Caprisun stond hier als gewone voorraad, maar valt onder Drank en wordt
-    // dus alleen nog bij een grote koeling geteld. Post-mix en de rest blijven.
+    // dus alleen nog geteld waar het echt ligt. Op de nieuwste Ziggo-lijst komt
+    // het niet voor en het krijgt dus geen norm terug.
+    //
+    // Dit is de papieren basis. `LATEST_ZIGGO_PLATFORM_OVERRIDES` legt daar de
+    // specifieke stocklijst overheen: bekers, chips, vuilniszakken, Biertrays,
+    // tien dranken en de Post-mix. Tork blijft van hier komen.
     kioskKey: 'kiosk-ziggo-platform',
     drinkStorageType: DrinkStorageType.SATELLITE,
     standards: {
@@ -1147,14 +1369,16 @@ export function paperStandardsFor(kioskKey: string): Record<string, number> {
 /**
  * De normen zoals ze werkelijk gelden.
  *
- * De papieren lijst met daarop de nieuwste handmatige waarden: drank uit de
- * bijgewerkte stocklijst, bekers uit de bekerlijst, chips uit de chipslijst en
- * de reservepakken uit de Post-mixlijst. Producten die op geen van die vier
- * lijsten staan houden hun papieren norm; een product dat op een lijst een 0
- * heeft, verdwijnt hier uit de actieve normen.
+ * De papieren lijst met daarop alle nieuwste handmatige waarden: drank, bekers,
+ * chips en Post-mix uit de eerdere stocklijsten, de zeven verpakkingsproducten
+ * uit de Disposable-lijst, de GFT-bakken, en bovenop dat alles de specifieke
+ * Ziggo Platform-lijst. Producten die op geen enkele lijst staan houden hun
+ * papieren norm; een product dat op een lijst een expliciete 0 heeft, verdwijnt
+ * hier uit de actieve normen.
  */
 export const secondRingStandards: KioskStandardConfig[] = PAPER_STANDARDS.map((config) => ({
   ...config,
+  keepsOwnDrinkStock: LOCAL_DRINK_STOCK_KIOSK_KEYS.has(config.kioskKey),
   standards: applyStandardOverrides(config.standards, latestOverridesFor(config.kioskKey)),
 }))
 

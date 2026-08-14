@@ -69,6 +69,19 @@ export interface Kiosk {
    */
   drinkStorageType: DrinkStorageType
   /**
+   * Heeft dit telpunt een eigen drankvoorraad, ondanks zijn opslagtype?
+   *
+   * Het opslagtype is een vuistregel; soms weet een aangeleverde stocklijst het
+   * beter. Ziggo Platform is een satelliet zonder grote koeling, maar heeft een
+   * eigen lijst met echte dranknormen. Die drank moet geteld én aangevuld
+   * worden, dus mag `shouldGenerateCentralRestock` hem niet wegfilteren.
+   *
+   * Bewust een eigen kenmerk in plaats van het opslagtype op `LARGE_COOLER`
+   * zetten: er staat daar geen koeling, en een opslagtype dat liegt over de
+   * vloer stuurt later ook de vulronde-indeling de verkeerde kant op.
+   */
+  keepsOwnDrinkStock: boolean
+  /**
    * Uit welke grote kiosk een satelliet zijn drank haalt.
    *
    * Voorlopig overal leeg: de bronrelaties zijn nog niet vastgesteld. Zodra ze

@@ -29,6 +29,7 @@ export interface ReconcileRequirementsInput {
   /** Zie `buildRestockRequirements`: nodig voor de satellietuitzondering. */
   kioskStorage?: Map<string, DrinkStorageType>
   satelliteSuppliedProductIds?: ReadonlySet<string>
+  localDrinkStockKioskIds?: ReadonlySet<string>
 }
 
 export interface RequirementReconciliation {
@@ -66,6 +67,7 @@ export function reconcileRestockRequirements(
     scopeKioskIds,
     kioskStorage,
     satelliteSuppliedProductIds,
+    localDrinkStockKioskIds,
   } = input
   const scope = new Set(scopeKioskIds)
 
@@ -76,6 +78,7 @@ export function reconcileRestockRequirements(
     existing,
     kioskStorage,
     satelliteSuppliedProductIds,
+    localDrinkStockKioskIds,
   }).filter((draft) => scope.has(draft.kioskId))
 
   const desiredByKey = new Map(

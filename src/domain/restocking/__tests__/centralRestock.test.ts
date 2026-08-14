@@ -70,6 +70,29 @@ describe('shouldGenerateCentralRestock', () => {
       })
     ).toBe(true)
   })
+
+  it('vult drank wél aan bij een satelliet met eigen voorraad', () => {
+    // Ziggo Platform: een satelliet met een eigen stocklijst en echte
+    // dranknormen. Zonder deze uitzondering wordt die drank geteld en nooit
+    // aangevuld — de teller ziet een tekort en de vulplanning ziet niets.
+    expect(
+      shouldGenerateCentralRestock({
+        kiosk: { drinkStorageType: DrinkStorageType.SATELLITE, keepsOwnDrinkStock: true },
+        product: DRANK,
+      })
+    ).toBe(true)
+  })
+
+  it('blijft zonder dat kenmerk gewoon overslaan', () => {
+    // De uitzondering hoort expliciet te zijn. Een satelliet die er niets over
+    // zegt valt onder de gewone regel.
+    expect(
+      shouldGenerateCentralRestock({
+        kiosk: { drinkStorageType: DrinkStorageType.SATELLITE, keepsOwnDrinkStock: false },
+        product: DRANK,
+      })
+    ).toBe(false)
+  })
 })
 
 describe('isLargeCoolerDrinkStock', () => {
@@ -117,6 +140,7 @@ function behoeften(params: {
   storage: DrinkStorageType
   regels: Array<{ productId: string; restock: number }>
   drankProducten: string[]
+  eigenDrankvoorraad?: boolean
 }) {
   const kc = kioskCount('kc-1', 'kiosk-402')
   return buildRestockRequirements({
@@ -127,6 +151,7 @@ function behoeften(params: {
     ]),
     kioskStorage: new Map([['kiosk-402', params.storage]]),
     satelliteSuppliedProductIds: new Set(params.drankProducten),
+    localDrinkStockKioskIds: params.eigenDrankvoorraad ? new Set(['kiosk-402']) : undefined,
   })
 }
 
@@ -186,6 +211,40 @@ describe('behoeften van een satelliet', () => {
     })
 
     expect(result).toHaveLength(1)
+  })
+
+  it('vult drank wél aan bij een satelliet met een eigen stocklijst', () => {
+    // De tien dranken van Ziggo Platform, in het klein. Deze tekorten moeten
+    // gewoon in de vulplanning terechtkomen; "wel tellen, niet bijvullen" is
+    // precies wat hier niet mag gebeuren.
+    const result = behoeften({
+      storage: DrinkStorageType.SATELLITE,
+      eigenDrankvoorraad: true,
+      drankProducten: ['fuze-tea', 'bacardi-cola', 'redbull'],
+      regels: [
+        { productId: 'fuze-tea', restock: 2 },
+        { productId: 'bacardi-cola', restock: 1 },
+        { productId: 'redbull', restock: 1 },
+        { productId: 'bierbeker-05', restock: 1 },
+      ],
+    })
+
+    expect(result.map((r) => [r.productId, r.requiredPackages])).toEqual([
+      ['bacardi-cola', 1],
+      ['bierbeker-05', 1],
+      ['fuze-tea', 2],
+      ['redbull', 1],
+    ])
+  })
+
+  it('laat diezelfde drank bij een gewone satelliet nog steeds weg', () => {
+    const result = behoeften({
+      storage: DrinkStorageType.SATELLITE,
+      drankProducten: ['fuze-tea'],
+      regels: [{ productId: 'fuze-tea', restock: 2 }],
+    })
+
+    expect(result).toEqual([])
   })
 
   it('vult gewoon aan wanneer het opslagtype onbekend is', () => {

@@ -298,4 +298,13 @@ export const demoProducts: Product[] = [
   product('tork-rol', CAT_SCHOONMAAK_ID, 'Tork Rol', 'Tork', 'rol', 'rollen', 90, SMALL),
   product('vuilniszakken', CAT_SCHOONMAAK_ID, 'Vuilniszakken', 'Vuilniszakken', 'rol', 'rollen', 91, SMALL),
   product('theedoeken', CAT_SCHOONMAAK_ID, 'Theedoeken', 'Theedoeken', 'stuk', 'pakken', 92, SMALL),
+  // De GFT-bak: hele bakken, geen halve. Een bak staat er of staat er niet, en
+  // "een halve GFT-bak" is geen aantal dat iemand kan aanwijzen. Vandaar
+  // `inputStep = ONE` en geen deelverpakkingen — de standaardwaarden van
+  // `product()`, hier expliciet gelaten omdat het de kern van dit product is.
+  //
+  // Bij Schoonmaak/afval, want daar hoort het en daar kijkt de teller ernaar.
+  // Achteraan in de sorteervolgorde: de sync werkt `sort_order` bewust niet bij,
+  // dus ertussen schuiven zou lokaal en in productie uit elkaar lopen.
+  product('gft-bak', CAT_SCHOONMAAK_ID, 'GFT Bak', 'GFT', 'bak', 'bakken', 93, SMALL),
 ]

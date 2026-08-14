@@ -31,7 +31,10 @@ interface StandardRow {
 }
 
 interface FakeState {
-  kiosks: Map<number, { label: string | null; drinkStorageType: string }>
+  kiosks: Map<
+    number,
+    { label: string | null; drinkStorageType: string; keepsOwnDrinkStock: boolean }
+  >
   standards: Map<string, StandardRow>
 }
 
@@ -47,6 +50,7 @@ function syncedState(): FakeState {
     state.kiosks.set(kiosk.number, {
       label: kiosk.label ?? null,
       drinkStorageType: kiosk.drinkStorageType,
+      keepsOwnDrinkStock: kiosk.keepsOwnDrinkStock,
     })
   }
 
@@ -135,6 +139,7 @@ function handle(
     return [
       { table_name: 'kiosks', column_name: 'drink_storage_type' },
       { table_name: 'kiosks', column_name: 'drink_source_kiosk_id' },
+      { table_name: 'kiosks', column_name: 'keeps_own_drink_stock' },
       { table_name: 'products', column_name: 'supplied_from_large_cooler_for_satellite' },
     ]
   }
@@ -146,18 +151,26 @@ function handle(
     return [...state.kiosks.keys()].map((number) => ({ id: kioskDbId(number), number }))
   }
 
-  if (sql.startsWith('select number, label, drink_storage_type from kiosks')) {
+  if (sql.startsWith('select number, label, drink_storage_type, keeps_own_drink_stock from kiosks')) {
     return [...state.kiosks].map(([number, kiosk]) => ({
       number,
       label: kiosk.label,
       drink_storage_type: kiosk.drinkStorageType,
+      keeps_own_drink_stock: kiosk.keepsOwnDrinkStock,
     }))
   }
 
-  if (sql.startsWith('select drink_storage_type from kiosks where id')) {
+  if (sql.startsWith('select drink_storage_type, keeps_own_drink_stock from kiosks where id')) {
     const number = Number(String(values[0]).replace('k-', ''))
     const kiosk = state.kiosks.get(number)
-    return kiosk ? [{ drink_storage_type: kiosk.drinkStorageType }] : []
+    return kiosk
+      ? [
+          {
+            drink_storage_type: kiosk.drinkStorageType,
+            keeps_own_drink_stock: kiosk.keepsOwnDrinkStock,
+          },
+        ]
+      : []
   }
 
   if (sql.startsWith('select id, name from products')) {
@@ -190,15 +203,16 @@ function handle(
   }
 
   if (sql.startsWith('insert into kiosks')) {
-    const [, number, label, , , drinkStorageType] = values as [
+    const [, number, label, , , drinkStorageType, keepsOwnDrinkStock] = values as [
       string,
       number,
       string | null,
       string | null,
       number,
       string,
+      boolean,
     ]
-    state.kiosks.set(number, { label, drinkStorageType })
+    state.kiosks.set(number, { label, drinkStorageType, keepsOwnDrinkStock })
     return []
   }
 
@@ -492,6 +506,167 @@ describe('expliciete removals', () => {
       expect(row?.isActive, `${nummer} ${productId}`).toBe(false)
     }
   })
+
+  it('zet een disposable uit waar de nieuwe lijst een 0 heeft', async () => {
+    // De Disposable-lijst staat vol nullen. Een 0 betekent "voert dit niet";
+    // een norm die daarna nog actief in de database staat — desnoods op nul —
+    // is precies wat die 0 moest uitsluiten.
+    const state = syncedState()
+    const weg: Array<[number, string]> = [
+      [423, 'rectangular-bakjes'],
+      [423, 'arena-blaadjes'],
+      [424, 'servetten'],
+      [420, 'patat-vorkjes'],
+      [4201, 'rectangular-bakjes'],
+    ]
+
+    for (const [nummer, productId] of weg) {
+      const key = `${kioskDbId(nummer)}|${productDbId(productId)}`
+      state.standards.set(key, {
+        id: `s-${key}`,
+        kioskId: kioskDbId(nummer),
+        productId: productDbId(productId),
+        targetQuantityQuarters: 8,
+        isActive: true,
+      })
+    }
+
+    const client = fakeClient(state)
+    const { problems } = await runSecondRingSync(client, { apply: true })
+
+    expect(problems).toEqual([])
+    for (const [nummer, productId] of weg) {
+      const row = client.state.standards.get(`${kioskDbId(nummer)}|${productDbId(productId)}`)
+      expect(row?.isActive, `${nummer} ${productId}`).toBe(false)
+    }
+  })
+})
+
+describe('weglating is geen deactivering', () => {
+  it('laat 422 zijn servetten houden, want die staat niet op de Disposable-lijst', async () => {
+    const client = fakeClient(syncedState())
+    const { problems } = await runSecondRingSync(client, { apply: true })
+
+    expect(problems).toEqual([])
+    const row = client.state.standards.get(
+      `${kioskDbId(422)}|${productDbId('servetten')}`
+    )
+    expect(row).toMatchObject({ isActive: true, targetQuantityQuarters: 20 })
+  })
+
+  it('laat koolzuur staan, dat op geen van de nieuwe lijsten voorkomt', async () => {
+    const client = fakeClient(syncedState())
+    const { problems } = await runSecondRingSync(client, { apply: true })
+
+    expect(problems).toEqual([])
+    for (const nummer of [401, 404, 406, 407, 410, 416, 420, 4201, 426]) {
+      const row = client.state.standards.get(`${kioskDbId(nummer)}|${productDbId('koolzuur')}`)
+      expect(row, `${nummer}`).toMatchObject({ isActive: true, targetQuantityQuarters: 8 })
+    }
+  })
+})
+
+describe('de drie nieuwe lijsten in de database', () => {
+  /** De actieve norm in hele verpakkingen, of undefined. */
+  function actief(client: FakeClient, nummer: number, productId: string): number | undefined {
+    const row = client.state.standards.get(`${kioskDbId(nummer)}|${productDbId(productId)}`)
+    return row?.isActive ? row.targetQuantityQuarters / 4 : undefined
+  }
+
+  it('zet de GFT-bakken bij precies acht kiosken neer', async () => {
+    const client = fakeClient(emptyState())
+    const { problems } = await runSecondRingSync(client, { apply: true })
+    expect(problems).toEqual([])
+
+    for (const nummer of [401, 403, 407, 410, 416, 419, 420, 423]) {
+      expect(actief(client, nummer, 'gft-bak'), `${nummer}`).toBe(1)
+    }
+    for (const nummer of [402, 404, 409, 422, 424, 426, 4201, 4300]) {
+      expect(actief(client, nummer, 'gft-bak'), `${nummer}`).toBeUndefined()
+    }
+  })
+
+  it('geeft Ziggo Platform zijn eigen normen, met Biertrays op 1', async () => {
+    const client = fakeClient(emptyState())
+    const { problems } = await runSecondRingSync(client, { apply: true })
+    expect(problems).toEqual([])
+
+    // De algemene Disposable-lijst zegt hier 3; de specifieke Ziggo-lijst 1.
+    expect(actief(client, 4300, 'sixpacks')).toBe(1)
+
+    expect(actief(client, 4300, 'bierbeker-03')).toBe(1)
+    expect(actief(client, 4300, 'vuilniszakken')).toBe(3)
+    expect(actief(client, 4300, 'cola')).toBe(10)
+    expect(actief(client, 4300, 'fuze-tea')).toBe(2)
+    expect(actief(client, 4300, 'redbull')).toBe(1)
+  })
+
+  it('zet het vinkje voor eigen drankvoorraad alleen bij Ziggo Platform', async () => {
+    const client = fakeClient(emptyState())
+    await runSecondRingSync(client, { apply: true })
+
+    const met = [...client.state.kiosks]
+      .filter(([, kiosk]) => kiosk.keepsOwnDrinkStock)
+      .map(([number]) => number)
+
+    expect(met).toEqual([4300])
+  })
+
+  it('maakt precies één nieuwe productrij voor GFT en hergebruikt de rest', async () => {
+    // In productie bestaat GFT nog niet. De koppeling loopt op naam, dus een
+    // ontbrekende rij hoort één keer aangemaakt te worden — en de bestaande
+    // Biertrays-rij hoort met rust gelaten te worden, niet gedupliceerd.
+    const client = fakeClient(emptyState())
+    const bestaandeNamen = new Set(
+      demoProducts.filter((p) => p.name !== 'GFT Bak').map((p) => p.name)
+    )
+
+    const zonderGft = {
+      ...client,
+      query: async (text: string, values?: unknown[]) => {
+        const sql = text.replace(/\s+/g, ' ').trim()
+        if (sql.startsWith('select id, name from products')) {
+          await client.query(text, values)
+          return {
+            rows: demoProducts
+              .filter((p) => bestaandeNamen.has(p.name))
+              .map((p) => ({ id: productDbId(p.id), name: p.name })),
+          }
+        }
+        if (sql.startsWith('insert into products')) {
+          bestaandeNamen.add(String(values?.[1]))
+        }
+        return client.query(text, values)
+      },
+    } as SqlClient
+
+    const { applied } = await runSecondRingSync(zonderGft, { apply: true })
+    expect(applied).toBe(true)
+
+    const inserts = client.queries.filter((q) => q.startsWith('insert into products'))
+    expect(inserts).toHaveLength(1)
+    expect(bestaandeNamen.has('GFT Bak')).toBe(true)
+
+    // En de biertrays wijzen nog steeds naar de bestaande rij.
+    const trays = client.state.standards.get(`${kioskDbId(423)}|${productDbId('sixpacks')}`)
+    expect(trays).toMatchObject({ isActive: true, targetQuantityQuarters: 12 })
+  })
+
+  it('meldt in de proefdraai dat Ziggo eigen drankvoorraad krijgt', async () => {
+    // Een bestaande database zonder dit kenmerk: de proefdraai hoort te zeggen
+    // wat er verandert voordat iemand --apply typt.
+    const state = syncedState()
+    state.kiosks.set(4300, {
+      label: 'Ziggo Platform',
+      drinkStorageType: 'SATELLITE',
+      keepsOwnDrinkStock: false,
+    })
+
+    const regels: string[] = []
+    await runSecondRingSync(fakeClient(state), { apply: false, log: (r) => regels.push(r) })
+
+    expect(regels.join('\n')).toMatch(/eigen drankvoorraad nee → ja/)
+  })
 })
 
 describe('scope', () => {
@@ -528,7 +703,7 @@ describe('scope', () => {
   it('laat een bestaande norm buiten de authoritative kiosken met rust', async () => {
     const state = syncedState()
     const vreemd = `${kioskDbId(110)}|${productDbId('fuze-tea')}`
-    state.kiosks.set(110, { label: null, drinkStorageType: 'NONE' })
+    state.kiosks.set(110, { label: null, drinkStorageType: 'NONE', keepsOwnDrinkStock: false })
     state.standards.set(vreemd, {
       id: 's-110',
       kioskId: kioskDbId(110),

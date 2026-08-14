@@ -62,6 +62,7 @@ function makeKiosks(ringId: string, start: number, count: number): Kiosk[] {
       // uitgangswaarde: wie niets weet van een telpunt gaat er niet vanuit dat
       // er een koeling staat.
       drinkStorageType: DrinkStorageType.NONE,
+      keepsOwnDrinkStock: false,
       drinkSourceKioskId: null,
       createdAt: '2026-01-01T00:00:00Z',
       updatedAt: '2026-01-01T00:00:00Z',
@@ -84,6 +85,7 @@ const cubes120: Kiosk = {
   sortOrder: 205, // direct na 120 (200), vóór 121 (210)
   isActive: true,
   drinkStorageType: DrinkStorageType.NONE,
+  keepsOwnDrinkStock: false,
   drinkSourceKioskId: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -103,6 +105,7 @@ const bar420: Kiosk = {
   sortOrder: 205, // direct na 420 (200), vóór 421 (210)
   isActive: true,
   drinkStorageType: DrinkStorageType.NONE,
+  keepsOwnDrinkStock: false,
   drinkSourceKioskId: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -129,6 +132,7 @@ const kiosk406Nieuw: Kiosk = {
   sortOrder: 65, // tussen 406 (60) en 407 (70)
   isActive: true,
   drinkStorageType: DrinkStorageType.NONE,
+  keepsOwnDrinkStock: false,
   drinkSourceKioskId: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -150,6 +154,7 @@ const ziggoPlatform: Kiosk = {
   sortOrder: 204, // tussen 420 (200) en 420 Bar (205)
   isActive: true,
   drinkStorageType: DrinkStorageType.NONE,
+  keepsOwnDrinkStock: false,
   drinkSourceKioskId: null,
   createdAt: '2026-01-01T00:00:00Z',
   updatedAt: '2026-01-01T00:00:00Z',
@@ -158,6 +163,16 @@ const ziggoPlatform: Kiosk = {
 /** Het opslagtype komt uit de tweede-ringconfig; de rest blijft NONE. */
 const storageByKioskKey = new Map(
   secondRingStandards.map((config) => [config.kioskKey, config.drinkStorageType])
+)
+
+/**
+ * Telpunten met een eigen drankvoorraad ondanks hun opslagtype.
+ *
+ * Komt uit dezelfde config, zodat de uitzondering op één plek staat en niet
+ * hier nog eens overgetypt wordt.
+ */
+const localDrinkStockByKioskKey = new Map(
+  secondRingStandards.map((config) => [config.kioskKey, config.keepsOwnDrinkStock === true])
 )
 
 export const demoKiosks: Kiosk[] = [
@@ -171,6 +186,7 @@ export const demoKiosks: Kiosk[] = [
   .map((kiosk) => ({
     ...kiosk,
     drinkStorageType: storageByKioskKey.get(kiosk.id) ?? kiosk.drinkStorageType,
+    keepsOwnDrinkStock: localDrinkStockByKioskKey.get(kiosk.id) ?? kiosk.keepsOwnDrinkStock,
     // Op de vloer heet dit "406 Oud" sinds er een tweede bijstaat.
     label: kiosk.id === 'kiosk-406' ? '406 Oud' : kiosk.label,
   }))

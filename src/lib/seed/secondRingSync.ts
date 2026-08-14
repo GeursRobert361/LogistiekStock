@@ -5,6 +5,8 @@ import {
   authoritativeKioskKeys,
   CHIP_PRODUCT_IDS,
   CUP_PRODUCT_IDS,
+  DISPOSABLE_PRODUCT_IDS,
+  LOCAL_DRINK_STOCK_KIOSK_KEYS,
   POSTMIX_PACKAGE_PRODUCT_IDS,
 } from './secondRingStandards'
 import { assertSchemaReady, resolveKioskIds, resolveProductIds, type SqlClient } from './dbIds'
@@ -12,10 +14,14 @@ import {
   buildSyncPlan,
   EXPECTED_CHIP_MATRIX,
   EXPECTED_CUP_MATRIX,
+  EXPECTED_DISPOSABLE_MATRIX,
   EXPECTED_DRINK_MATRIX,
+  EXPECTED_GFT,
   EXPECTED_KOOLZUUR,
+  EXPECTED_LOCAL_DRINK_STOCK,
   EXPECTED_POSTMIX_MATRIX,
   EXPECTED_STORAGE_TYPES,
+  EXPECTED_VUILNISZAKKEN,
   type CurrentKiosk,
   type CurrentStandard,
   type DesiredKiosk,
@@ -75,6 +81,7 @@ export function desiredKiosks(): DesiredKiosk[] {
       number: kiosk.number,
       label: kiosk.label,
       drinkStorageType: kiosk.drinkStorageType,
+      keepsOwnDrinkStock: kiosk.keepsOwnDrinkStock,
     }))
 }
 
@@ -93,7 +100,11 @@ async function readCurrentKiosks(client: SqlClient): Promise<Map<number, Current
     number: number
     label: string | null
     drink_storage_type: string
-  }>('select number, label, drink_storage_type from kiosks where deleted_at is null')
+    keeps_own_drink_stock: boolean
+  }>(
+    `select number, label, drink_storage_type, keeps_own_drink_stock
+       from kiosks where deleted_at is null`
+  )
 
   return new Map(
     rows.map((row) => [
@@ -102,6 +113,7 @@ async function readCurrentKiosks(client: SqlClient): Promise<Map<number, Current
         number: Number(row.number),
         label: row.label,
         drinkStorageType: row.drink_storage_type as DrinkStorageType,
+        keepsOwnDrinkStock: row.keeps_own_drink_stock === true,
       },
     ])
   )
@@ -221,11 +233,13 @@ async function applyChanges(client: SqlClient): Promise<void> {
     if (!ringId) throw new Error(`Ring van ${kiosk.id} bestaat niet in de database.`)
 
     await client.query(
-      `insert into kiosks (ring_id, number, label, name, sort_order, is_active, drink_storage_type)
-       values ($1, $2, $3, $4, $5, true, $6)
+      `insert into kiosks (ring_id, number, label, name, sort_order, is_active,
+                           drink_storage_type, keeps_own_drink_stock)
+       values ($1, $2, $3, $4, $5, true, $6, $7)
        on conflict (ring_id, number) do update
          set label = excluded.label, name = excluded.name,
-             sort_order = excluded.sort_order, drink_storage_type = excluded.drink_storage_type`,
+             sort_order = excluded.sort_order, drink_storage_type = excluded.drink_storage_type,
+             keeps_own_drink_stock = excluded.keeps_own_drink_stock`,
       [
         ringId,
         kiosk.number,
@@ -233,6 +247,7 @@ async function applyChanges(client: SqlClient): Promise<void> {
         kiosk.name ?? null,
         kiosk.sortOrder,
         kiosk.drinkStorageType,
+        kiosk.keepsOwnDrinkStock,
       ]
     )
   }
@@ -356,10 +371,12 @@ async function applyChanges(client: SqlClient): Promise<void> {
  * Leest de database opnieuw en controleert de uitkomst.
  *
  * Een sync die zegt dat hij klaar is zonder te kijken wat er staat, is een
- * sync die je op zijn woord moet geloven. Controleert de vier normmatrices —
- * drank, bekers, chips en Post-mix — inclusief de regels die géén actieve norm
- * horen te hebben, plus de koolzuurnormen die de Post-mixlijst niet mocht
- * wissen, en de opslagtypes. Geeft de problemen terug; leeg betekent goed.
+ * sync die je op zijn woord moet geloven. Controleert alle normmatrices —
+ * drank, bekers, chips, Post-mix, de zeven disposables, GFT en vuilniszakken —
+ * inclusief de regels die géén actieve norm horen te hebben, plus de
+ * koolzuurnormen die geen enkele latere lijst mocht wissen, de opslagtypes en
+ * het vinkje voor eigen drankvoorraad. Geeft de problemen terug; leeg betekent
+ * goed.
  */
 export async function verifySecondRing(client: SqlClient): Promise<string[]> {
   const problemen: string[] = []
@@ -422,9 +439,13 @@ export async function verifySecondRing(client: SqlClient): Promise<string[]> {
   await checkMatrix(EXPECTED_CUP_MATRIX, CUP_PRODUCT_IDS)
   await checkMatrix(EXPECTED_CHIP_MATRIX, CHIP_PRODUCT_IDS)
   await checkMatrix(EXPECTED_POSTMIX_MATRIX, POSTMIX_PACKAGE_PRODUCT_IDS)
+  await checkMatrix(EXPECTED_DISPOSABLE_MATRIX, DISPOSABLE_PRODUCT_IDS)
+  await checkMatrix(EXPECTED_GFT, ['gft-bak'])
+  await checkMatrix(EXPECTED_VUILNISZAKKEN, ['vuilniszakken'])
 
   // Koolzuur komt op de Post-mixlijst nergens voor en moet daar dus ook niet
-  // door verdwijnen.
+  // door verdwijnen. Hetzelfde geldt voor de nieuwe Ziggo-lijst, die koolzuur
+  // ook niet noemt: weglating is geen deactivering.
   await checkMatrix(
     Object.fromEntries(Object.entries(EXPECTED_KOOLZUUR).map(([key, aantal]) => [key, [aantal]])),
     ['koolzuur']
@@ -436,12 +457,29 @@ export async function verifySecondRing(client: SqlClient): Promise<string[]> {
       problemen.push(`${kioskKey} bestaat niet`)
       continue
     }
-    const { rows } = await client.query<{ drink_storage_type: string }>(
-      'select drink_storage_type from kiosks where id = $1',
-      [kioskId]
-    )
+    const { rows } = await client.query<{
+      drink_storage_type: string
+      keeps_own_drink_stock: boolean
+    }>('select drink_storage_type, keeps_own_drink_stock from kiosks where id = $1', [kioskId])
+
     if (rows[0]?.drink_storage_type !== verwacht) {
       problemen.push(`${kioskKey} drankopslag: ${rows[0]?.drink_storage_type} ≠ ${verwacht}`)
+    }
+
+    const eigenVoorraad = rows[0]?.keeps_own_drink_stock === true
+    const hoortEigenVoorraad = EXPECTED_LOCAL_DRINK_STOCK[kioskKey] ?? false
+    if (eigenVoorraad !== hoortEigenVoorraad) {
+      problemen.push(
+        `${kioskKey} eigen drankvoorraad: ${eigenVoorraad} ≠ ${hoortEigenVoorraad}`
+      )
+    }
+  }
+
+  // De uitzondering hoort in de database te staan waar de config hem heeft, en
+  // nergens anders: dit vinkje zet de satellietbescherming uit.
+  for (const kioskKey of LOCAL_DRINK_STOCK_KIOSK_KEYS) {
+    if (EXPECTED_LOCAL_DRINK_STOCK[kioskKey] !== true) {
+      problemen.push(`${kioskKey} staat als eigen drankvoorraad in de config maar niet in de controle`)
     }
   }
 

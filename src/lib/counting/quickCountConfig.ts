@@ -120,6 +120,8 @@ export const QUICK_COUNT_CONFIG: Record<string, QuickCountConfig> = {
   Vuilniszakken: INTEGER(5),
   'Tork Rol': INTEGER(6),
   Theedoeken: INTEGER(5),
+  // Hele bakken; de norm is overal één en meer dan een paar staan er nergens.
+  'GFT Bak': INTEGER(3),
 
   // ── Sauzen ─────────────────────────────────────────────────────────────
   // Alleen de emmers. Normen zijn hier 5 (tweede ring) en 1 tot 2 (eerste

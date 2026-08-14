@@ -25,6 +25,7 @@ interface KioskDraft {
   isActive: boolean
   label: string
   drinkStorageType: DrinkStorageType
+  keepsOwnDrinkStock: boolean
   drinkSourceKioskId: string
 }
 
@@ -39,6 +40,7 @@ function toDraft(kiosk: Kiosk | undefined, fallbackRingId: string): KioskDraft {
     notes: kiosk?.notes ?? '',
     isActive: kiosk?.isActive ?? true,
     drinkStorageType: kiosk?.drinkStorageType ?? DrinkStorageType.NONE,
+    keepsOwnDrinkStock: kiosk?.keepsOwnDrinkStock ?? false,
     drinkSourceKioskId: kiosk?.drinkSourceKioskId ?? '',
   }
 }
@@ -127,6 +129,7 @@ export default function AdminKiosksPage() {
       notes: draft.notes.trim() || undefined,
       isActive: draft.isActive,
       drinkStorageType: draft.drinkStorageType,
+      keepsOwnDrinkStock: draft.keepsOwnDrinkStock,
       // Leeg blijft leeg: een satelliet zonder vastgestelde bronkiosk hoort
       // NULL te zijn, niet een lege tekst.
       drinkSourceKioskId: draft.drinkSourceKioskId || null,
@@ -279,6 +282,22 @@ export default function AdminKiosksPage() {
           uit een grote kiosk. Dranktekorten daar gaan niet naar het magazijn. Al het andere —
           bekers, chips, post-mix, koffie — wordt gewoon aangevuld.
         </p>
+
+        {draft.drinkStorageType !== DrinkStorageType.LARGE_COOLER && (
+          <>
+            <ToggleField
+              label="Eigen drankvoorraad"
+              checked={draft.keepsOwnDrinkStock}
+              onChange={(checked) => setDraft({ ...draft, keepsOwnDrinkStock: checked })}
+            />
+            <p className="text-xs text-gray-600">
+              Aanzetten wanneer voor dit telpunt een eigen stocklijst met echte dranknormen is
+              aangeleverd, zoals bij Ziggo Platform. Dranktekorten gaan dan gewoon naar het
+              magazijn in plaats van uit een grote koeling te komen. Alleen aanzetten als de
+              voorraad er werkelijk staat — anders krijgt het magazijn werk dat niemand uitvoert.
+            </p>
+          </>
+        )}
 
         {draft.drinkStorageType === DrinkStorageType.SATELLITE && (
           <>

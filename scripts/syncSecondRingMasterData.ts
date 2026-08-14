@@ -53,7 +53,8 @@ async function main(): Promise<void> {
     }
     if (applied) {
       console.log(
-        '✓ Verificatie geslaagd: drank, bekers, chips, Post-mix en opslagtypes kloppen.'
+        '✓ Verificatie geslaagd: drank, bekers, chips, Post-mix, disposables, GFT,' +
+          ' vuilniszakken, opslagtypes en eigen drankvoorraad kloppen.'
       )
     }
   } finally {

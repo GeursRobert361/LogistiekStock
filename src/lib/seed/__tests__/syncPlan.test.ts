@@ -5,10 +5,14 @@ import {
   planStandardChanges,
   EXPECTED_CHIP_MATRIX,
   EXPECTED_CUP_MATRIX,
+  EXPECTED_DISPOSABLE_MATRIX,
   EXPECTED_DRINK_MATRIX,
+  EXPECTED_GFT,
   EXPECTED_KOOLZUUR,
+  EXPECTED_LOCAL_DRINK_STOCK,
   EXPECTED_POSTMIX_MATRIX,
   EXPECTED_STORAGE_TYPES,
+  EXPECTED_VUILNISZAKKEN,
   type CurrentKiosk,
   type CurrentStandard,
 } from '../syncPlan'
@@ -16,6 +20,7 @@ import { demoKiosks, demoStandards } from '../demoData'
 import {
   authoritativeKioskKeys,
   CHIP_PRODUCT_IDS,
+  DISPOSABLE_PRODUCT_IDS,
   POSTMIX_PACKAGE_PRODUCT_IDS,
 } from '../secondRingStandards'
 import { DrinkStorageType } from '@/types'
@@ -28,7 +33,21 @@ import { DrinkStorageType } from '@/types'
  * hetzelfde plan te gebruiken, anders liegt de proefdraai over wat er gebeurt.
  */
 
-const KIOSK_402 = { kioskKey: 'kiosk-402', number: 402, label: undefined }
+const KIOSK_402 = {
+  kioskKey: 'kiosk-402',
+  number: 402,
+  label: undefined,
+  keepsOwnDrinkStock: false,
+}
+
+/** Een kiosk zoals hij nu in de database staat. */
+function huidigeKiosk(
+  number: number,
+  drinkStorageType: DrinkStorageType,
+  overrides: Partial<CurrentKiosk> = {}
+): CurrentKiosk {
+  return { number, label: null, drinkStorageType, keepsOwnDrinkStock: false, ...overrides }
+}
 
 describe('planKioskChanges', () => {
   it('meldt een kiosk die nog niet bestaat', () => {
@@ -42,7 +61,7 @@ describe('planKioskChanges', () => {
 
   it('meldt een gewijzigd opslagtype', () => {
     const current = new Map<number, CurrentKiosk>([
-      [402, { number: 402, label: null, drinkStorageType: DrinkStorageType.NONE }],
+      [402, huidigeKiosk(402, DrinkStorageType.NONE)],
     ])
     const changes = planKioskChanges(
       [{ ...KIOSK_402, drinkStorageType: DrinkStorageType.SATELLITE }],
@@ -53,7 +72,7 @@ describe('planKioskChanges', () => {
 
   it('zwijgt wanneer alles al klopt', () => {
     const current = new Map<number, CurrentKiosk>([
-      [402, { number: 402, label: null, drinkStorageType: DrinkStorageType.SATELLITE }],
+      [402, huidigeKiosk(402, DrinkStorageType.SATELLITE)],
     ])
     expect(
       planKioskChanges([{ ...KIOSK_402, drinkStorageType: DrinkStorageType.SATELLITE }], current)
@@ -62,7 +81,7 @@ describe('planKioskChanges', () => {
 
   it('meldt een gewijzigd opschrift', () => {
     const current = new Map<number, CurrentKiosk>([
-      [406, { number: 406, label: null, drinkStorageType: DrinkStorageType.SATELLITE }],
+      [406, huidigeKiosk(406, DrinkStorageType.SATELLITE)],
     ])
     const changes = planKioskChanges(
       [
@@ -71,11 +90,34 @@ describe('planKioskChanges', () => {
           number: 406,
           label: '406 Oud',
           drinkStorageType: DrinkStorageType.SATELLITE,
+          keepsOwnDrinkStock: false,
         },
       ],
       current
     )
     expect(changes[0]!.details[0]).toMatch(/406 Oud/)
+  })
+
+  it('meldt dat een telpunt eigen drankvoorraad krijgt', () => {
+    // Ziggo Platform blijft een satelliet — er staat geen koeling — maar krijgt
+    // wél echte dranknormen uit een eigen stocklijst. Zonder dit vinkje worden
+    // die geteld en nooit aangevuld.
+    const current = new Map<number, CurrentKiosk>([
+      [4300, huidigeKiosk(4300, DrinkStorageType.SATELLITE)],
+    ])
+    const changes = planKioskChanges(
+      [
+        {
+          kioskKey: 'kiosk-ziggo-platform',
+          number: 4300,
+          label: 'Ziggo Platform',
+          drinkStorageType: DrinkStorageType.SATELLITE,
+          keepsOwnDrinkStock: true,
+        },
+      ],
+      current
+    )
+    expect(changes[0]!.details).toContain('eigen drankvoorraad nee → ja')
   })
 })
 
@@ -137,6 +179,7 @@ describe('scope van de sync', () => {
         number: k.number,
         label: k.label,
         drinkStorageType: k.drinkStorageType,
+        keepsOwnDrinkStock: k.keepsOwnDrinkStock,
       }))
 
     expect(gewenstKiosken.some((k) => k.kioskKey === 'kiosk-110')).toBe(false)
@@ -185,8 +228,14 @@ describe('scope van de sync', () => {
 })
 
 describe('verwachtingen voor de verificatie na afloop', () => {
-  it('dekt alle negen grote koelingen', () => {
-    expect(Object.keys(EXPECTED_DRINK_MATRIX)).toHaveLength(9)
+  it('dekt elke tweede-ringlocatie, met koeling of zonder', () => {
+    // Niet alleen de negen grote koelingen: ook de locaties die géén enkele
+    // dranknorm horen te hebben staan erin, met tien keer `null`. Juist dat is
+    // wat na een sync mis kan gaan zonder dat het opvalt.
+    for (const key of authoritativeKioskKeys) {
+      expect(EXPECTED_DRINK_MATRIX[key], key).toBeDefined()
+    }
+    expect(Object.keys(EXPECTED_DRINK_MATRIX)).toHaveLength(authoritativeKioskKeys.size)
   })
 
   it('komt overeen met de stamdata', () => {
@@ -208,10 +257,18 @@ describe('verwachtingen voor de verificatie na afloop', () => {
         const standard = demoStandards.find(
           (s) => s.kioskId === kioskKey && s.productId === productId
         )
-        return standard ? standard.targetQuantityQuarters / 4 : undefined
+        // null in de matrix betekent "geen actieve norm"; in de stamdata is dat
+        // een ontbrekende regel.
+        return standard ? standard.targetQuantityQuarters / 4 : null
       })
       expect(werkelijk, kioskKey).toEqual(verwacht)
     }
+  })
+
+  it('geeft Ziggo Platform tien echte dranknormen en de rest geen', () => {
+    expect(EXPECTED_DRINK_MATRIX['kiosk-ziggo-platform']).toEqual([1, 2, 2, 1, 1, 2, 1, 1, 1, 2])
+    expect(EXPECTED_DRINK_MATRIX['kiosk-402']?.every((n) => n === null)).toBe(true)
+    expect(EXPECTED_DRINK_MATRIX['kiosk-420-bar']?.every((n) => n === null)).toBe(true)
   })
 
   it('komt overeen met de bekers in de stamdata', () => {
@@ -230,12 +287,13 @@ describe('verwachtingen voor de verificatie na afloop', () => {
     }
   })
 
-  it('controleert de bekers van alle locaties op de handmatige lijst', () => {
-    // 422 en Ziggo Platform staan er bewust niet op en worden dus niet
-    // gecontroleerd; de andere eenentwintig wel.
-    expect(Object.keys(EXPECTED_CUP_MATRIX)).toHaveLength(21)
+  it('controleert de bekers van alle locaties met een bekerlijst', () => {
+    // 422 staat er bewust niet op en wordt dus niet gecontroleerd. Ziggo
+    // Platform stond er ook niet op tot zijn eigen lijst er kwam; die zet alle
+    // drie de formaten op 1 doos.
+    expect(Object.keys(EXPECTED_CUP_MATRIX)).toHaveLength(22)
     expect(EXPECTED_CUP_MATRIX['kiosk-422']).toBeUndefined()
-    expect(EXPECTED_CUP_MATRIX['kiosk-ziggo-platform']).toBeUndefined()
+    expect(EXPECTED_CUP_MATRIX['kiosk-ziggo-platform']).toEqual([1, 1, 1])
   })
 
   it('komt overeen met de chips in de stamdata', () => {
@@ -250,13 +308,14 @@ describe('verwachtingen voor de verificatie na afloop', () => {
     }
   })
 
-  it('controleert alle eenentwintig chipslocaties', () => {
-    // 422 en Ziggo Platform staan niet op de chipslijst; de rest wel, inclusief
-    // 403 sinds bevestigd is dat het tweede "402"-blok van die kiosk was.
-    expect(Object.keys(EXPECTED_CHIP_MATRIX)).toHaveLength(21)
+  it('controleert alle locaties met een chipsnorm', () => {
+    // 422 staat niet op de chipslijst; de rest wel, inclusief 403 sinds
+    // bevestigd is dat het tweede "402"-blok van die kiosk was. Ziggo Platform
+    // komt hier via zijn eigen lijst binnen, met dezelfde 2/2/2 als op papier.
+    expect(Object.keys(EXPECTED_CHIP_MATRIX)).toHaveLength(22)
     expect(EXPECTED_CHIP_MATRIX['kiosk-403']).toEqual([8, 8, 6])
     expect(EXPECTED_CHIP_MATRIX['kiosk-422']).toBeUndefined()
-    expect(EXPECTED_CHIP_MATRIX['kiosk-ziggo-platform']).toBeUndefined()
+    expect(EXPECTED_CHIP_MATRIX['kiosk-ziggo-platform']).toEqual([2, 2, 2])
   })
 
   it('komt overeen met de Post-mix in de stamdata', () => {
@@ -270,6 +329,68 @@ describe('verwachtingen voor de verificatie na afloop', () => {
         return standard ? standard.targetQuantityQuarters / 4 : null
       })
       expect(werkelijk, kioskKey).toEqual(verwacht)
+    }
+  })
+
+  it('komt overeen met de disposables in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_DISPOSABLE_MATRIX)) {
+      const werkelijk = DISPOSABLE_PRODUCT_IDS.map((productId) => {
+        const standard = demoStandards.find(
+          (s) => s.kioskId === kioskKey && s.productId === productId
+        )
+        return standard ? standard.targetQuantityQuarters / 4 : null
+      })
+      expect(werkelijk, kioskKey).toEqual(verwacht)
+    }
+  })
+
+  it('controleert de tweeëntwintig locaties van de Disposable-lijst', () => {
+    // 422 staat er niet op en wordt dus niet gecontroleerd.
+    expect(Object.keys(EXPECTED_DISPOSABLE_MATRIX)).toHaveLength(22)
+    expect(EXPECTED_DISPOSABLE_MATRIX['kiosk-422']).toBeUndefined()
+  })
+
+  it('komt overeen met de GFT-bakken in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_GFT)) {
+      const standard = demoStandards.find(
+        (s) => s.kioskId === kioskKey && s.productId === 'gft-bak'
+      )
+      expect(standard ? standard.targetQuantityQuarters / 4 : null, kioskKey).toBe(verwacht[0])
+    }
+  })
+
+  it('controleert elke tweede-ringlocatie op GFT, ook waar er geen staat', () => {
+    for (const key of authoritativeKioskKeys) {
+      expect(EXPECTED_GFT[key], key).toBeDefined()
+    }
+  })
+
+  it('komt overeen met de vuilniszakken in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_VUILNISZAKKEN)) {
+      const standard = demoStandards.find(
+        (s) => s.kioskId === kioskKey && s.productId === 'vuilniszakken'
+      )
+      expect(standard ? standard.targetQuantityQuarters / 4 : null, kioskKey).toBe(verwacht[0])
+    }
+  })
+
+  it('komt overeen met de eigen drankvoorraad in de stamdata', () => {
+    for (const [kioskKey, verwacht] of Object.entries(EXPECTED_LOCAL_DRINK_STOCK)) {
+      const kiosk = demoKiosks.find((k) => k.id === kioskKey)
+      expect(kiosk?.keepsOwnDrinkStock, kioskKey).toBe(verwacht)
+    }
+  })
+
+  it('noemt precies één locatie met eigen drankvoorraad', () => {
+    // Dit vinkje zet de satellietbescherming uit; het hoort nergens per ongeluk
+    // aan te staan.
+    const met = Object.entries(EXPECTED_LOCAL_DRINK_STOCK)
+      .filter(([, waarde]) => waarde)
+      .map(([key]) => key)
+
+    expect(met).toEqual(['kiosk-ziggo-platform'])
+    for (const key of authoritativeKioskKeys) {
+      expect(EXPECTED_LOCAL_DRINK_STOCK[key], key).toBeDefined()
     }
   })
 

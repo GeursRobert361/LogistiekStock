@@ -21,14 +21,33 @@ import { DrinkStorageType } from '@/types/enums'
  *   2. Geen regel op de categorie. "Drank" is te grof: Caprisun staat bij
  *      Ziggo Platform als gewone voorraad en moet gewoon aangevuld worden.
  *      Daarom een kenmerk op het product zelf.
+ *
+ * ── De uitzondering op de uitzondering ──────────────────────────────────────
+ *
+ * `keepsOwnDrinkStock` gaat vóór alles. Het opslagtype is een vuistregel over
+ * hoe een telpunt er meestal uitziet; een aangeleverde stocklijst is een
+ * waarneming van hoe dít telpunt er werkelijk uitziet. Ziggo Platform is een
+ * satelliet met een eigen lijst met echte dranknormen, en die drank komt uit
+ * het magazijn.
+ *
+ * Zonder deze regel wordt zulke voorraad wél geteld en nooit aangevuld: de
+ * teller ziet een tekort, de vulplanning ziet niets, en dat verschil valt pas
+ * op als het platform droogstaat. Dat is de reden dat de uitzondering hier
+ * staat en niet als filter ergens verderop.
  */
 
 export interface CentralRestockInput {
-  kiosk: { drinkStorageType: DrinkStorageType }
+  kiosk: {
+    drinkStorageType: DrinkStorageType
+    /** Zie `LOCAL_DRINK_STOCK_KIOSK_KEYS`; standaard onwaar. */
+    keepsOwnDrinkStock?: boolean
+  }
   product: { suppliedFromLargeCoolerForSatellite: boolean }
 }
 
 export function shouldGenerateCentralRestock(input: CentralRestockInput): boolean {
+  if (input.kiosk.keepsOwnDrinkStock === true) return true
+
   const isSatellite = input.kiosk.drinkStorageType === DrinkStorageType.SATELLITE
   return !(isSatellite && input.product.suppliedFromLargeCoolerForSatellite)
 }

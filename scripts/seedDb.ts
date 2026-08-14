@@ -126,12 +126,14 @@ async function seedKiosks(): Promise<void> {
     // vastgesteld, en een seed die er een zou raden legt een verkeerde relatie
     // vast die daarna moeilijk te herkennen is.
     const result = await client.query<{ id: string }>(
-      `insert into kiosks (ring_id, number, label, name, sort_order, is_active, drink_storage_type)
-       values ($1, $2, $3, $4, $5, $6, $7)
+      `insert into kiosks (ring_id, number, label, name, sort_order, is_active,
+                           drink_storage_type, keeps_own_drink_stock)
+       values ($1, $2, $3, $4, $5, $6, $7, $8)
        on conflict (ring_id, number) do update
          set label = excluded.label, name = excluded.name,
              sort_order = excluded.sort_order, is_active = excluded.is_active,
-             drink_storage_type = excluded.drink_storage_type
+             drink_storage_type = excluded.drink_storage_type,
+             keeps_own_drink_stock = excluded.keeps_own_drink_stock
        returning id`,
       [
         ringId,
@@ -141,6 +143,7 @@ async function seedKiosks(): Promise<void> {
         kiosk.sortOrder,
         kiosk.isActive,
         kiosk.drinkStorageType,
+        kiosk.keepsOwnDrinkStock,
       ]
     )
     kioskIds.set(kiosk.id, result.rows[0]!.id)

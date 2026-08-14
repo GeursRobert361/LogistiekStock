@@ -321,6 +321,12 @@ export async function approveSession(session: CountSession): Promise<ApprovalRes
     existing: await restock.getRequirements(fresh.eventId),
     scopeKioskIds: fresh.kioskRoute,
     kioskStorage: new Map(kiosks.map((kiosk) => [kiosk.id, kiosk.drinkStorageType])),
+    // Telpunten met een eigen stocklijst voor drank, zoals Ziggo Platform. Hun
+    // tekorten moeten wél in de vulplanning komen; zonder dit worden ze geteld
+    // en nooit aangevuld.
+    localDrinkStockKioskIds: new Set(
+      kiosks.filter((kiosk) => kiosk.keepsOwnDrinkStock).map((kiosk) => kiosk.id)
+    ),
     satelliteSuppliedProductIds: new Set(
       products
         .filter((product) => product.suppliedFromLargeCoolerForSatellite)

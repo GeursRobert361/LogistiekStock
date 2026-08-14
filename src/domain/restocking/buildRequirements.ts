@@ -23,6 +23,14 @@ export interface BuildRequirementsInput {
    */
   kioskStorage?: Map<string, DrinkStorageType>
   satelliteSuppliedProductIds?: ReadonlySet<string>
+  /**
+   * Kiosken die volgens een eigen stocklijst wél echte drankvoorraad houden,
+   * ook zonder grote koeling. Hun tekorten gaan gewoon naar het magazijn.
+   *
+   * Leeg laten is de oude situatie, niet een risico: dan geldt overal de
+   * generieke regel op het opslagtype.
+   */
+  localDrinkStockKioskIds?: ReadonlySet<string>
 }
 
 /**
@@ -44,6 +52,7 @@ export function buildRestockRequirements(input: BuildRequirementsInput): Require
     existing = [],
     kioskStorage,
     satelliteSuppliedProductIds,
+    localDrinkStockKioskIds,
   } = input
 
   const existingByKey = new Map(
@@ -72,6 +81,7 @@ export function buildRestockRequirements(input: BuildRequirementsInput): Require
       const mayRestock = shouldGenerateCentralRestock({
         kiosk: {
           drinkStorageType: kioskStorage?.get(kioskCount.kioskId) ?? DrinkStorageType.NONE,
+          keepsOwnDrinkStock: localDrinkStockKioskIds?.has(kioskCount.kioskId) ?? false,
         },
         product: {
           suppliedFromLargeCoolerForSatellite:

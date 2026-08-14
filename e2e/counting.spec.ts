@@ -17,6 +17,20 @@ async function startCountAt(page: Page, kioskNumber: number) {
   await page.waitForURL(/\/kiosk\//)
 }
 
+/**
+ * Start een telronde in de tweede ring bij een telpunt met een eigen opschrift.
+ *
+ * De kiosklijst volgt de gekozen ring, en niet elk telpunt heet "Kiosk <n>":
+ * "Ziggo Platform" en "420 Bar" staan onder hun eigen naam.
+ */
+async function startSecondRingCountAt(page: Page, keuze: string, kioskId: string) {
+  await page.goto('/events/event-demo-ajax/count/start')
+  await page.getByLabel('Ring').selectOption({ label: 'Tweede ring' })
+  await page.getByLabel('Startkiosk').selectOption({ label: keuze })
+  await page.getByRole('button', { name: /Telronde starten/ }).click()
+  await page.waitForURL(new RegExp(`/kiosk/${kioskId}`))
+}
+
 /** Het invoerveld van één product, op id in plaats van op volgorde. */
 function inputFor(page: Page, productSelector: string) {
   return page.locator(productSelector).locator('input[inputmode="decimal"]')
@@ -228,12 +242,7 @@ test.describe('Assortiment per kiosk', () => {
   test('een satelliet in de tweede ring telt geen drank maar wel de rest', async ({ page }) => {
     // 402 heeft geen koeling. Hier stond elk drankproduct op norm 1 als
     // assortimentsindicatie; dat leverde regels op die niemand kon tellen.
-    await page.goto('/events/event-demo-ajax/count/start')
-    // De kiosklijst volgt de gekozen ring; 402 zit in de tweede.
-    await page.getByLabel('Ring').selectOption({ label: 'Tweede ring' })
-    await page.getByLabel('Startkiosk').selectOption({ label: 'Kiosk 402' })
-    await page.getByRole('button', { name: /Telronde starten/ }).click()
-    await page.waitForURL(/\/kiosk\/kiosk-402/)
+    await startSecondRingCountAt(page, 'Kiosk 402', 'kiosk-402')
 
     await expect(page.locator(WATER)).toHaveCount(0)
     await expect(page.locator('#product-redbull')).toHaveCount(0)
@@ -251,6 +260,33 @@ test.describe('Assortiment per kiosk', () => {
     // Bekers en trays, niet rollen en pakken.
     await expect(page.locator('#product-bierbeker-05')).toContainText('dozen')
     await expect(page.locator('#product-heineken-00')).toContainText('trays')
+  })
+
+  test('Ziggo Platform telt zijn eigen drank, ondanks dat het een satelliet is', async ({
+    page,
+  }) => {
+    // De uitzondering: geen grote koeling, maar wel een eigen stocklijst met
+    // echte dranknormen. Die moeten op het telscherm staan.
+    await startSecondRingCountAt(page, 'Ziggo Platform', 'kiosk-ziggo-platform')
+
+    await expect(page.locator(WATER)).toBeVisible()
+    await expect(page.locator('#product-fuze-tea')).toBeVisible()
+    await expect(page.locator('#product-redbull')).toBeVisible()
+
+    // En de rest van zijn eigen lijst.
+    await expect(page.locator('#product-bierbeker-03')).toBeVisible()
+    await expect(page.locator('#product-sixpacks')).toBeVisible()
+  })
+
+  test('een GFT-bak staat alleen bij de kiosken die er een hebben', async ({ page }) => {
+    await startSecondRingCountAt(page, 'Kiosk 416', 'kiosk-416')
+    await expect(page.locator('#product-gft-bak')).toBeVisible()
+    await expect(page.locator('#product-gft-bak')).toContainText('bak')
+  })
+
+  test('een kiosk zonder GFT telt hem niet', async ({ page }) => {
+    await startSecondRingCountAt(page, 'Kiosk 417', 'kiosk-417')
+    await expect(page.locator('#product-gft-bak')).toHaveCount(0)
   })
 })
 

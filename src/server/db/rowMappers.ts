@@ -199,6 +199,7 @@ export function mapKiosk(row: Row): Kiosk {
     location: optStr(row.location),
     notes: optStr(row.notes),
     drinkStorageType: str(row.drink_storage_type) as DrinkStorageType,
+    keepsOwnDrinkStock: bool(row.keeps_own_drink_stock),
     drinkSourceKioskId: optStr(row.drink_source_kiosk_id) ?? null,
     createdAt: str(row.created_at),
     updatedAt: str(row.updated_at),
@@ -218,6 +219,7 @@ export function kioskToRow(data: Partial<Kiosk>): Row {
   if (data.location !== undefined) row.location = data.location
   if (data.notes !== undefined) row.notes = data.notes
   if (data.drinkStorageType !== undefined) row.drink_storage_type = data.drinkStorageType
+  if (data.keepsOwnDrinkStock !== undefined) row.keeps_own_drink_stock = data.keepsOwnDrinkStock
   // Leeg betekent hier echt leeg: een satelliet zonder vastgestelde bronkiosk
   // hoort NULL te zijn en niet een lege tekst.
   if (data.drinkSourceKioskId !== undefined) {

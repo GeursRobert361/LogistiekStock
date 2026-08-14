@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest'
-import { secondRingStandards, authoritativeKioskKeys } from '../secondRingStandards'
+import {
+  secondRingStandards,
+  authoritativeKioskKeys,
+  paperStandardsFor,
+} from '../secondRingStandards'
 import { demoKiosks, demoStandards } from '../demoData'
 import { demoProducts } from '../catalogue'
 import { DrinkStorageType } from '@/types'
@@ -127,15 +131,10 @@ describe('dranknormen van de grote koelingen', () => {
 
 describe('419 volgens de papieren lijst', () => {
   it('heeft de non-dranknormen van het papier', () => {
-    // Bewust zonder de bekers en de chips: die komen sinds de nieuwe handmatige
-    // lijsten niet meer van papier. Zie de tests hieronder.
+    // Bewust zonder de bekers, de chips en de zeven disposables: die komen
+    // sinds de nieuwe handmatige lijsten niet meer van papier. Zie de tests
+    // hieronder en de Disposable-matrix in standardPrecedence.
     const verwacht: Record<string, number> = {
-      'square-bakjes': 2,
-      'patat-bakjes': 3,
-      servetten: 5,
-      sixpacks: 3,
-      'patat-vorkjes': 1,
-      'arena-blaadjes': 1,
       'mayo-emmers': 5,
       'ketchup-flessen': 15,
     }
@@ -157,6 +156,27 @@ describe('419 volgens de papieren lijst', () => {
     expect(norm('kiosk-419', 'chips-blauw')).toBe(7)
     expect(norm('kiosk-419', 'chips-rood')).toBe(5)
     expect(norm('kiosk-419', 'chips-oranje')).toBe(5)
+  })
+
+  it('volgt voor de verpakkingen de nieuwste Disposable-lijst', () => {
+    // Papier zei drie patatbakjes; de Disposable-lijst zegt er twee. De rest
+    // van de regel bevestigt wat er al stond.
+    expect(paperStandardsFor('kiosk-419')['patat-bakjes']).toBe(3)
+    expect(norm('kiosk-419', 'patat-bakjes')).toBe(2)
+
+    expect(norm('kiosk-419', 'square-bakjes')).toBe(2)
+    expect(norm('kiosk-419', 'servetten')).toBe(5)
+    expect(norm('kiosk-419', 'sixpacks')).toBe(3)
+    expect(norm('kiosk-419', 'patat-vorkjes')).toBe(1)
+    expect(norm('kiosk-419', 'arena-blaadjes')).toBe(1)
+
+    // Rectangular staat op die lijst met een 0 en heeft dus geen norm — 419
+    // voerde ze al niet en krijgt ze er ook niet bij.
+    expect(norm('kiosk-419', 'rectangular-bakjes')).toBeUndefined()
+  })
+
+  it('krijgt een GFT-bak', () => {
+    expect(norm('kiosk-419', 'gft-bak')).toBe(1)
   })
 
   it('voert geen post-mix en geen van de andere niet-genoemde producten', () => {
@@ -258,19 +278,32 @@ describe('Ziggo Platform', () => {
     expect(kiosk?.drinkStorageType).toBe(DrinkStorageType.SATELLITE)
   })
 
-  it('voert geen Caprisun meer, want dat is drank', () => {
-    // Caprisun stond hier als gewone voorraad, maar valt onder de categorie
-    // Drank en die wordt alleen bij een grote koeling geteld.
+  it('voert geen Caprisun, ook niet nu er weer drank staat', () => {
+    // Caprisun stond hier ooit als gewone voorraad. De nieuwste Ziggo-lijst
+    // noemt het niet, en wat een lijst niet noemt krijgt geen norm terug.
     expect(norm('kiosk-ziggo-platform', 'caprisun')).toBeUndefined()
 
     // Het product bestaat nog wel; alleen deze locatie voert het niet.
     expect(demoProducts.find((p) => p.id === 'caprisun')).toBeDefined()
   })
 
-  it('houdt zijn bekers, chips en Post-mix', () => {
+  it('volgt voor bekers, chips en Post-mix zijn eigen lijst', () => {
+    // Papier kende hier geen 0,3 en zei bij Post-mix 2/2/2/2.
     expect(norm('kiosk-ziggo-platform', 'bierbeker-05')).toBe(1)
+    expect(norm('kiosk-ziggo-platform', 'bierbeker-03')).toBe(1)
     expect(norm('kiosk-ziggo-platform', 'chips-blauw')).toBe(2)
-    expect(norm('kiosk-ziggo-platform', 'cola')).toBe(2)
+    expect(norm('kiosk-ziggo-platform', 'cola')).toBe(10)
+  })
+
+  it('houdt eigen drankvoorraad zonder grote koeling', () => {
+    const kiosk = demoKiosks.find((k) => k.id === 'kiosk-ziggo-platform')
+    expect(kiosk?.drinkStorageType).toBe(DrinkStorageType.SATELLITE)
+    expect(kiosk?.keepsOwnDrinkStock).toBe(true)
+  })
+
+  it('is de enige locatie met dat kenmerk', () => {
+    const met = demoKiosks.filter((k) => k.keepsOwnDrinkStock).map((k) => k.id)
+    expect(met).toEqual(['kiosk-ziggo-platform'])
   })
 })
 
