@@ -2,7 +2,8 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { PrintableRestockStop } from '../PrintableRestockStop'
 import { demoProducts } from '@/lib/seed/catalogue'
-import { demoKiosks } from '@/lib/seed/demoData'
+import { demoKiosks, demoStandards } from '@/lib/seed/demoData'
+import { fromQuarterUnits } from '@/lib/quarterUnits'
 import type { Product, RestockRoundStop, RestockStopItem } from '@/types'
 
 /**
@@ -31,6 +32,18 @@ function item(productId: string, plannedPackages: number, stopId = 'stop-1'): Re
   }
 }
 
+/** De echte normen van een kiosk, in hele verpakkingen. */
+function standardsFor(kioskId: string): Map<string, number> {
+  return new Map(
+    demoStandards
+      .filter((standard) => standard.kioskId === kioskId)
+      .map((standard) => [
+        standard.productId,
+        fromQuarterUnits(standard.targetQuantityQuarters),
+      ])
+  )
+}
+
 function renderStop(overrides: Partial<Parameters<typeof PrintableRestockStop>[0]> = {}) {
   return render(
     <PrintableRestockStop
@@ -38,6 +51,7 @@ function renderStop(overrides: Partial<Parameters<typeof PrintableRestockStop>[0
       stopItems={[item('chips-blauw', 3)]}
       products={products}
       categoryNames={categoryNames}
+      standards={standardsFor('kiosk-401')}
       kiosk={kioskById('kiosk-401')}
       index={0}
       totalStops={3}
@@ -115,6 +129,23 @@ describe('PrintableRestockStop', () => {
     expect(screen.getByText(/2 dozen achter in de kiosk/)).toBeDefined()
   })
 
+  it('zet de norm naast het te vullen aantal', () => {
+    // Zo is op de vloer te zien of het plan klopt met wat er hoort te staan.
+    // 401 voert Chips Blauw op zes dozen; er staan er drie gepland.
+    renderStop({ stopItems: [item('chips-blauw', 3)] })
+
+    expect(screen.getByRole('columnheader', { name: 'Standaard' })).toBeDefined()
+    expect(screen.getByText('6 dozen')).toBeDefined()
+    expect(screen.getByText('3 dozen')).toBeDefined()
+  })
+
+  it('laat de norm leeg als die er niet is, in plaats van er een te verzinnen', () => {
+    renderStop({ stopItems: [item('chips-blauw', 3)], standards: new Map() })
+
+    const cellen = within(screen.getAllByRole('row')[1]!).getAllByRole('cell')
+    expect(cellen[1]!.textContent).toBe('')
+  })
+
   it('geeft iedere regel een lege kolom om het geleverde aantal in te vullen', () => {
     renderStop({ stopItems: [item('chips-blauw', 3)] })
 
@@ -122,8 +153,8 @@ describe('PrintableRestockStop', () => {
 
     const rijen = screen.getAllByRole('row')
     const cellen = within(rijen[1]!).getAllByRole('cell')
-    expect(cellen).toHaveLength(3)
-    expect(cellen[2]!.textContent).toBe('')
+    expect(cellen).toHaveLength(4)
+    expect(cellen[3]!.textContent).toBe('')
   })
 
   it('heeft een vinkje voor "alles geleverd zoals gepland"', () => {

@@ -64,6 +64,60 @@ async function prepareRoundWithRoute(page: Page): Promise<number> {
   return stops
 }
 
+test.describe('Bestellijst printen', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetAppData(page)
+    await login(page, 'admin@demo.nl')
+  })
+
+  test('bestaat ook zonder telling en zonder vulronde', async ({ page }) => {
+    // Dit is het geval waar het misging: een evenement waar niets te vullen
+    // valt leverde geen enkele pagina op. De bestellijst komt uit de normen en
+    // is er dus altijd.
+    await page.goto('/events/event-demo-ajax')
+    await page.getByRole('button', { name: /Bestellijst printen/ }).click()
+    await page.waitForURL(/\/events\/[^/]+\/print$/)
+
+    const pages = page.locator('.print-kiosk-page')
+    await expect(pages.first()).toBeVisible()
+    expect(await pages.count()).toBeGreaterThan(1)
+
+    const eerste = pages.first()
+    await expect(eerste.getByRole('columnheader', { name: 'Artikel' })).toBeVisible()
+    await expect(eerste.getByRole('columnheader', { name: 'Standaard' })).toBeVisible()
+    await expect(eerste.getByRole('columnheader', { name: 'Bestellen' })).toBeVisible()
+    await expect(eerste.getByText(/blad 1 van/)).toBeVisible()
+    await expect(eerste.getByRole('heading', { level: 2 })).toBeVisible()
+  })
+
+  test('geeft iedere kiosk zijn eigen vel met zijn eigen normen', async ({ page }) => {
+    await page.goto('/events/event-demo-ajax/print')
+    await expect(page.locator('.print-kiosk-page').first()).toBeVisible()
+
+    const nummers = await page.evaluate(() =>
+      [...document.querySelectorAll('.print-kiosk-page')].map((el) =>
+        el.getAttribute('data-kiosk-number')
+      )
+    )
+    expect(new Set(nummers).size).toBe(nummers.length)
+
+    // Elk vel heeft artikelen; een leeg vel hoort er niet tussen te staan.
+    const regels = await page.evaluate(() =>
+      [...document.querySelectorAll('.print-kiosk-page')].map(
+        (el) => el.querySelectorAll('tbody tr').length
+      )
+    )
+    expect(regels.every((n) => n > 0)).toBe(true)
+  })
+
+  test('de bediening print niet mee', async ({ page }) => {
+    await page.goto('/events/event-demo-ajax/print')
+    const printButton = page.getByRole('button', { name: 'Printen' })
+    await expect(printButton).toBeVisible()
+    await expect(page.locator('.no-print').filter({ has: printButton })).toHaveCount(1)
+  })
+})
+
 test.describe('Vullijst printen', () => {
   test.setTimeout(240_000)
 

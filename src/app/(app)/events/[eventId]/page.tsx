@@ -186,6 +186,14 @@ export default function EventDetailPage({
               </Link>
             </>
           )}
+
+          {/* Uit de normen en niet uit een vulronde: deze lijst is er altijd,
+              ook als er nog niets geteld is en niets bij te vullen valt. */}
+          <Link href={`/events/${eventId}/print`} className="block">
+            <Button variant="outline" className="w-full" size="lg">
+              🖨 Bestellijst printen
+            </Button>
+          </Link>
         </div>
 
         {event.notes && (

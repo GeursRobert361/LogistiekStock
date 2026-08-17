@@ -11,8 +11,9 @@ import {
 } from '@/components/restock/PrintableRestockStop'
 import { kioskTitle } from '@/lib/kiosk'
 import { formatDate } from '@/lib/utils'
+import { fromQuarterUnits } from '@/lib/quarterUnits'
 import type { Event, Kiosk, Product, Ring } from '@/types'
-import './print.css'
+import '../../../print.css'
 
 /**
  * De vulronde op papier: één kiosk per A4.
@@ -32,6 +33,8 @@ interface PrintData {
   products: Map<string, Product>
   categoryNames: Map<string, string>
   kiosks: Map<string, Kiosk>
+  /** kioskId → productId → norm in hele verpakkingen. */
+  standards: Map<string, Map<string, number>>
   ring: Ring | undefined
   event: Event | undefined
 }
@@ -63,11 +66,27 @@ export default function RestockRoundPrintPage({
       .getEventById(plan.round.eventId)
       .catch(() => null)
 
+    // De norm hoort naast het te vullen aantal, zodat op de vloer te zien is of
+    // het plan klopt met wat er hoort te staan. Eén matrixquery voor de ring
+    // van deze ronde.
+    const matrix = await repositories.product().getStandardMatrix(plan.round.ringId)
+    const standards = new Map<string, Map<string, number>>()
+    for (const [productId, perKiosk] of Object.entries(matrix.standards)) {
+      for (const standard of Object.values(perKiosk)) {
+        if (!standard.isActive) continue
+        if (!standards.has(standard.kioskId)) standards.set(standard.kioskId, new Map())
+        standards
+          .get(standard.kioskId)!
+          .set(productId, fromQuarterUnits(standard.targetQuantityQuarters))
+      }
+    }
+
     setData({
       plan,
       products: new Map(productList.map((p) => [p.id, p])),
       categoryNames: new Map(categories.map((c) => [c.id, c.name])),
       kiosks: new Map(kioskList.map((k) => [k.id, k])),
+      standards,
       ring: rings.find((r) => r.id === plan.round.ringId),
       event: event ?? undefined,
     })
@@ -99,7 +118,7 @@ export default function RestockRoundPrintPage({
     )
   }
 
-  const { plan, products, categoryNames, kiosks, ring, event } = data
+  const { plan, products, categoryNames, kiosks, standards, ring, event } = data
   const { round, stops } = plan
 
   // Alleen voorgedrukt wanneer het zonder extra query kan: de ingelogde
@@ -163,6 +182,7 @@ export default function RestockRoundPrintPage({
               stopItems={plan.stopItems.filter((item) => item.restockRoundStopId === stop.id)}
               products={products}
               categoryNames={categoryNames}
+              standards={standards.get(stop.kioskId) ?? new Map()}
               kiosk={kiosks.get(stop.kioskId)}
               index={index}
               totalStops={stops.length}

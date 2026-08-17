@@ -23,13 +23,10 @@ import type { Kiosk, Product, RestockRoundStop, RestockStopItem } from '@/types'
  * naarmate er meer zijn: 11pt bij een gewone lijst, 10pt daarboven, 9pt bij een
  * volle kiosk.
  *
- * De grenzen zijn nagemeten aan echte PDF-paginering en niet geschat. Wat er op
- * die manier uitkwam, in millimeters van de 273 beschikbare:
- *
- *     17 regels ruim  259    18 regels compact 195    29 regels compact 255
- *     30 regels dicht 214    42 regels dicht   267    46 regels dicht   285 ✗
- *
- * Bij 18 valt het terug naar compact omdat 19 ruime regels al 278mm werden.
+ * De grenzen zijn nagemeten aan echte PDF-paginering en niet geschat: 19 ruime
+ * regels werden al 278mm, vandaar dat het bij 18 terugvalt naar compact. Met de
+ * dichtste stand past een vel van vijftig regels — 42 producten plus acht
+ * tussenkoppen — nog binnen één A4.
  */
 const COMPACT_FROM_ITEMS = 18
 const DENSE_FROM_ITEMS = 30
@@ -54,6 +51,14 @@ export interface PrintableRestockStopProps {
   stopItems: RestockStopItem[]
   products: Map<string, Product>
   categoryNames: Map<string, string>
+  /**
+   * De norm van deze kiosk per product, in hele verpakkingen.
+   *
+   * Staat naast het te vullen aantal, zodat op de vloer te zien is of het plan
+   * klopt met wat er hoort te staan. Ontbreekt een norm, dan blijft het vakje
+   * leeg — een verzonnen getal is erger dan geen getal.
+   */
+  standards: Map<string, number>
   kiosk: Kiosk | undefined
   /** Nulgebaseerd; op papier staat `index + 1`. */
   index: number
@@ -70,6 +75,7 @@ export function PrintableRestockStop({
   stopItems,
   products,
   categoryNames,
+  standards,
   kiosk,
   index,
   totalStops,
@@ -122,6 +128,11 @@ export function PrintableRestockStop({
               <th scope="col" className="print-col-product">
                 Product
               </th>
+              {/* De norm erbij: dan is op de vloer te zien of het geplande
+                  aantal klopt met wat er hoort te staan. */}
+              <th scope="col" className="print-col-standard">
+                Standaard
+              </th>
               <th scope="col" className="print-col-planned">
                 Te vullen
               </th>
@@ -139,6 +150,11 @@ export function PrintableRestockStop({
                         en herkenbaarheid weegt hier zwaarder dan compactheid. */}
                     <span className="print-product-name">{product?.name ?? item.productId}</span>
                     {note && <span className="print-storage-note">↳ {note}</span>}
+                  </td>
+                  <td className="print-col-standard">
+                    {product && standards.has(item.productId)
+                      ? formatProductQuantity(product, standards.get(item.productId)!)
+                      : ''}
                   </td>
                   <td className="print-col-planned">
                     {product
