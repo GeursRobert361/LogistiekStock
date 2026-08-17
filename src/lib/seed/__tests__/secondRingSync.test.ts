@@ -28,6 +28,8 @@ interface StandardRow {
   productId: string
   targetQuantityQuarters: number
   isActive: boolean
+  /** Gezet in Beheer; de sync hoort er vanaf te blijven. */
+  manuallySetAt?: string
 }
 
 interface FakeState {
@@ -188,7 +190,14 @@ function handle(
         product_id: row.productId,
         target_quantity_quarters: row.targetQuantityQuarters,
         is_active: row.isActive,
+        manually_set_at: row.manuallySetAt ?? null,
       }))
+  }
+
+  if (sql.startsWith('select kiosk_id, product_id from kiosk_product_standards')) {
+    return [...state.standards.values()]
+      .filter((row) => row.manuallySetAt !== undefined)
+      .map((row) => ({ kiosk_id: row.kioskId, product_id: row.productId }))
   }
 
   if (sql.startsWith('select id, kiosk_id, product_id from kiosk_product_standards')) {
@@ -320,6 +329,118 @@ describe('transactie', () => {
 
     expect(applied).toBe(false)
     expect(client.queries).not.toContain('begin')
+  })
+})
+
+/**
+ * Wat iemand in Beheer zet, hoort daar te blijven staan.
+ *
+ * Dit is de aanleiding: na Ajax – SC Heerenveen bleek dat 401 en 410 leegliepen
+ * op chips, de norm werd op de vloer verhoogd, en de eerstvolgende sync zou hem
+ * zonder deze regel gewoon weer op het papieren getal zetten. Dan loopt dezelfde
+ * kiosk bij de volgende wedstrijd opnieuw leeg, en niemand die begrijpt waarom.
+ */
+describe('handmatig gezette normen', () => {
+  const CHIPS_401 = `${kioskDbId(401)}|${productDbId('chips-blauw')}`
+  const CHIPS_402 = `${kioskDbId(402)}|${productDbId('chips-blauw')}`
+
+  /**
+   * 401 chips-blauw staat met de hand op 10; bij 402 staat een gewone afwijking
+   * die de sync wél hoort recht te trekken.
+   *
+   * Die tweede is nodig: zonder werk stopt de sync al voordat hij iets doet, en
+   * dan bewijst "de norm staat er nog" niets.
+   */
+  function metHandmatigeNorm(): FakeState {
+    const state = syncedState()
+    const handmatig = state.standards.get(CHIPS_401)!
+    handmatig.targetQuantityQuarters = 40
+    handmatig.manuallySetAt = '2026-08-17T09:55:04Z'
+
+    state.standards.get(CHIPS_402)!.targetQuantityQuarters = 4
+    return state
+  }
+
+  /** Dezelfde handmatige norm, maar verder staat alles goed. */
+  function alleenHandmatig(): FakeState {
+    const state = metHandmatigeNorm()
+    state.standards.get(CHIPS_402)!.targetQuantityQuarters = 8
+    return state
+  }
+
+  it('laat de norm staan terwijl de rest wél wordt rechtgetrokken', async () => {
+    const client = fakeClient(metHandmatigeNorm())
+    const { applied } = await runSecondRingSync(client, { apply: true })
+
+    expect(applied).toBe(true)
+    expect(client.state.standards.get(CHIPS_401)!.targetQuantityQuarters).toBe(40)
+    // 402 hoort op 2 dozen te staan volgens de lijst.
+    expect(client.state.standards.get(CHIPS_402)!.targetQuantityQuarters).toBe(8)
+  })
+
+  it('raakt de rij niet aan, dus het stempel blijft staan', async () => {
+    // De nepdatabase vervangt de rij bij een insert en verliest daarbij het
+    // stempel. Staat het er na afloop nog, dan is er niets overheen geschreven.
+    const client = fakeClient(metHandmatigeNorm())
+    await runSecondRingSync(client, { apply: true })
+
+    expect(client.state.standards.get(CHIPS_401)!.manuallySetAt).toBe('2026-08-17T09:55:04Z')
+  })
+
+  it('meldt het verschil, zodat een vergissing niet stil blijft', async () => {
+    const client = fakeClient(metHandmatigeNorm())
+    const regels: string[] = []
+    await runSecondRingSync(client, { apply: false, log: (line) => regels.push(line) })
+
+    const uitvoer = regels.join('\n')
+    expect(uitvoer).toMatch(/Handmatig gezet in Beheer \(1\)/)
+    expect(uitvoer).toMatch(/kiosk-401 chips-blauw: 10 \(lijst: 6\)/)
+  })
+
+  it('telt niet als werk: een run met alleen zulke normen heeft niets te doen', async () => {
+    const { plan } = await runSecondRingSync(fakeClient(alleenHandmatig()), { apply: false })
+
+    expect(plan.isEmpty).toBe(true)
+  })
+
+  it('laat de controle achteraf er niet over struikelen', async () => {
+    // Anders faalt de sync op precies het gedrag dat hij zelf toepast.
+    expect(await verifySecondRing(fakeClient(alleenHandmatig()))).toEqual([])
+  })
+
+  it('schakelt een handmatig toegevoegde norm niet uit', async () => {
+    // Koffie hoort volgens de lijst niet bij 429 — maar wie hem daar bewust
+    // neerzet heeft een reden, en dat is geen restant om op te ruimen.
+    const state = syncedState()
+    const key = `${kioskDbId(429)}|${productDbId('koffie')}`
+    state.standards.set(key, {
+      id: `s-${key}`,
+      kioskId: kioskDbId(429),
+      productId: productDbId('koffie'),
+      targetQuantityQuarters: 8,
+      isActive: true,
+      manuallySetAt: '2026-08-17T09:55:04Z',
+    })
+
+    const client = fakeClient(state)
+    await runSecondRingSync(client, { apply: true })
+
+    expect(client.state.standards.get(key)!.isActive).toBe(true)
+    expect(client.state.standards.get(key)!.targetQuantityQuarters).toBe(8)
+  })
+
+  it('zet een handmatig uitgezette norm niet terug', async () => {
+    // Een norm op nul zetten in Beheer betekent "hoort hier niet"; de lijst mag
+    // hem niet opnieuw aanzetten.
+    const state = syncedState()
+    const row = state.standards.get(CHIPS_401)!
+    row.isActive = false
+    row.manuallySetAt = '2026-08-17T09:55:04Z'
+
+    const client = fakeClient(state)
+    await runSecondRingSync(client, { apply: true })
+
+    expect(client.state.standards.get(CHIPS_401)!.isActive).toBe(false)
   })
 })
 

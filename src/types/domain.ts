@@ -174,6 +174,14 @@ export interface KioskProductStandard {
   /** custom 80% threshold, defaults to 80 */
   halfPackageThresholdPercentage: number
   isActive: boolean
+  /**
+   * Wanneer iemand deze norm zelf in Beheer heeft gezet.
+   *
+   * De stamdata-sync laat zo'n norm met rust: hij komt van de vloer en niet van
+   * de papieren lijst, en stil terugzetten laat dezelfde kiosk opnieuw leeglopen.
+   * Leeg betekent dat de norm uit de aangeleverde lijsten komt.
+   */
+  manuallySetAt?: string
   createdAt: string
   updatedAt: string
 }

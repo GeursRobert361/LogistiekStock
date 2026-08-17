@@ -28,6 +28,7 @@ import {
   type CurrentStandard,
   type DesiredKiosk,
   type DesiredStandard,
+  type StandardChange,
   type SyncPlan,
 } from './syncPlan'
 
@@ -137,8 +138,9 @@ async function readCurrentStandards(
     product_id: string
     target_quantity_quarters: number
     is_active: boolean
+    manually_set_at: string | null
   }>(
-    `select kiosk_id, product_id, target_quantity_quarters, is_active
+    `select kiosk_id, product_id, target_quantity_quarters, is_active, manually_set_at
        from kiosk_product_standards where kiosk_id = any($1::uuid[])`,
     [dbIds]
   )
@@ -156,6 +158,7 @@ async function readCurrentStandards(
       productId,
       targetQuantityQuarters: Number(row.target_quantity_quarters),
       isActive: row.is_active,
+      manuallySetAt: row.manually_set_at,
     })
   }
   return current
@@ -179,7 +182,11 @@ export async function planSecondRingSync(client: SqlClient): Promise<SyncPlan> {
 }
 
 export function describePlan(plan: SyncPlan): string[] {
-  if (plan.isEmpty) return ['De stamdata is al gelijk. Niets te doen.']
+  const handmatig = plan.standards.filter((s) => s.kind === 'handmatig')
+
+  if (plan.isEmpty) {
+    return ['De stamdata is al gelijk. Niets te doen.', ...describeManual(handmatig)]
+  }
 
   const regels: string[] = []
 
@@ -220,6 +227,30 @@ export function describePlan(plan: SyncPlan): string[] {
       regels.push(`  … en nog ${perKind.nieuw.length - voorbeeld.length}`)
     }
   }
+
+  return [...regels, ...describeManual(handmatig)]
+}
+
+/**
+ * Wat de sync met rust laat omdat het in Beheer is gezet.
+ *
+ * Dit hoort in de uitvoer en niet alleen in de code: een norm die van de lijst
+ * afwijkt is meestal een bewuste correctie, maar soms een vergissing. Zolang
+ * het verschil bij elke run genoemd wordt kan iemand dat zien; verzwijgen maakt
+ * er stille afwijkende stamdata van.
+ */
+function describeManual(handmatig: StandardChange[]): string[] {
+  if (handmatig.length === 0) return []
+
+  const regels = [
+    `\nHandmatig gezet in Beheer (${handmatig.length}) — blijft staan, wijkt af van de lijst:`,
+  ]
+  for (const change of handmatig) {
+    const staat = change.from === undefined ? 'staat uit' : `${change.from / 4}`
+    const lijst = change.to === undefined ? 'staat niet op de lijst' : `lijst: ${change.to / 4}`
+    regels.push(`  = ${change.kioskKey} ${change.productId}: ${staat} (${lijst})`)
+  }
+  regels.push('  Terug naar de lijst? Pas de norm in Beheer aan, of maak hem daar leeg.')
 
   return regels
 }
@@ -327,6 +358,16 @@ async function applyChanges(client: SqlClient): Promise<void> {
   const freshProductIds = await resolveProductIds(client)
   const kioskIds = await resolveKioskIds(client, demoKiosks)
 
+  // Normen die in Beheer zijn gezet blijven zoals ze staan. Ze komen van de
+  // vloer en niet van de papieren lijst; `planStandardChanges` houdt ze om
+  // dezelfde reden buiten het plan. Zonder dat zou de dry-run iets anders
+  // beloven dan er gebeurt.
+  const { rows: manualRows } = await client.query<{ kiosk_id: string; product_id: string }>(
+    `select kiosk_id, product_id from kiosk_product_standards
+      where manually_set_at is not null`
+  )
+  const manual = new Set(manualRows.map((row) => `${row.kiosk_id}|${row.product_id}`))
+
   const wanted = new Set<string>()
   for (const standard of desiredStandards()) {
     const kioskId = kioskIds.get(standard.kioskKey)
@@ -334,7 +375,10 @@ async function applyChanges(client: SqlClient): Promise<void> {
     if (!kioskId || !productId) {
       throw new Error(`Kan ${standard.kioskKey} / ${standard.productId} niet koppelen.`)
     }
+    // Wél in `wanted`: anders zou hij hieronder als verouderd worden
+    // uitgeschakeld, en dan is "met rust laten" alsnog een wijziging.
     wanted.add(`${kioskId}|${productId}`)
+    if (manual.has(`${kioskId}|${productId}`)) continue
 
     await client.query(
       `insert into kiosk_product_standards
@@ -363,6 +407,9 @@ async function applyChanges(client: SqlClient): Promise<void> {
 
   const stale = active
     .filter((row) => !wanted.has(`${row.kiosk_id}|${row.product_id}`))
+    // Staat er met de hand een norm voor iets dat de lijst niet noemt, dan is
+    // dat een keuze en geen restant.
+    .filter((row) => !manual.has(`${row.kiosk_id}|${row.product_id}`))
     .map((row) => row.id)
 
   if (stale.length > 0) {
@@ -388,6 +435,14 @@ export async function verifySecondRing(client: SqlClient): Promise<string[]> {
   const problemen: string[] = []
   const kioskIds = await resolveKioskIds(client, demoKiosks)
   const productIds = await resolveProductIds(client)
+
+  // Een norm die in Beheer is gezet hoort bewust af te wijken van de lijst. Die
+  // hier als probleem melden zou betekenen dat de sync faalt op precies het
+  // gedrag dat hij zelf toepast.
+  const { rows: manualRows } = await client.query<{ kiosk_id: string; product_id: string }>(
+    `select kiosk_id, product_id from kiosk_product_standards where manually_set_at is not null`
+  )
+  const manual = new Set(manualRows.map((row) => `${row.kiosk_id}|${row.product_id}`))
 
   /** De actieve norm in hele verpakkingen, of undefined als hij niet actief is. */
   async function activeStandard(
@@ -422,6 +477,8 @@ export async function verifySecondRing(client: SqlClient): Promise<string[]> {
       }
 
       for (const [index, productSeedId] of volgorde.entries()) {
+        if (manual.has(`${kioskId}|${productIds.get(productSeedId)}`)) continue
+
         const gevonden = await activeStandard(kioskId, productSeedId)
         const hoort = verwacht[index]
 

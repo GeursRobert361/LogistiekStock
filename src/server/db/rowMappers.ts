@@ -312,11 +312,23 @@ export function mapStandard(row: Row): KioskProductStandard {
     targetQuantityQuarters: num(row.target_quantity_quarters),
     halfPackageThresholdPercentage: num(row.half_package_threshold_pct),
     isActive: bool(row.is_active),
+    manuallySetAt:
+      row.manually_set_at === null || row.manually_set_at === undefined
+        ? undefined
+        : str(row.manually_set_at),
     createdAt: str(row.created_at),
     updatedAt: str(row.updated_at),
   }
 }
 
+/**
+ * Elke norm die hier langskomt is door een mens gezet.
+ *
+ * Deze weg loopt via `/api/rpc` en vereist MANAGE_STANDARDS: het normenscherm,
+ * het bulk-kopiëren en de CSV-import. De stamdata-sync schrijft niet hierlangs
+ * maar rechtstreeks met SQL, juist zodat hij dit stempel niet zet — en de norm
+ * daarna herkent als iets waar hij vanaf moet blijven.
+ */
 export function standardToRow(
   data: Omit<KioskProductStandard, 'id' | 'createdAt' | 'updatedAt'>
 ): Row {
@@ -326,6 +338,7 @@ export function standardToRow(
     target_quantity_quarters: data.targetQuantityQuarters,
     half_package_threshold_pct: data.halfPackageThresholdPercentage,
     is_active: data.isActive,
+    manually_set_at: new Date().toISOString(),
   }
 }
 

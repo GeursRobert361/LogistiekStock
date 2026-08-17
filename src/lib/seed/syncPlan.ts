@@ -39,6 +39,11 @@ export interface CurrentStandard {
   productId: string
   targetQuantityQuarters: number
   isActive: boolean
+  /**
+   * Gezet in Beheer, niet overgenomen uit een aangeleverde lijst. Zo'n norm
+   * blijft staan; zie `planStandardChanges`.
+   */
+  manuallySetAt?: string | null
 }
 
 export interface KioskChange {
@@ -52,9 +57,19 @@ export interface KioskChange {
 export interface StandardChange {
   kioskKey: string
   productId: string
-  kind: 'nieuw' | 'gewijzigd' | 'uitgeschakeld'
+  /**
+   * `handmatig` is geen wijziging maar een wijziging die níét gebeurt: de norm
+   * is in Beheer gezet en blijft staan. Hij staat in dezelfde lijst zodat een
+   * dry-run laat zien waar database en papieren lijst uit elkaar lopen.
+   */
+  kind: 'nieuw' | 'gewijzigd' | 'uitgeschakeld' | 'handmatig'
   from?: number
   to?: number
+}
+
+/** Wat de sync werkelijk gaat doen — `handmatig` telt niet mee. */
+export function isActionable(change: StandardChange): boolean {
+  return change.kind !== 'handmatig'
 }
 
 export interface SyncPlan {
@@ -111,6 +126,15 @@ export function planKioskChanges(
  * Verouderde normen worden alleen binnen de authoritative kiosken
  * uitgeschakeld. Wat daarbuiten staat is niet van deze config, en daar blijft
  * de sync vanaf — ook als het er raar uitziet.
+ *
+ * Een norm die in Beheer is gezet blijft eveneens staan. De aangeleverde lijst
+ * is de bron voor wat van papier komt, maar niet voor een correctie die op de
+ * vloer is bedacht: die is nieuwer en weet meer. Zonder deze uitzondering zet
+ * de eerstvolgende sync hem stilzwijgend terug en loopt dezelfde kiosk bij de
+ * volgende wedstrijd opnieuw leeg.
+ *
+ * Dat geldt ook voor uitschakelen: staat er met de hand een norm voor een
+ * product dat de lijst niet noemt, dan is dat een keuze en geen restant.
  */
 export function planStandardChanges(
   desired: DesiredStandard[],
@@ -118,12 +142,32 @@ export function planStandardChanges(
 ): StandardChange[] {
   const desiredByKey = new Map(desired.map((s) => [compositeKey(s.kioskKey, s.productId), s]))
   const currentByKey = new Map(current.map((s) => [compositeKey(s.kioskKey, s.productId), s]))
-
   const changes: StandardChange[] = []
 
   for (const standard of desired) {
     const key = compositeKey(standard.kioskKey, standard.productId)
     const existing = currentByKey.get(key)
+
+    // Ook een handmatig uitgezette norm blijft uit. Een norm op nul zetten in
+    // Beheer betekent "dit product hoort niet in deze kiosk"; de lijst mag hem
+    // niet terugzetten.
+    if (existing?.manuallySetAt) {
+      const staatUit = !existing.isActive
+      const wijktAf = staatUit || existing.targetQuantityQuarters !== standard.targetQuantityQuarters
+
+      // Alleen melden wanneer het ergens over gaat: staat er hetzelfde als op
+      // de lijst, dan is er niets aan de hand en hoeft niemand het te zien.
+      if (wijktAf) {
+        changes.push({
+          kioskKey: standard.kioskKey,
+          productId: standard.productId,
+          kind: 'handmatig',
+          from: staatUit ? undefined : existing.targetQuantityQuarters,
+          to: standard.targetQuantityQuarters,
+        })
+      }
+      continue
+    }
 
     if (!existing || !existing.isActive) {
       changes.push({
@@ -151,6 +195,16 @@ export function planStandardChanges(
     const key = compositeKey(standard.kioskKey, standard.productId)
     if (desiredByKey.has(key)) continue
 
+    if (standard.manuallySetAt) {
+      changes.push({
+        kioskKey: standard.kioskKey,
+        productId: standard.productId,
+        kind: 'handmatig',
+        from: standard.targetQuantityQuarters,
+      })
+      continue
+    }
+
     changes.push({
       kioskKey: standard.kioskKey,
       productId: standard.productId,
@@ -173,7 +227,13 @@ export function buildSyncPlan(params: {
   const kiosks = planKioskChanges(params.desiredKiosks, params.currentKiosks)
   const standards = planStandardChanges(params.desiredStandards, params.currentStandards)
 
-  return { kiosks, standards, isEmpty: kiosks.length === 0 && standards.length === 0 }
+  // Handmatig gezette normen staan wel in het plan maar leveren geen werk op;
+  // een run die alleen die meldt heeft niets te doen.
+  return {
+    kiosks,
+    standards,
+    isEmpty: kiosks.length === 0 && !standards.some(isActionable),
+  }
 }
 
 /**
