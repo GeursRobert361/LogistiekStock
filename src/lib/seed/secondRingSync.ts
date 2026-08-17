@@ -250,7 +250,10 @@ function describeManual(handmatig: StandardChange[]): string[] {
     const lijst = change.to === undefined ? 'staat niet op de lijst' : `lijst: ${change.to / 4}`
     regels.push(`  = ${change.kioskKey} ${change.productId}: ${staat} (${lijst})`)
   }
-  regels.push('  Terug naar de lijst? Pas de norm in Beheer aan, of maak hem daar leeg.')
+  // Bewust niet "maak hem leeg": dat zet de norm uit, en uit blijft hij dan ook.
+  // Op het getal van de lijst zetten is de echte terugweg — het verschil is dan
+  // weg en deze melding ook.
+  regels.push('  Terug naar de lijst? Zet de norm in Beheer op het getal van de lijst.')
 
   return regels
 }
