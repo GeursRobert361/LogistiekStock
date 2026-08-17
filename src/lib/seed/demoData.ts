@@ -45,9 +45,33 @@ export const demoRings: Ring[] = [
 
 // ─── Kiosks ───────────────────────────────────────────────────────────────
 
-function makeKiosks(ringId: string, start: number, count: number): Kiosk[] {
-  return Array.from({ length: count }, (_, i) => {
-    const number = start + i
+/** 101 tot en met 128, zonder gaten. */
+const RING1_KIOSK_NUMBERS = Array.from({ length: 28 }, (_, i) => 101 + i)
+
+/**
+ * De tweede ring is niet aaneengesloten genummerd.
+ *
+ * 405, 408, 411, 413, 415, 418, 421, 425 en 428 bestaan niet op de vloer. Ze
+ * stonden er wel in zolang dit een reeks van 401 tot en met 429 was: negen
+ * telpunten waar niemand ooit langsliep, compleet met normen, en op de tellijst
+ * van iedere ronde. De aangeleverde tweede-ringlijsten hebben ze nooit gekend —
+ * dit is de plek waar ze ontstonden.
+ */
+const RING2_KIOSK_NUMBERS = [
+  401, 402, 403, 404, 406, 407, 409, 410, 412, 414,
+  416, 417, 419, 420, 422, 423, 424, 426, 427, 429,
+]
+
+/**
+ * `sortOrder` volgt het nummer en niet de plaats in de lijst.
+ *
+ * De losse telpunten hangen er met vaste waarden tussen — 406 Nieuw op 65,
+ * Ziggo Platform op 204, 420 Bar op 205 — en die zouden op de verkeerde plek
+ * belanden zodra er een nummer uit de reeks valt.
+ */
+function makeKiosks(ringId: string, numbers: number[]): Kiosk[] {
+  const first = numbers[0]!
+  return numbers.map((number) => {
     return {
       id: `kiosk-${number}`,
       ringId,
@@ -55,7 +79,7 @@ function makeKiosks(ringId: string, start: number, count: number): Kiosk[] {
       name: `Kiosk ${number}`,
       // Stappen van 10: dan past er een telpunt tussen twee kiosken in,
       // zoals de cubes tegenover 120.
-      sortOrder: (i + 1) * 10,
+      sortOrder: (number - first + 1) * 10,
       isActive: true,
       location: undefined,
       notes: undefined,
@@ -177,9 +201,9 @@ const localDrinkStockByKioskKey = new Map(
 )
 
 export const demoKiosks: Kiosk[] = [
-  ...makeKiosks(RING1_ID, 101, 28), // 101–128
+  ...makeKiosks(RING1_ID, RING1_KIOSK_NUMBERS),
   cubes120,
-  ...makeKiosks(RING2_ID, 401, 29), // 401–429, daarna wrapt de ring naar 401
+  ...makeKiosks(RING2_ID, RING2_KIOSK_NUMBERS),
   bar420,
   kiosk406Nieuw,
   ziggoPlatform,

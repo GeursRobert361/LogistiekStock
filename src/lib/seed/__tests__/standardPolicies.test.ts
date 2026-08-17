@@ -96,14 +96,14 @@ describe('koffie hoort in de koeling', () => {
   })
 
   it('haalt hem weg waar de oude lijst hem wel noemde', () => {
-    // 402, 417 en 429 hadden koffie 2 van papier; 405 kreeg er een uit het
+    // 402, 417 en 429 hadden koffie 2 van papier; 105 krijgt er een uit het
     // richtaantal. Geen van vieren heeft een koeling.
     for (const kioskKey of ['kiosk-402', 'kiosk-417', 'kiosk-429']) {
       expect(paperStandardsFor(kioskKey).koffie, kioskKey).toBe(2)
       expect(norm(kioskKey, 'koffie'), kioskKey).toBeUndefined()
     }
-    expect(assortmentForKiosk(405).some((i) => i.productId === 'koffie')).toBe(true)
-    expect(norm('kiosk-405', 'koffie')).toBeUndefined()
+    expect(assortmentForKiosk(105).some((i) => i.productId === 'koffie')).toBe(true)
+    expect(norm('kiosk-105', 'koffie')).toBeUndefined()
   })
 
   it('houdt hem waar er wél een koeling staat, in beide ringen', () => {

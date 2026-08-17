@@ -4,7 +4,7 @@ import {
   authoritativeKioskKeys,
   paperStandardsFor,
 } from '../secondRingStandards'
-import { demoKiosks, demoStandards } from '../demoData'
+import { demoKiosks, demoStandards, RING2_ID } from '../demoData'
 import { demoProducts } from '../catalogue'
 import { DrinkStorageType } from '@/types'
 
@@ -372,10 +372,14 @@ describe('de config als geheel', () => {
     expect(new Set(keys).size).toBe(keys.length)
   })
 
-  it('laat locaties zonder aangeleverde lijst op de oude normen staan', () => {
-    // 405 heeft geen echte lijst en moet dus gewoon normen houden.
-    expect(authoritativeKioskKeys.has('kiosk-405')).toBe(false)
-    expect(demoStandards.some((s) => s.kioskId === 'kiosk-405')).toBe(true)
+  it('dekt elke locatie van de tweede ring', () => {
+    // Sinds de negen niet-bestaande telpunten uit de ring zijn, valt er in de
+    // tweede ring niets meer terug op een afgeleid richtaantal: de aangeleverde
+    // lijsten dekken hem volledig. Komt er ooit een locatie bij zonder lijst,
+    // dan hoort dat hier op te vallen en niet pas op de vloer.
+    for (const kiosk of demoKiosks.filter((k) => k.ringId === RING2_ID)) {
+      expect(authoritativeKioskKeys.has(kiosk.id), kiosk.id).toBe(true)
+    }
   })
 
   it('laat de eerste ring ongemoeid', () => {

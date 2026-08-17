@@ -593,7 +593,7 @@ describe('een kiosk zonder drank raakt niet leeg', () => {
 })
 
 describe('de tweede-ringroute rond 420', () => {
-  it('loopt 420, Ziggo Platform, 420 Bar, 421', () => {
+  it('loopt 420, Ziggo Platform, 420 Bar, 422', () => {
     // Op id en niet op opschrift: een label is zo veranderd, de volgorde in de
     // route bepaalt waar iemand fysiek naartoe loopt.
     const volgorde = demoKiosks.map((k) => k.id)
@@ -602,7 +602,8 @@ describe('de tweede-ringroute rond 420', () => {
     expect(index('kiosk-420')).toBeGreaterThanOrEqual(0)
     expect(index('kiosk-420')).toBeLessThan(index('kiosk-ziggo-platform'))
     expect(index('kiosk-ziggo-platform')).toBeLessThan(index('kiosk-420-bar'))
-    expect(index('kiosk-420-bar')).toBeLessThan(index('kiosk-421'))
+    // 421 bestaat niet; na 420 Bar volgt 422.
+    expect(index('kiosk-420-bar')).toBeLessThan(index('kiosk-422'))
   })
 
   it('zet Ziggo Platform niet meer achteraan', () => {
@@ -734,13 +735,15 @@ describe('er is nog maar één bron voor de echte normen', () => {
 
   it('gebruikt voor een kiosk zonder lijst nog het richtaantal', async () => {
     const { assortmentForKiosk } = await import('../assortment')
-    // 405 heeft geen aangeleverde lijst; die valt terug op de afleiding.
-    const richtaantallen = assortmentForKiosk(405)
+    // 105 heeft geen aangeleverde lijst; die valt terug op de afleiding. Stond
+    // hier eerder 405, tot bleek dat die kiosk niet bestaat: sindsdien is er in
+    // de tweede ring geen locatie meer zonder lijst.
+    const richtaantallen = assortmentForKiosk(105)
     expect(richtaantallen.length).toBeGreaterThan(0)
 
-    // Eén regel minder: 405 heeft geen koeling en voert dus geen koffie. De
+    // Eén regel minder: 105 heeft geen koeling en voert dus geen koffie. De
     // afspraken uit standardPolicies gaan ook over de afgeleide normen.
-    const uitStamdata = demoStandards.filter((s) => s.kioskId === 'kiosk-405')
+    const uitStamdata = demoStandards.filter((s) => s.kioskId === 'kiosk-105')
     expect(uitStamdata).toHaveLength(richtaantallen.length - 1)
     expect(richtaantallen.some((item) => item.productId === 'koffie')).toBe(true)
     expect(uitStamdata.some((s) => s.productId === 'koffie')).toBe(false)
