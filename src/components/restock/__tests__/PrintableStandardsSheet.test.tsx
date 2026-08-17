@@ -19,12 +19,16 @@ import { toQuarterUnits } from '@/lib/quarterUnits'
 const kioskById = (id: string) => demoKiosks.find((k) => k.id === id)
 const product = (id: string) => demoProducts.find((p) => p.id === id)!
 
-function group(categoryName: string, rows: Array<[string, number]>): StandardsSheetGroup {
+function group(
+  categoryName: string,
+  rows: Array<[string, number] | [string, number, number]>
+): StandardsSheetGroup {
   return {
     categoryName,
-    rows: rows.map(([productId, packages]) => ({
+    rows: rows.map(([productId, packages, restockPackages]) => ({
       product: product(productId),
       targetQuantityQuarters: toQuarterUnits(packages),
+      restockPackages,
     })),
   }
 }
@@ -61,15 +65,33 @@ describe('PrintableStandardsSheet', () => {
     expect(screen.getByText('4 pakken')).toBeDefined()
   })
 
-  it('houdt een lege kolom om te bestellen', () => {
+  it('houdt de kolom "Vullen" leeg zolang er niet geteld is', () => {
     renderSheet()
 
-    expect(screen.getAllByRole('columnheader', { name: 'Bestellen' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('columnheader', { name: 'Vullen' }).length).toBeGreaterThan(0)
 
     const rij = screen.getByText('Chips Blauw').closest('tr')!
     const cellen = within(rij).getAllByRole('cell')
     expect(cellen).toHaveLength(3)
     expect(cellen[2]!.textContent).toBe('')
+  })
+
+  it('vult het aantal in zodra de telling er is', () => {
+    // Norm zes dozen, er stonden er nog twee: dan moeten er vier bij.
+    renderSheet({ groups: [group('Chips', [['chips-blauw', 6, 4]])] })
+
+    const rij = screen.getByText('Chips Blauw').closest('tr')!
+    const cellen = within(rij).getAllByRole('cell')
+    expect(cellen[1]!.textContent).toBe('6 dozen')
+    expect(cellen[2]!.textContent).toBe('4 dozen')
+  })
+
+  it('laat het vakje leeg wanneer er niets bij hoeft', () => {
+    // Nul is geen opdracht; een lege regel leest sneller dan een rij nullen.
+    renderSheet({ groups: [group('Chips', [['chips-blauw', 6, 0]])] })
+
+    const rij = screen.getByText('Chips Blauw').closest('tr')!
+    expect(within(rij).getAllByRole('cell')[2]!.textContent).toBe('')
   })
 
   it('geeft ieder soort product een eigen blokje, zoals de papieren lijst', () => {

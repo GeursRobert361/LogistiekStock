@@ -35,6 +35,11 @@ interface PrintData {
   categories: ProductCategory[]
   /** kioskId → productId → norm in kwarteenheden. */
   standards: Map<string, Map<string, number>>
+  /**
+   * kioskId → productId → bij te vullen verpakkingen volgens de goedgekeurde
+   * telling. Leeg zolang er niet geteld is.
+   */
+  restock: Map<string, Map<string, number>>
 }
 
 export default function EventStandardsPrintPage({
@@ -77,6 +82,23 @@ export default function EventStandardsPrintPage({
       }
     }
 
+    // Wat de goedgekeurde telling heeft opgeleverd. Bestaat die niet, dan is
+    // deze lijst leeg en blijft de kolom "Vullen" open om zelf in te vullen.
+    const requirements = await repositories
+      .restock()
+      .getRequirements(eventId)
+      .catch((requirementError: unknown) => {
+        console.warn('[bestellijst] Bijvulregels niet te laden.', requirementError)
+        return []
+      })
+
+    const restock = new Map<string, Map<string, number>>()
+    for (const requirement of requirements) {
+      if (requirement.requiredPackages <= 0) continue
+      if (!restock.has(requirement.kioskId)) restock.set(requirement.kioskId, new Map())
+      restock.get(requirement.kioskId)!.set(requirement.productId, requirement.requiredPackages)
+    }
+
     setData({
       event,
       rings: ringsInUse,
@@ -84,6 +106,7 @@ export default function EventStandardsPrintPage({
       products: new Map(productList.map((p) => [p.id, p])),
       categories: categoryList,
       standards,
+      restock,
     })
     setIsLoading(false)
   }, [eventId])
@@ -114,21 +137,27 @@ export default function EventStandardsPrintPage({
 
     return kiosks.map((kiosk) => {
       const perProduct = data.standards.get(kiosk.id) ?? new Map<string, number>()
+      const perProductRestock = data.restock.get(kiosk.id)
 
       // Gegroepeerd per soort product, in de volgorde van de catalogus — zoals
       // de blokjes op de papieren lijst.
       const groups: StandardsSheetGroup[] = data.categories
         .map((category) => ({
           categoryName: category.name,
+          // flatMap in plaats van map + filter: dan hoeft er geen typepredicaat
+          // omheen om te vertellen dat het product bestaat.
           rows: [...perProduct]
-            .map(([productId, quarters]) => ({
-              product: data.products.get(productId),
-              targetQuantityQuarters: quarters,
-            }))
-            .filter(
-              (row): row is { product: Product; targetQuantityQuarters: number } =>
-                row.product !== undefined && row.product.categoryId === category.id
-            )
+            .flatMap(([productId, quarters]) => {
+              const product = data.products.get(productId)
+              if (!product || product.categoryId !== category.id) return []
+              return [
+                {
+                  product,
+                  targetQuantityQuarters: quarters,
+                  restockPackages: perProductRestock?.get(productId),
+                },
+              ]
+            })
             .sort((a, b) => a.product.sortOrder - b.product.sortOrder),
         }))
         .filter((group) => group.rows.length > 0)

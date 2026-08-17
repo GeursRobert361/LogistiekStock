@@ -176,12 +176,17 @@
 .print-block .print-col-standard {
   width: 17mm;
   white-space: nowrap;
-  font-weight: 700;
 }
 
-/* Leeg gelaten om met de hand in te vullen. */
+/*
+ * Wat er bij moet. Staat er nog geen telling, dan is dit vakje leeg om met de
+ * hand in te vullen — daarom breed genoeg om in te schrijven, ook als er al
+ * een getal staat.
+ */
 .print-block .print-col-order {
-  width: 15mm;
+  width: 20mm;
+  white-space: nowrap;
+  font-weight: 700;
 }
 
 /* Leeg gelaten om met de hand in te vullen. */

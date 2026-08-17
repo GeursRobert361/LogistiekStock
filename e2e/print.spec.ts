@@ -21,7 +21,7 @@ const ROUTE_LENGTH = 29
  * koeling en voert de gekoelde dranken helemaal niet — en dan valt er niets
  * over meerdere vellen te testen.
  */
-async function prepareRoundWithRoute(page: Page): Promise<number> {
+async function countTwoKiosksAndApprove(page: Page): Promise<void> {
   await page.goto('/events/event-demo-ajax')
   await page.getByRole('button', { name: /telronde starten/i }).click()
   await page.waitForURL(/\/count\/start/)
@@ -50,6 +50,11 @@ async function prepareRoundWithRoute(page: Page): Promise<number> {
   await page.getByRole('button', { name: /Telling goedkeuren/ }).click()
   await page.getByRole('button', { name: 'Goedkeuren', exact: true }).click()
   await expect(page.getByText(/Telling goedgekeurd/)).toBeVisible()
+}
+
+/** Bouwt op die telling een productronde met een route en geeft het aantal haltes. */
+async function prepareRoundWithRoute(page: Page): Promise<number> {
+  await countTwoKiosksAndApprove(page)
 
   await page.goto('/events/event-demo-ajax/restock')
   await page.getByRole('button', { name: 'Productronde maken' }).first().click()
@@ -87,7 +92,7 @@ test.describe('Bestellijst printen', () => {
     const eerste = pages.first()
     await expect(eerste.getByRole('columnheader', { name: 'Artikel' }).first()).toBeVisible()
     await expect(eerste.getByRole('columnheader', { name: 'Standaard' }).first()).toBeVisible()
-    await expect(eerste.getByRole('columnheader', { name: 'Bestellen' }).first()).toBeVisible()
+    await expect(eerste.getByRole('columnheader', { name: 'Vullen' }).first()).toBeVisible()
     await expect(eerste.getByText(/blad 1 van/)).toBeVisible()
     await expect(eerste.getByRole('heading', { level: 2 })).toBeVisible()
     expect(await eerste.locator('.print-block').count()).toBeGreaterThan(1)
@@ -148,6 +153,36 @@ test.describe('Bestellijst printen', () => {
     expect(nummers.length).toBeGreaterThan(0)
     expect(nummers.length).toBeLessThan(alles)
     expect(nummers.every((n) => n >= 400)).toBe(true)
+  })
+
+  test('vult de kolom "Vullen" zodra de telling goedgekeurd is', async ({ page }) => {
+    test.setTimeout(240_000)
+
+    // Vóór het tellen staat er niets in die kolom.
+    await page.goto('/events/event-demo-ajax/print')
+    const kiosk116 = page.locator('.print-kiosk-page[data-kiosk-number="116"]')
+    await expect(kiosk116).toBeVisible()
+    const leeg = await kiosk116
+      .locator('tbody tr .print-col-order')
+      .evaluateAll((cellen) => cellen.every((cel) => cel.textContent === ''))
+    expect(leeg).toBe(true)
+
+    // 116 is op nul geteld, dus daar moet alles bij.
+    await countTwoKiosksAndApprove(page)
+    await page.goto('/events/event-demo-ajax/print')
+    await expect(kiosk116).toBeVisible()
+
+    const gevuld = await kiosk116
+      .locator('tbody tr .print-col-order')
+      .evaluateAll((cellen) => cellen.filter((cel) => cel.textContent !== '').length)
+    expect(gevuld).toBeGreaterThan(0)
+
+    // Een kiosk die is overgeslagen houdt zijn lege kolom om zelf in te vullen.
+    const kiosk117 = page.locator('.print-kiosk-page[data-kiosk-number="117"]')
+    const nogSteedsLeeg = await kiosk117
+      .locator('tbody tr .print-col-order')
+      .evaluateAll((cellen) => cellen.every((cel) => cel.textContent === ''))
+    expect(nogSteedsLeeg).toBe(true)
   })
 
   test('de bediening print niet mee', async ({ page }) => {

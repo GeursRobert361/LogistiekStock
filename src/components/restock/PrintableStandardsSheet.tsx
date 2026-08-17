@@ -29,6 +29,13 @@ export interface StandardsSheetRow {
   product: Product
   /** De norm in kwarteenheden, zoals hij in de stamdata staat. */
   targetQuantityQuarters: number
+  /**
+   * Wat er volgens de goedgekeurde telling bij moet, in hele verpakkingen.
+   *
+   * Ontbreekt zolang er niet geteld is — dan blijft het vakje leeg om zelf in
+   * te vullen, precies zoals op de papieren lijst.
+   */
+  restockPackages?: number
 }
 
 export interface StandardsSheetGroup {
@@ -105,7 +112,7 @@ export function PrintableStandardsSheet({
                     Standaard
                   </th>
                   <th scope="col" className="print-col-order">
-                    Bestellen
+                    Vullen
                   </th>
                 </tr>
               </thead>
@@ -122,8 +129,14 @@ export function PrintableStandardsSheet({
                         fromQuarterUnits(row.targetQuantityQuarters)
                       )}
                     </td>
-                    {/* Leeg: hier schrijft de vuller op wat er moet komen. */}
-                    <td className="print-col-order" />
+                    {/* Staat er een goedgekeurde telling, dan staat het aantal
+                        er al. Zo niet, dan blijft het vakje leeg en schrijft de
+                        vuller het er zelf bij. */}
+                    <td className="print-col-order">
+                      {row.restockPackages !== undefined && row.restockPackages > 0
+                        ? formatProductQuantity(row.product, row.restockPackages)
+                        : ''}
+                    </td>
                   </tr>
                 ))}
               </tbody>
