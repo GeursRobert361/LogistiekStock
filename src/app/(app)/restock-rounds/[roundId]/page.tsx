@@ -303,6 +303,15 @@ export default function RestockRoundDetailPage({
                 )
               })}
             </div>
+
+            {/* Niet iedereen loopt de ronde met een telefoon in zijn hand. De
+                papieren versie is dezelfde route, één kiosk per vel; hem openen
+                verandert niets aan de ronde. */}
+            <Link href={`/restock-rounds/${roundId}/print`} className="mt-2 block">
+              <Button variant="outline" className="w-full">
+                🖨 Vullijst printen
+              </Button>
+            </Link>
           </section>
         )}
 

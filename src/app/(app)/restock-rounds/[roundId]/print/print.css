@@ -1,0 +1,322 @@
+/*
+ * De papieren vullijst.
+ *
+ * Bewust een eigen bestand naast deze route en niet in globals.css: `@page`
+ * geldt per document en is niet met een klasse te beperken, dus in globals zou
+ * elk ander scherm van de app ook op A4 gaan staan.
+ *
+ * Alles hier is zwart-wit. Een zwart-witprinter maakt van ArenA-rood een
+ * onduidelijk grijs, en een vullijst hoort ook uit de goedkoopste printer te
+ * komen zonder dat er informatie wegvalt.
+ */
+
+@page {
+  size: A4 portrait;
+  margin: 12mm;
+}
+
+/* Bediening op het scherm; nooit op papier. */
+@media print {
+  .no-print {
+    display: none !important;
+  }
+}
+
+.print-sheet {
+  color: #000;
+  background: #fff;
+  font-size: 11pt;
+  line-height: 1.35;
+}
+
+/*
+ * Eén kiosk per A4.
+ *
+ * `break-after` is de huidige eigenschap, `page-break-after` de oude; oudere
+ * printengines kennen alleen die tweede. Beide meegeven kost niets en scheelt
+ * een pagina-indeling die per browser verschilt.
+ *
+ * `break-inside: avoid` erbij, anders schuift een lange kiosk alsnog over twee
+ * vellen — precies wat deze pagina moet voorkomen.
+ */
+.print-kiosk-page {
+  break-after: page;
+  page-break-after: always;
+  break-inside: avoid;
+  page-break-inside: avoid;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+/* Anders levert de laatste kiosk een lege pagina op. */
+.print-kiosk-page:last-child {
+  break-after: auto;
+  page-break-after: auto;
+}
+
+/* ── Kop ──────────────────────────────────────────────────────────────── */
+
+.print-stop-header {
+  border-bottom: 2px solid #000;
+  padding-bottom: 3mm;
+  margin-bottom: 4mm;
+}
+
+.print-stop-counter {
+  font-size: 12pt;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin: 0;
+}
+
+/*
+ * Het enige gegeven dat van een armlengte afstand leesbaar moet zijn: wie met
+ * een stapel A4'tjes loopt zoekt hierop.
+ */
+.print-kiosk-name {
+  font-size: 32pt;
+  font-weight: 800;
+  line-height: 1.05;
+  margin: 1mm 0 0;
+  word-break: break-word;
+}
+
+.print-round-name {
+  font-size: 10pt;
+  margin: 1.5mm 0 0;
+}
+
+/* ── Producttabel ─────────────────────────────────────────────────────── */
+
+.print-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 11pt;
+}
+
+.print-table th,
+.print-table td {
+  border: 1px solid #000;
+  padding: 1.8mm 2mm;
+  text-align: left;
+  vertical-align: top;
+}
+
+.print-table th {
+  font-size: 9pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.print-col-planned {
+  width: 28mm;
+  white-space: nowrap;
+  font-weight: 700;
+}
+
+/* Leeg gelaten om met de hand in te vullen. */
+.print-col-delivered {
+  width: 32mm;
+}
+
+.print-product-name {
+  display: block;
+  /* Op papier niet afkappen: een halve productnaam is niet te herkennen. */
+  overflow-wrap: anywhere;
+}
+
+.print-storage-note {
+  display: block;
+  font-size: 9pt;
+  margin-top: 0.5mm;
+}
+
+.print-empty {
+  font-size: 11pt;
+  font-style: italic;
+  margin: 4mm 0;
+}
+
+/*
+ * Dichter op elkaar zodra een kiosk veel producten heeft.
+ *
+ * De ruimste kiosk voert 42 producten en die moeten er alle 42 op één vel op —
+ * een regel weglaten stuurt iemand met een incomplete lijst de vloer op. Dus
+ * krimpt de regelhoogte mee, en pas als laatste de tekstgrootte. De grenzen
+ * zijn nagemeten op echte PDF-paginering; bij 42 regels blijft er nog een paar
+ * millimeter over.
+ */
+.print-kiosk-page--compact .print-table,
+.print-kiosk-page--compact .print-table th {
+  font-size: 10pt;
+}
+
+.print-kiosk-page--compact .print-table {
+  line-height: 1.15;
+}
+
+.print-kiosk-page--compact .print-table th,
+.print-kiosk-page--compact .print-table td {
+  padding: 0.6mm 2mm;
+}
+
+.print-kiosk-page--compact .print-kiosk-name {
+  font-size: 28pt;
+}
+
+.print-kiosk-page--compact .print-storage-note {
+  font-size: 8.5pt;
+}
+
+.print-kiosk-page--compact .print-writeline {
+  height: 6mm;
+}
+
+.print-kiosk-page--compact .print-confirm,
+.print-kiosk-page--compact .print-remarks {
+  margin-top: 3.5mm;
+}
+
+/*
+ * Het dichtste niveau, vanaf ongeveer dertig producten. 9pt is klein maar leest
+ * nog; een tweede vel voor dezelfde kiosk is erger, want dan raakt de helft van
+ * de lijst zoek tussen de andere kiosken.
+ */
+.print-kiosk-page--dense .print-table,
+.print-kiosk-page--dense .print-table th {
+  font-size: 9pt;
+}
+
+.print-kiosk-page--dense .print-table {
+  line-height: 1.1;
+}
+
+.print-kiosk-page--dense .print-table th,
+.print-kiosk-page--dense .print-table td {
+  padding: 0.35mm 1.5mm;
+}
+
+.print-kiosk-page--dense .print-kiosk-name {
+  font-size: 24pt;
+}
+
+.print-kiosk-page--dense .print-stop-header {
+  padding-bottom: 2mm;
+  margin-bottom: 2.5mm;
+}
+
+.print-kiosk-page--dense .print-storage-note {
+  font-size: 8pt;
+}
+
+.print-kiosk-page--dense .print-writeline {
+  height: 5mm;
+}
+
+.print-kiosk-page--dense .print-confirm,
+.print-kiosk-page--dense .print-remarks {
+  margin-top: 2.5mm;
+  font-size: 11pt;
+}
+
+.print-kiosk-page--dense .print-stop-footer {
+  padding-top: 2.5mm;
+}
+
+.print-kiosk-page--dense .print-route {
+  margin-top: 2.5mm;
+}
+
+/* ── Afvinken, opmerkingen, ondertekenen ──────────────────────────────── */
+
+.print-confirm {
+  display: flex;
+  align-items: center;
+  gap: 3mm;
+  margin-top: 5mm;
+  font-size: 12pt;
+  font-weight: 700;
+}
+
+.print-checkbox {
+  display: inline-block;
+  width: 6mm;
+  height: 6mm;
+  border: 1.5pt solid #000;
+  flex: none;
+}
+
+.print-remarks {
+  margin-top: 5mm;
+}
+
+.print-label {
+  font-size: 9pt;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  margin: 0 0 2mm;
+}
+
+/* De schrijfregels zelf: een lijn om met pen op te schrijven. */
+.print-writeline {
+  display: block;
+  border-bottom: 1px solid #000;
+  height: 7mm;
+}
+
+.print-writeline--inline {
+  display: inline-block;
+  width: 70mm;
+  height: auto;
+  vertical-align: bottom;
+}
+
+.print-stop-footer {
+  margin-top: auto;
+  padding-top: 5mm;
+}
+
+.print-signer {
+  font-size: 11pt;
+  margin: 0;
+}
+
+.print-signer-name {
+  margin-left: 3mm;
+  font-size: 10pt;
+}
+
+.print-route {
+  display: flex;
+  justify-content: space-between;
+  gap: 6mm;
+  border-top: 1px solid #000;
+  margin: 4mm 0 0;
+  padding-top: 2mm;
+  font-size: 9pt;
+}
+
+/* ── Schermweergave ───────────────────────────────────────────────────── */
+
+/*
+ * Op het scherm staan de vellen als losse witte pagina's op een grijze
+ * achtergrond, zodat de gebruiker ziet wat er uit de printer komt. Bij het
+ * printen valt dit allemaal weg.
+ */
+@media screen {
+  .print-sheet {
+    background: #e5e5e5;
+    padding: 16px 0;
+  }
+
+  .print-kiosk-page {
+    width: 210mm;
+    min-height: 297mm;
+    padding: 12mm;
+    margin: 0 auto 16px;
+    background: #fff;
+    box-shadow: 0 1px 4px rgb(0 0 0 / 25%);
+  }
+}

@@ -1,5 +1,5 @@
-import { test, expect, type Page } from '@playwright/test'
-import { login, resetAppData, fillAllCounts } from './helpers'
+import { test, expect } from '@playwright/test'
+import { login, resetAppData, fillAllCounts, skipCurrentKiosk } from './helpers'
 
 /**
  * De volledige operationele keten in één test: evenement → telronde → review →
@@ -200,21 +200,3 @@ test.describe('Volledige workflow', () => {
 })
 
 /** Slaat de kiosk waar we nu staan over, met een reden. */
-async function skipCurrentKiosk(page: Page): Promise<void> {
-  const plate = page.getByRole('heading', { level: 2 })
-  const before = await plate.textContent()
-
-  await page.getByRole('button', { name: 'Overslaan', exact: true }).click()
-  await page.getByRole('radio', { name: 'Kiosk gesloten' }).check()
-  await page.getByRole('button', { name: 'Overslaan' }).last().click()
-
-  // Tijdens het doorklikken blijft de vorige kiosk nog even in beeld — mét
-  // werkende knoppen. Pas doorgaan als het bord echt een andere kiosk toont,
-  // anders belandt de volgende klik op dezelfde kiosk en blijft er één staan.
-  // Na de laatste kiosk is er geen bord meer: dan staan we op de review.
-  await expect
-    .poll(async () =>
-      page.url().includes('/count/review') ? 'review' : await plate.textContent()
-    )
-    .not.toBe(before)
-}

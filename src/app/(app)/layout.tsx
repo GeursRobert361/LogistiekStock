@@ -36,10 +36,15 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex min-h-screen flex-col">
-      {/* pb-28 houdt ruimte vrij voor de vaste voet (statusbalk + navigatie). */}
-      <main className="flex-1 pb-28">{isAllowed ? children : <AccessDenied />}</main>
+      {/* pb-28 houdt ruimte vrij voor de vaste voet (statusbalk + navigatie).
+          Op papier is die voet er niet, en dan is die ruimte een lege strook
+          onderaan elk vel. */}
+      <main className="flex-1 pb-28 print:pb-0">{isAllowed ? children : <AccessDenied />}</main>
 
-      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white">
+      {/* Navigatie en synchronisatiestand horen bij het scherm. Op een geprinte
+          vullijst staan ze in de weg, en op de laatste pagina drukken ze de
+          inhoud zelfs naar een extra vel. */}
+      <div className="fixed bottom-0 left-0 right-0 z-40 border-t border-gray-200 bg-white print:hidden">
         <SyncStatusBar />
         <BottomNavigation />
       </div>

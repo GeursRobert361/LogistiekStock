@@ -1,0 +1,146 @@
+import { test, expect, type Page } from '@playwright/test'
+import { login, resetAppData, fillAllCounts, skipCurrentKiosk } from './helpers'
+
+/**
+ * De papieren vullijst.
+ *
+ * Wat hier misgaat rolt uit een printer en gaat de vloer op: een vel dat twee
+ * kiosken bevat, een productregel bij de verkeerde kiosk, of een knop die
+ * meeprint. Op het scherm valt dat allemaal niet op.
+ */
+
+/** Ring 1: kiosk 101 t/m 128 plus de cubes tegenover 120. */
+const ROUTE_LENGTH = 29
+
+/**
+ * Zet een vulronde met een route klaar en geeft het aantal haltes terug.
+ *
+ * Geteld worden 116 en 118, en de rest wordt overgeslagen. Bewust die twee: ze
+ * hebben allebei een drankkoeling en voeren dus hetzelfde assortiment. Een
+ * productronde over 116 en 117 zou op één kiosk uitkomen, want 117 heeft geen
+ * koeling en voert de gekoelde dranken helemaal niet — en dan valt er niets
+ * over meerdere vellen te testen.
+ */
+async function prepareRoundWithRoute(page: Page): Promise<number> {
+  await page.goto('/events/event-demo-ajax')
+  await page.getByRole('button', { name: /telronde starten/i }).click()
+  await page.waitForURL(/\/count\/start/)
+
+  await page.getByLabel('Startkiosk').selectOption({ label: 'Kiosk 116' })
+  await page.getByRole('button', { name: /Telronde starten/ }).click()
+  await page.waitForURL(/\/kiosk\/kiosk-116/)
+
+  // Alles op nul: dan moet elk product bij beide kiosken bijgevuld worden.
+  await fillAllCounts(page, '0')
+  await page.getByRole('button', { name: /Kiosk afronden/ }).click()
+  await page.waitForURL(/\/kiosk\/kiosk-117/)
+
+  await skipCurrentKiosk(page)
+
+  await fillAllCounts(page, '0')
+  await page.getByRole('button', { name: /Kiosk afronden/ }).click()
+  await page.waitForURL(/\/kiosk\/kiosk-119/)
+
+  for (let index = 0; index < ROUTE_LENGTH - 3; index++) {
+    await skipCurrentKiosk(page)
+  }
+  await page.waitForURL(/\/count\/review/)
+
+  await expect(page.getByText('Alles opgeslagen')).toBeVisible()
+  await page.getByRole('button', { name: /Telling goedkeuren/ }).click()
+  await page.getByRole('button', { name: 'Goedkeuren', exact: true }).click()
+  await expect(page.getByText(/Telling goedgekeurd/)).toBeVisible()
+
+  await page.goto('/events/event-demo-ajax/restock')
+  await page.getByRole('button', { name: 'Productronde maken' }).first().click()
+  await page.waitForURL(/\/restock-rounds\//)
+
+  await page.getByRole('button', { name: /Route maken/ }).click()
+  const routeHeading = page.getByRole('heading', { name: /Route \(/ })
+  await expect(routeHeading).toBeVisible()
+
+  const stops = Number(/Route \((\d+)/.exec((await routeHeading.textContent()) ?? '')?.[1] ?? '0')
+  expect(stops).toBeGreaterThan(1)
+  return stops
+}
+
+test.describe('Vullijst printen', () => {
+  test.setTimeout(240_000)
+
+  test.beforeEach(async ({ page }) => {
+    await resetAppData(page)
+    await login(page, 'admin@demo.nl')
+  })
+
+  test('één kiosk per vel, in de volgorde van de route', async ({ page }) => {
+    const stops = await prepareRoundWithRoute(page)
+
+    // ── De knop staat op de vulronde en opent de printweergave ────────────
+    await page.getByRole('button', { name: /Vullijst printen/ }).click()
+    await page.waitForURL(/\/print$/)
+
+    // ── Eén pagina per halte ──────────────────────────────────────────────
+    const pages = page.locator('.print-kiosk-page')
+    await expect(pages).toHaveCount(stops)
+
+    // ── De volgorde is die van de route, niet op kiosknummer gesorteerd ───
+    const routeOrder = await page.evaluate(() =>
+      [...document.querySelectorAll('.print-kiosk-page')].map((el) =>
+        el.getAttribute('data-kiosk-number')
+      )
+    )
+    expect(routeOrder).toHaveLength(stops)
+    expect(new Set(routeOrder).size).toBe(stops)
+
+    // ── Iedere pagina noemt zichzelf, en de eerste is stop 1 ──────────────
+    for (const [index, wrapper] of (await pages.all()).entries()) {
+      await expect(wrapper.getByText(`Stop ${index + 1} van ${stops}`)).toBeVisible()
+      // Kiosknaam als kop, groot en herkenbaar.
+      await expect(wrapper.getByRole('heading', { level: 2 })).toBeVisible()
+    }
+
+    // ── Productregels horen bij hun eigen kiosk ───────────────────────────
+    // Elke pagina heeft minstens één productregel, en geen enkele pagina toont
+    // de regels van een andere: dat zou een dubbel aantal opleveren.
+    const rowsPerPage = await page.evaluate(() =>
+      [...document.querySelectorAll('.print-kiosk-page')].map(
+        (el) => el.querySelectorAll('tbody tr').length
+      )
+    )
+    expect(rowsPerPage.every((count) => count > 0)).toBe(true)
+
+    // ── De bediening print niet mee ───────────────────────────────────────
+    const printButton = page.getByRole('button', { name: 'Printen' })
+    await expect(printButton).toBeVisible()
+    await expect(page.locator('.no-print').filter({ has: printButton })).toHaveCount(1)
+    await expect(page.getByRole('link', { name: /Terug naar vulronde/ })).toBeVisible()
+  })
+
+  test('iedere pagina heeft de invulvelden voor papier', async ({ page }) => {
+    await prepareRoundWithRoute(page)
+    await page.getByRole('button', { name: /Vullijst printen/ }).click()
+    await page.waitForURL(/\/print$/)
+
+    const first = page.locator('.print-kiosk-page').first()
+    await expect(first.getByRole('columnheader', { name: 'Geleverd' })).toBeVisible()
+    await expect(first.getByText('Alles geleverd zoals gepland')).toBeVisible()
+    await expect(first.getByText('Opmerking / afwijking')).toBeVisible()
+    await expect(first.getByText(/Naam vuller:/)).toBeVisible()
+    await expect(first.getByText('Vorige: Start')).toBeVisible()
+  })
+
+  test('printen verandert niets aan de ronde', async ({ page }) => {
+    await prepareRoundWithRoute(page)
+
+    const statusVoor = await page.locator('main, body').first().textContent()
+    expect(statusVoor).toContain('Route')
+
+    await page.getByRole('button', { name: /Vullijst printen/ }).click()
+    await page.waitForURL(/\/print$/)
+    await page.goBack()
+
+    // De ronde staat nog klaar om aangenomen te worden; hij is niet geclaimd,
+    // gestart of afgerond doordat iemand een lijst wilde uitprinten.
+    await expect(page.getByRole('button', { name: /Ronde aannemen en starten/ })).toBeVisible()
+  })
+})

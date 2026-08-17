@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test'
+import { expect, type Page } from '@playwright/test'
 
 export const DEMO_PASSWORD = 'demo1234'
 
@@ -68,4 +68,27 @@ export async function fillAllCounts(page: Page, value: string): Promise<void> {
     await input.fill(value)
     await input.blur()
   }
+}
+
+/**
+ * Slaat de kiosk over die nu op het scherm staat en wacht tot de volgende er is.
+ *
+ * Tijdens het doorklikken blijft de vorige kiosk nog even in beeld — mét
+ * werkende knoppen. Pas doorgaan als het bord echt een andere kiosk toont,
+ * anders belandt de volgende klik op dezelfde kiosk en blijft er één staan.
+ * Na de laatste kiosk is er geen bord meer: dan staan we op de review.
+ */
+export async function skipCurrentKiosk(page: Page): Promise<void> {
+  const plate = page.getByRole('heading', { level: 2 })
+  const before = await plate.textContent()
+
+  await page.getByRole('button', { name: 'Overslaan', exact: true }).click()
+  await page.getByRole('radio', { name: 'Kiosk gesloten' }).check()
+  await page.getByRole('button', { name: 'Overslaan' }).last().click()
+
+  await expect
+    .poll(async () =>
+      page.url().includes('/count/review') ? 'review' : await plate.textContent()
+    )
+    .not.toBe(before)
 }
