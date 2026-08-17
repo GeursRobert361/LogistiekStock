@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { kioskTitle } from '@/lib/kiosk'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
 import { Card, CardContent } from '@/components/ui/Card'
 import { Button } from '@/components/ui/Button'
@@ -21,16 +22,30 @@ import {
 } from '@/services/countSessionService'
 import { getRestockOverview } from '@/services/restockPlanningService'
 import { getIncidents, isOpen } from '@/services/incidentService'
-import { getOperationalEvent, isOperational } from '@/domain/events/eventSelection'
+import { getEventFocus, type EventFocus, type EventFocusKind } from '@/domain/events/eventSelection'
+import { createEventFromAgenda } from '@/services/eventService'
 import { ROUND_STATUS_LABEL, RUNNING_STATUSES } from '@/lib/roundStatus'
 import { PERMISSIONS } from '@/lib/permissions'
 import { RestockRoundStatus } from '@/types'
-import type { Event, Incident, Kiosk, Product, RestockRound } from '@/types'
+import type { AgendaEntry, Incident, Kiosk, Product, RestockRound } from '@/types'
 import { formatDate } from '@/lib/utils'
 import { IconAdmin, IconCount } from '@/components/layout/NavIcons'
 
+/**
+ * Wat er boven de kaart staat. "Eerstvolgende" hoort alleen bij iets dat nog
+ * moet komen — een wedstrijd van gisteren zo noemen was precies de verwarring
+ * die dit scherm opleverde toen de laatste wedstrijd gespeeld was.
+ */
+const FOCUS_HEADING: Record<EventFocusKind, string> = {
+  RUNNING: 'Actief evenement',
+  UPCOMING: 'Eerstvolgende evenement',
+  PLANNED: 'Eerstvolgende evenement',
+  PAST: 'Laatste evenement',
+  NONE: 'Evenement',
+}
+
 interface DashboardData {
-  event: Event | null
+  focus: EventFocus
   resumableSessions: SessionOverview[]
   allSessions: SessionOverview[]
   shortages: Array<{ product: Product; packages: number }>
@@ -40,9 +55,12 @@ interface DashboardData {
 }
 
 export default function DashboardPage() {
+  const router = useRouter()
   const { profile, hasAnyRole } = useAuth()
   const [data, setData] = useState<DashboardData | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isCreatingEvent, setIsCreatingEvent] = useState(false)
+  const [createError, setCreateError] = useState<string | null>(null)
 
   const canCount = hasAnyRole([...PERMISSIONS.COUNT])
   const canReview = hasAnyRole([...PERMISSIONS.REVIEW_COUNTS])
@@ -52,14 +70,25 @@ export default function DashboardPage() {
   const canManageEvents = hasAnyRole([...PERMISSIONS.MANAGE_EVENTS])
 
   const load = useCallback(async () => {
-    const events = await repositories.event().getEvents()
-    // Niet events[0]: die lijst staat oplopend op datum en begint dus bij het
-    // oudste evenement van het seizoen.
-    const event = getOperationalEvent(events)
+    // De agenda hoort erbij: is de laatste wedstrijd gespeeld en afgerond, dan
+    // bestaat het volgende evenement nog niet en weet alleen de kalender waar
+    // dit scherm over moet gaan.
+    const [events, agenda] = await Promise.all([
+      repositories.event().getEvents(),
+      repositories
+        .event()
+        .getAgenda()
+        .catch((error: unknown) => {
+          console.warn('[dashboard] Agenda niet te laden.', error)
+          return []
+        }),
+    ])
+    const focus = getEventFocus({ events, agenda })
+    const event = focus.event
 
     if (!event) {
       setData({
-        event: null,
+        focus,
         resumableSessions: [],
         allSessions: [],
         shortages: [],
@@ -90,7 +119,7 @@ export default function DashboardPage() {
       .slice(0, 5)
 
     setData({
-      event,
+      focus,
       resumableSessions: overviews.filter(
         (overview) => isResumable(overview.session) && !overview.isFullyHandled
       ),
@@ -121,7 +150,27 @@ export default function DashboardPage() {
     )
   }
 
-  const { event, resumableSessions, allSessions, shortages, rounds, openIncidents, kiosks } = data
+  const { focus, resumableSessions, allSessions, shortages, rounds, openIncidents, kiosks } = data
+  const event = focus.event
+
+  /**
+   * De agendaregel wordt hier pas een evenement. Dat scheelt een formulier op
+   * de dag dat er geteld moet worden: alles staat open, en een kiosk die dicht
+   * moet zet je daarna bij het evenement zelf.
+   */
+  async function startFromAgenda(entry: AgendaEntry) {
+    if (!profile || isCreatingEvent) return
+    setIsCreatingEvent(true)
+    setCreateError(null)
+    try {
+      const created = await createEventFromAgenda(entry, profile.id)
+      router.push(`/events/${created.id}/count/start`)
+    } catch (error) {
+      console.error('[dashboard] Evenement aanmaken mislukt.', error)
+      setCreateError('Het evenement kon niet worden aangemaakt.')
+      setIsCreatingEvent(false)
+    }
+  }
 
   const countedKiosks = allSessions.reduce((sum, o) => sum + o.completedCount + o.skippedCount, 0)
   const totalKiosks = allSessions.reduce((sum, o) => sum + o.totalCount, 0)
@@ -146,12 +195,12 @@ export default function DashboardPage() {
           </p>
         </div>
 
-        {!event ? (
+        {focus.kind === 'NONE' ? (
           <EmptyState
             title="Geen evenementen"
             description={
               canManageEvents
-                ? 'Maak een evenement aan om te kunnen tellen.'
+                ? 'Zet de kalender in Beheer → Agenda, of maak zelf een evenement aan.'
                 : 'Er staat op dit moment geen evenement gepland.'
             }
             icon="📅"
@@ -163,17 +212,71 @@ export default function DashboardPage() {
               ) : undefined
             }
           />
-        ) : (
+        ) : focus.kind === 'PLANNED' && focus.agendaEntry ? (
           <>
-            {/* ── Actief evenement ─────────────────────────────────────── */}
+            {/* ── Uit de agenda: bestaat nog niet als evenement ─────────── */}
             <section aria-labelledby="event-heading">
-              {/* "Actief" alleen als er ook echt geteld of gevuld wordt;
-                  anders is het gewoon wat eraan komt. */}
               <h3
                 id="event-heading"
                 className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500"
               >
-                {isOperational(event) ? 'Actief evenement' : 'Eerstvolgende evenement'}
+                {FOCUS_HEADING.PLANNED}
+              </h3>
+              <Card>
+                <CardContent className="flex items-center justify-between py-3">
+                  <div>
+                    <p className="font-semibold text-gray-900">{focus.agendaEntry.name}</p>
+                    <p className="text-sm text-gray-600">{formatDate(focus.agendaEntry.date)}</p>
+                  </div>
+                  <Badge variant="default">Uit de agenda</Badge>
+                </CardContent>
+              </Card>
+            </section>
+
+            {canManageEvents ? (
+              <section aria-label="Beginnen met dit evenement">
+                <Button
+                  size="lg"
+                  className="w-full"
+                  disabled={isCreatingEvent}
+                  onClick={() => void startFromAgenda(focus.agendaEntry!)}
+                >
+                  {isCreatingEvent ? 'Bezig…' : 'Telronde starten'}
+                </Button>
+                <p className="mt-1 text-center text-sm text-gray-600">
+                  Alle ringen en kiosken doen mee.{' '}
+                  <Link href="/events/new" className="underline">
+                    Zelf instellen
+                  </Link>
+                </p>
+                {createError && (
+                  <p
+                    role="alert"
+                    className="mt-2 rounded-xl bg-red-50 px-3 py-2 text-sm font-medium text-red-800"
+                  >
+                    {createError}
+                  </p>
+                )}
+              </section>
+            ) : (
+              <p className="rounded-xl border border-gray-200 bg-white px-3 py-4 text-center text-sm text-gray-600">
+                Dit evenement is nog niet aangemaakt. Een planner zet het klaar.
+              </p>
+            )}
+
+            {(canManageMasterData || canPlanRestock) && <AdminShortcuts />}
+          </>
+        ) : event ? (
+          <>
+            {/* ── Actief evenement ─────────────────────────────────────── */}
+            <section aria-labelledby="event-heading">
+              {/* "Actief" alleen als er ook echt geteld of gevuld wordt, en
+                  "eerstvolgende" alleen als het nog moet komen. */}
+              <h3
+                id="event-heading"
+                className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500"
+              >
+                {FOCUS_HEADING[focus.kind]}
               </h3>
               <Link href={`/events/${event.id}`} className="block">
                 <Card className="active:bg-gray-100">
@@ -334,24 +437,28 @@ export default function DashboardPage() {
             </section>
 
             {/* ── Beheer alleen voor wie er iets mag ───────────────────── */}
-            {(canManageMasterData || canPlanRestock) && (
-              <section aria-labelledby="admin-heading">
-                <h3
-                  id="admin-heading"
-                  className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500"
-                >
-                  Beheer
-                </h3>
-                <div className="grid grid-cols-2 gap-2">
-                  <ShortcutCard href="/admin/standards" Icon={IconCount} label="Normen" />
-                  <ShortcutCard href="/admin" Icon={IconAdmin} label="Alle instellingen" />
-                </div>
-              </section>
-            )}
+            {(canManageMasterData || canPlanRestock) && <AdminShortcuts />}
           </>
-        )}
+        ) : null}
       </div>
     </>
+  )
+}
+
+function AdminShortcuts() {
+  return (
+    <section aria-labelledby="admin-heading">
+      <h3
+        id="admin-heading"
+        className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500"
+      >
+        Beheer
+      </h3>
+      <div className="grid grid-cols-2 gap-2">
+        <ShortcutCard href="/admin/standards" Icon={IconCount} label="Normen" />
+        <ShortcutCard href="/admin" Icon={IconAdmin} label="Alle instellingen" />
+      </div>
+    </section>
   )
 }
 

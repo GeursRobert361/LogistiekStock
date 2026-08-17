@@ -11,8 +11,9 @@ import { ListSkeleton } from '@/components/shared/LoadingSkeleton'
 import { repositories } from '@/repositories'
 import { useAuth } from '@/context/AuthContext'
 import { PERMISSIONS } from '@/lib/permissions'
-import { getUpcomingEvents, getHistoricalEvents } from '@/domain/events/eventSelection'
-import type { Event } from '@/types'
+import { Badge } from '@/components/ui/Badge'
+import { getUpcomingEvents, getHistoricalEvents, todayLocalDate } from '@/domain/events/eventSelection'
+import type { AgendaEntry, Event } from '@/types'
 import { formatDate } from '@/lib/utils'
 
 function EventSection({ title, events }: { title: string; events: Event[] }) {
@@ -45,9 +46,47 @@ function EventSection({ title, events }: { title: string; events: Event[] }) {
   )
 }
 
+/**
+ * Wat er op de kalender staat maar nog geen evenement is.
+ *
+ * Zonder dit stopt deze lijst bij de laatste wedstrijd waar iemand een
+ * evenement van heeft gemaakt, en lijkt het seizoen afgelopen terwijl de
+ * agenda nog vol staat.
+ */
+function AgendaSection({ entries }: { entries: AgendaEntry[] }) {
+  if (entries.length === 0) return null
+
+  return (
+    <section aria-labelledby="events-agenda">
+      <h3
+        id="events-agenda"
+        className="mb-2 text-sm font-semibold uppercase tracking-wide text-gray-500"
+      >
+        Nog aan te maken
+      </h3>
+      <div className="space-y-2">
+        {entries.map((entry) => (
+          <Link key={entry.id} href="/events/new" className="block">
+            <Card className="transition-colors hover:bg-gray-50 active:bg-gray-100">
+              <CardContent className="flex items-center justify-between py-3">
+                <div className="min-w-0">
+                  <p className="truncate font-semibold text-gray-900">{entry.name}</p>
+                  <p className="mt-0.5 text-sm text-gray-500">{formatDate(entry.date)}</p>
+                </div>
+                <Badge variant="default">Uit de agenda</Badge>
+              </CardContent>
+            </Card>
+          </Link>
+        ))}
+      </div>
+    </section>
+  )
+}
+
 export default function EventsPage() {
   const { hasAnyRole } = useAuth()
   const [events, setEvents] = useState<Event[]>([])
+  const [agenda, setAgenda] = useState<AgendaEntry[]>([])
   const [isLoading, setIsLoading] = useState(true)
 
   const canManage = hasAnyRole([...PERMISSIONS.MANAGE_EVENTS])
@@ -58,12 +97,30 @@ export default function EventsPage() {
   const upcoming = useMemo(() => getUpcomingEvents(events), [events])
   const history = useMemo(() => getHistoricalEvents(events), [events])
 
+  // Een agendaregel waar al een evenement op die datum voor bestaat is
+  // afgehandeld en hoort niet nog een tweede keer in de lijst.
+  const planned = useMemo(() => {
+    const today = todayLocalDate()
+    const taken = new Set(events.map((event) => event.date))
+    return agenda
+      .filter((entry) => entry.date >= today && !taken.has(entry.date))
+      .sort((a, b) => a.date.localeCompare(b.date))
+  }, [agenda, events])
+
   useEffect(() => {
-    repositories
-      .event()
-      .getEvents()
-      .then((data) => {
-        setEvents(data)
+    Promise.all([
+      repositories.event().getEvents(),
+      repositories
+        .event()
+        .getAgenda()
+        .catch((error: unknown) => {
+          console.warn('[evenementen] Agenda niet te laden.', error)
+          return [] as AgendaEntry[]
+        }),
+    ])
+      .then(([eventList, agendaList]) => {
+        setEvents(eventList)
+        setAgenda(agendaList)
         setIsLoading(false)
       })
       .catch((error: unknown) => {
@@ -87,7 +144,7 @@ export default function EventsPage() {
       <div className="p-4">
         {isLoading ? (
           <ListSkeleton count={3} />
-        ) : events.length === 0 ? (
+        ) : events.length === 0 && planned.length === 0 ? (
           <EmptyState
             title="Geen evenementen"
             description="Er zijn nog geen evenementen aangemaakt."
@@ -103,6 +160,7 @@ export default function EventsPage() {
         ) : (
           <div className="space-y-5">
             <EventSection title="Komt eraan" events={upcoming} />
+            <AgendaSection entries={planned} />
             <EventSection title="Geweest" events={history} />
           </div>
         )}

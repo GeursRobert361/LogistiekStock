@@ -138,6 +138,29 @@ test.describe('Startkiosk per ring', () => {
     await expect(page.getByLabel(/bezoekers/i)).toHaveCount(0)
   })
 
+  test('het dashboard loopt uit zichzelf door naar de volgende wedstrijd', async ({ page }) => {
+    // De situatie na een speeldag: het laatste evenement is geweest en er is
+    // nog geen nieuw aangemaakt. Het dashboard moet dan de kalender volgen en
+    // niet naar de wedstrijd van gisteren blijven wijzen.
+    await page.goto('/events/event-demo-ajax')
+    await page.getByRole('button', { name: 'Evenement verwijderen' }).click()
+    await page.getByRole('button', { name: 'Verwijderen', exact: true }).click()
+    await page.waitForURL(/\/events$/)
+
+    await page.goto('/dashboard')
+    await expect(page.getByRole('heading', { name: 'Eerstvolgende evenement' })).toBeVisible()
+    await expect(page.getByText('Ajax – PSV')).toBeVisible()
+    await expect(page.getByText('Uit de agenda')).toBeVisible()
+
+    // Eén tik maakt het evenement aan en zet de telronde klaar.
+    await page.getByRole('button', { name: 'Telronde starten' }).click()
+    await page.waitForURL(/\/events\/[^/]+\/count\/start/)
+
+    await page.goto('/events')
+    await expect(page.getByRole('link', { name: /Ajax – PSV/ })).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Komt eraan' })).toBeVisible()
+  })
+
   test('een evenement verwijderen, met alles wat eraan hangt', async ({ page }) => {
     await page.goto('/events/event-demo-ajax')
     await page.getByRole('button', { name: 'Evenement verwijderen' }).click()
@@ -145,7 +168,13 @@ test.describe('Startkiosk per ring', () => {
     await page.getByRole('button', { name: 'Verwijderen', exact: true }).click()
 
     await page.waitForURL(/\/events$/)
-    await expect(page.getByText('Ajax – Demo FC')).toHaveCount(0)
+    await expect(page.locator('a[href="/events/event-demo-ajax"]')).toHaveCount(0)
+
+    // De wedstrijd zelf staat nog op de kalender. Die hoort dus terug te komen
+    // als iets dat nog aangemaakt moet worden — het evenement is verwijderd,
+    // de speeldag niet afgelast.
+    await expect(page.getByText('Ajax – Demo FC')).toBeVisible()
+    await expect(page.getByRole('heading', { name: 'Nog aan te maken' })).toBeVisible()
   })
 
   test('een nieuw evenement legt zijn voorganger vast', async ({ page }) => {

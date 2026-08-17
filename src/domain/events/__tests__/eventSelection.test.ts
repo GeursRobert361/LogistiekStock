@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
+  getEventFocus,
   getOperationalEvent,
   getUpcomingEvents,
   getHistoricalEvents,
@@ -7,7 +8,7 @@ import {
   todayLocalDate,
 } from '../eventSelection'
 import { EventStatus, EventType } from '@/types'
-import type { Event } from '@/types'
+import type { AgendaEntry, Event } from '@/types'
 
 const TODAY = '2026-08-08'
 
@@ -125,6 +126,124 @@ describe('lijsten', () => {
       '1 augustus',
       '1 juli',
     ])
+  })
+})
+
+describe('getEventFocus', () => {
+  function agenda(name: string, date: string): AgendaEntry {
+    return {
+      id: `agenda-${name}`,
+      name,
+      date,
+      eventType: EventType.VOETBAL,
+      createdAt: '',
+      updatedAt: '',
+    }
+  }
+
+  /** De seizoenskalender loopt door waar de evenementen ophouden. */
+  const KALENDER = [
+    agenda('1 augustus', '2026-08-01'),
+    agenda('12 augustus', '2026-08-12'),
+    agenda('20 augustus', '2026-08-20'),
+    agenda('27 augustus', '2026-08-27'),
+  ]
+
+  it('valt terug op de agenda zodra er geen evenement meer te gaan is', () => {
+    // De situatie die dit alles aanleiding gaf: de wedstrijd van gisteren is
+    // geteld en afgerond, en er is nog geen evenement voor de volgende.
+    const focus = getEventFocus({
+      events: [event('gisteren', '2026-08-07', EventStatus.COMPLETED)],
+      agenda: KALENDER,
+      today: TODAY,
+    })
+    expect(focus.kind).toBe('PLANNED')
+    expect(focus.agendaEntry?.name).toBe('12 augustus')
+    expect(focus.event).toBeNull()
+  })
+
+  it('slaat agendaregels over waar al een evenement voor bestaat', () => {
+    const focus = getEventFocus({
+      events: [event('12 augustus', '2026-08-12', EventStatus.COMPLETED)],
+      agenda: KALENDER,
+      today: TODAY,
+    })
+    // 12 augustus is al een evenement en afgerond; dan is 20 augustus aan de beurt.
+    expect(focus.kind).toBe('PLANNED')
+    expect(focus.agendaEntry?.name).toBe('20 augustus')
+  })
+
+  it('kiest een echt evenement boven een agendaregel van later', () => {
+    const focus = getEventFocus({
+      events: [event('12 augustus', '2026-08-12', EventStatus.READY_FOR_COUNTING)],
+      agenda: KALENDER,
+      today: TODAY,
+    })
+    expect(focus.kind).toBe('UPCOMING')
+    expect(focus.event?.name).toBe('12 augustus')
+  })
+
+  it('kiest de agendaregel wanneer die eerder valt dan het eerstvolgende evenement', () => {
+    const focus = getEventFocus({
+      events: [event('27 augustus', '2026-08-27', EventStatus.DRAFT)],
+      agenda: KALENDER,
+      today: TODAY,
+    })
+    expect(focus.kind).toBe('PLANNED')
+    expect(focus.agendaEntry?.name).toBe('12 augustus')
+  })
+
+  it('houdt lopend werk vast, ook als de agenda al verder staat', () => {
+    // Een telronde die nog niet af is vraagt aandacht; de kalender kan wachten.
+    const focus = getEventFocus({
+      events: [event('gisteren', '2026-08-07', EventStatus.COUNTING)],
+      agenda: KALENDER,
+      today: TODAY,
+    })
+    expect(focus.kind).toBe('RUNNING')
+    expect(focus.event?.name).toBe('gisteren')
+  })
+
+  it('noemt een afgelopen evenement het laatste en niet het eerstvolgende', () => {
+    // Zonder agenda en zonder wat er nog komt blijft alleen de historie over.
+    // Die mag geen "eerstvolgende" heten — dat was precies de rare regel.
+    const focus = getEventFocus({
+      events: [event('gisteren', '2026-08-07', EventStatus.COMPLETED)],
+      agenda: [],
+      today: TODAY,
+    })
+    expect(focus.kind).toBe('PAST')
+    expect(focus.event?.name).toBe('gisteren')
+  })
+
+  it('laat een agendaregel van vandaag meetellen', () => {
+    const focus = getEventFocus({
+      events: [],
+      agenda: [agenda('vandaag', TODAY)],
+      today: TODAY,
+    })
+    expect(focus.kind).toBe('PLANNED')
+    expect(focus.agendaEntry?.name).toBe('vandaag')
+  })
+
+  it('negeert agendaregels die geweest zijn', () => {
+    const focus = getEventFocus({
+      events: [],
+      agenda: [agenda('vorige week', '2026-08-01')],
+      today: TODAY,
+    })
+    expect(focus.kind).toBe('NONE')
+  })
+
+  it('geeft NONE wanneer er niets is', () => {
+    const focus = getEventFocus({ events: [], agenda: [], today: TODAY })
+    expect(focus).toEqual({ kind: 'NONE', event: null, agendaEntry: null })
+  })
+
+  it('werkt zonder agenda', () => {
+    const focus = getEventFocus({ events: SEASON, today: TODAY })
+    expect(focus.kind).toBe('UPCOMING')
+    expect(focus.event?.name).toBe('12 augustus')
   })
 })
 

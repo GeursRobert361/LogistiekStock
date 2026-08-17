@@ -1,5 +1,5 @@
 import { EventStatus } from '@/types/enums'
-import type { Event } from '@/types/domain'
+import type { AgendaEntry, Event } from '@/types/domain'
 
 /**
  * Welk evenement bedoelt iemand die de app opent?
@@ -47,8 +47,12 @@ export function isFinished(event: Event): boolean {
   return FINISHED_STATUSES.includes(event.status)
 }
 
-const byDateAscending = (a: Event, b: Event) => a.date.localeCompare(b.date)
-const byDateDescending = (a: Event, b: Event) => b.date.localeCompare(a.date)
+interface Dated {
+  date: string
+}
+
+const byDateAscending = (a: Dated, b: Dated) => a.date.localeCompare(b.date)
+const byDateDescending = (a: Dated, b: Dated) => b.date.localeCompare(a.date)
 
 /**
  * Het evenement waar de app standaard over gaat.
@@ -83,6 +87,81 @@ export function getOperationalEvent(
   if (upcoming[0]) return upcoming[0]
 
   return [...relevant].sort(byDateDescending)[0] ?? null
+}
+
+/**
+ * Waar de app op dit moment over gaat, agenda meegerekend.
+ *
+ * `getOperationalEvent` kan alleen kiezen uit evenementen die al bestaan. Zodra
+ * de laatste wedstrijd gespeeld en afgerond is, is dat er geen enkele meer, en
+ * viel de app terug op het meest recente — een wedstrijd van gisteren, onder
+ * het kopje "eerstvolgende". De kalender wist toen allang beter.
+ *
+ * Een agendaregel is nog geen evenement: er hangen geen ringen, kiosken of
+ * telrondes aan. Hij mag hier wel de plaats innemen van het evenement dat er
+ * nog van gemaakt moet worden, zodat de app uit zichzelf doorloopt naar de
+ * volgende wedstrijd in plaats van naar de vorige te blijven wijzen.
+ *
+ * De volgorde:
+ *
+ *   RUNNING   er wordt geteld of gevuld — dat gaat voor, ook als het gisteren was
+ *   UPCOMING  het eerstvolgende evenement dat al bestaat
+ *   PLANNED   de eerstvolgende agendaregel waar nog geen evenement voor is
+ *   PAST      niets meer te gaan; het laatste dat geweest is
+ *   NONE      een lege agenda en geen enkel evenement
+ *
+ * Valt een agendaregel eerder dan het eerstvolgende evenement, dan wint de
+ * agendaregel: die wedstrijd is als eerste aan de beurt.
+ */
+export type EventFocusKind = 'RUNNING' | 'UPCOMING' | 'PLANNED' | 'PAST' | 'NONE'
+
+export interface EventFocus {
+  kind: EventFocusKind
+  /** Het evenement waar het om gaat. `null` bij PLANNED en NONE. */
+  event: Event | null
+  /** De agendaregel die nog een evenement moet worden. Alleen bij PLANNED. */
+  agendaEntry: AgendaEntry | null
+}
+
+export function getEventFocus(input: {
+  events: Event[]
+  agenda?: AgendaEntry[]
+  today?: string
+}): EventFocus {
+  const today = input.today ?? todayLocalDate()
+  const relevant = input.events.filter((event) => event.status !== EventStatus.ARCHIVED)
+
+  const running = relevant.filter(isOperational)
+  if (running.length > 0) {
+    const ahead = running.filter((event) => event.date >= today).sort(byDateAscending)
+    const chosen = ahead[0] ?? [...running].sort(byDateDescending)[0]!
+    return { kind: 'RUNNING', event: chosen, agendaEntry: null }
+  }
+
+  const upcomingEvent = relevant
+    .filter((event) => event.date >= today && !isFinished(event))
+    .sort(byDateAscending)[0]
+
+  // Een agendaregel waarvoor al een evenement bestaat is afgehandeld, ook als
+  // dat evenement afgerond of gearchiveerd is. Vandaar de volledige lijst en
+  // niet `relevant`: anders zou een gearchiveerde wedstrijd via de agenda
+  // terugkomen.
+  const datesWithEvent = new Set(input.events.map((event) => event.date))
+  const plannedEntry = (input.agenda ?? [])
+    .filter((entry) => entry.date >= today && !datesWithEvent.has(entry.date))
+    .sort(byDateAscending)[0]
+
+  if (upcomingEvent && (!plannedEntry || upcomingEvent.date <= plannedEntry.date)) {
+    return { kind: 'UPCOMING', event: upcomingEvent, agendaEntry: null }
+  }
+  if (plannedEntry) {
+    return { kind: 'PLANNED', event: null, agendaEntry: plannedEntry }
+  }
+
+  const last = [...relevant].sort(byDateDescending)[0]
+  return last
+    ? { kind: 'PAST', event: last, agendaEntry: null }
+    : { kind: 'NONE', event: null, agendaEntry: null }
 }
 
 /** Wat er nog aankomt, eerstvolgende eerst. */
