@@ -8,18 +8,22 @@ import type { Kiosk, Product } from '@/types'
  * De bestellijst van één kiosk op één A4.
  *
  * Naar het model van de papieren lijsten die er al lagen: per soort product een
- * blokje, met de norm voorgedrukt onder "Standaard" en een lege kolom
+ * eigen blokje, met de norm voorgedrukt onder "Standaard" en een lege kolom
  * "Bestellen" om met de hand in te vullen.
  *
+ * In twee kolommen naast elkaar, net als op het papier waar dit vandaan komt.
+ * Dat is niet alleen vorm: één doorlopende tabel van vijftig regels moest zo
+ * ver samengeperst worden dat hij op 8,5pt uitkwam. Naast elkaar past dezelfde
+ * inhoud op ruim elf punt, met witruimte tussen de blokjes.
+ *
  * Anders dan de vullijst hangt deze niet aan een vulronde. Hij komt uit de
- * normen, en die zijn er altijd — ook als er niets geteld is en er niets bij
- * te vullen valt. Dat is precies waarvoor je hem meeneemt: je loopt langs en
+ * normen, en die zijn er altijd — ook als er niets geteld is en er niets bij te
+ * vullen valt. Dat is precies waarvoor je hem meeneemt: je loopt langs en
  * schrijft op wat er moet komen.
  */
 
-/** Zie `PrintableRestockStop`: dezelfde gemeten grenzen, dezelfde A4. */
-const COMPACT_FROM_LINES = 18
-const DENSE_FROM_LINES = 30
+/** Waarboven de blokjes krapper moeten om binnen één A4 te blijven. */
+const COMPACT_FROM_LINES = 44
 
 export interface StandardsSheetRow {
   product: Product
@@ -42,12 +46,6 @@ export interface PrintableStandardsSheetProps {
   subtitle: string
 }
 
-function densityClass(lineCount: number): string {
-  if (lineCount >= DENSE_FROM_LINES) return ' print-kiosk-page--dense'
-  if (lineCount >= COMPACT_FROM_LINES) return ' print-kiosk-page--compact'
-  return ''
-}
-
 export function PrintableStandardsSheet({
   kiosk,
   groups,
@@ -65,20 +63,21 @@ export function PrintableStandardsSheet({
     })),
   }))
 
-  // Productregels, notitieregels en de kop van elk blokje tellen allemaal mee
-  // voor de hoogte van het vel.
+  // Artikelen, notitieregels, de kop van elk blokje en de kolomnamen erin
+  // tellen allemaal mee voor de hoogte.
   const lineCount = withNotes.reduce(
     (sum, group) =>
-      sum + 1 + group.rows.length + group.rows.filter((row) => row.note).length,
+      sum + 2 + group.rows.length + group.rows.filter((row) => row.note).length,
     0
   )
 
   return (
     <section
-      className={`print-kiosk-page${densityClass(lineCount)}`}
+      className={`print-kiosk-page${lineCount >= COMPACT_FROM_LINES ? ' print-kiosk-page--compact' : ''}`}
       aria-label={`Bestellijst ${kioskTitle(kiosk)}`}
       data-sheet-index={index + 1}
       data-kiosk-number={kiosk?.number}
+      data-ring={kiosk?.ringId}
     >
       <header className="print-stop-header">
         <p className="print-stop-counter">
@@ -91,60 +90,52 @@ export function PrintableStandardsSheet({
       {withNotes.length === 0 ? (
         <p className="print-empty">Voor deze kiosk staan geen normen ingesteld.</p>
       ) : (
-        <table className="print-table">
-          <thead>
-            <tr>
-              <th scope="col" className="print-col-product">
-                Artikel
-              </th>
-              <th scope="col" className="print-col-planned">
-                Standaard
-              </th>
-              <th scope="col" className="print-col-delivered">
-                Bestellen
-              </th>
-            </tr>
-          </thead>
+        <div className="print-columns">
           {withNotes.map((group) => (
-            <tbody key={group.categoryName}>
-              <tr className="print-group-row">
-                {/* Het soort product als tussenkop, zoals op de papieren lijst
-                    de blokjes per soort. */}
-                <th scope="colgroup" colSpan={3} className="print-group-name">
-                  {group.categoryName}
-                </th>
-              </tr>
-              {group.rows.map((row) => (
-                <tr key={row.product.id}>
-                  <td className="print-col-product">
-                    <span className="print-product-name">{row.product.name}</span>
-                    {row.note && <span className="print-storage-note">↳ {row.note}</span>}
-                  </td>
-                  <td className="print-col-planned">
-                    {formatProductQuantity(
-                      row.product,
-                      fromQuarterUnits(row.targetQuantityQuarters)
-                    )}
-                  </td>
-                  {/* Leeg: hier schrijft de vuller op wat er moet komen. */}
-                  <td className="print-col-delivered" />
+            /* Elk soort product een eigen blokje; `break-inside: avoid` in de
+               CSS houdt zo'n blokje bij elkaar in één kolom. */
+            <table key={group.categoryName} className="print-block">
+              <caption className="print-block-name">{group.categoryName}</caption>
+              <thead>
+                <tr>
+                  <th scope="col" className="print-col-product">
+                    Artikel
+                  </th>
+                  <th scope="col" className="print-col-standard">
+                    Standaard
+                  </th>
+                  <th scope="col" className="print-col-order">
+                    Bestellen
+                  </th>
                 </tr>
-              ))}
-            </tbody>
+              </thead>
+              <tbody>
+                {group.rows.map((row) => (
+                  <tr key={row.product.id}>
+                    <td className="print-col-product">
+                      <span className="print-product-name">{row.product.name}</span>
+                      {row.note && <span className="print-storage-note">↳ {row.note}</span>}
+                    </td>
+                    <td className="print-col-standard">
+                      {formatProductQuantity(
+                        row.product,
+                        fromQuarterUnits(row.targetQuantityQuarters)
+                      )}
+                    </td>
+                    {/* Leeg: hier schrijft de vuller op wat er moet komen. */}
+                    <td className="print-col-order" />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
           ))}
-        </table>
+        </div>
       )}
 
-      <div className="print-remarks">
+      <footer className="print-stop-footer">
         <p className="print-label">Storing / opmerking</p>
         <span className="print-writeline" />
         <span className="print-writeline" />
-      </div>
-
-      <footer className="print-stop-footer">
-        <p className="print-signer">
-          Naam: <span className="print-writeline print-writeline--inline" />
-        </p>
       </footer>
     </section>
   )

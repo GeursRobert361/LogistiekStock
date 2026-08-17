@@ -54,8 +54,8 @@ describe('PrintableStandardsSheet', () => {
   it('zet de norm bij ieder artikel', () => {
     renderSheet()
 
-    expect(screen.getByRole('columnheader', { name: 'Artikel' })).toBeDefined()
-    expect(screen.getByRole('columnheader', { name: 'Standaard' })).toBeDefined()
+    expect(screen.getAllByRole('columnheader', { name: 'Artikel' }).length).toBeGreaterThan(0)
+    expect(screen.getAllByRole('columnheader', { name: 'Standaard' }).length).toBeGreaterThan(0)
     expect(screen.getByText('Chips Blauw')).toBeDefined()
     expect(screen.getAllByText('6 dozen')).toHaveLength(2)
     expect(screen.getByText('4 pakken')).toBeDefined()
@@ -64,7 +64,7 @@ describe('PrintableStandardsSheet', () => {
   it('houdt een lege kolom om te bestellen', () => {
     renderSheet()
 
-    expect(screen.getByRole('columnheader', { name: 'Bestellen' })).toBeDefined()
+    expect(screen.getAllByRole('columnheader', { name: 'Bestellen' }).length).toBeGreaterThan(0)
 
     const rij = screen.getByText('Chips Blauw').closest('tr')!
     const cellen = within(rij).getAllByRole('cell')
@@ -72,11 +72,22 @@ describe('PrintableStandardsSheet', () => {
     expect(cellen[2]!.textContent).toBe('')
   })
 
-  it('groepeert per soort product, zoals de papieren lijst', () => {
-    renderSheet()
+  it('geeft ieder soort product een eigen blokje, zoals de papieren lijst', () => {
+    // Losse blokjes met witruimte ertussen, niet één doorlopende tabel: dat is
+    // wat de oude lijst leesbaar maakte.
+    const { container } = renderSheet()
 
-    expect(screen.getByRole('columnheader', { name: 'Chips' })).toBeDefined()
-    expect(screen.getByRole('columnheader', { name: 'Post-mix' })).toBeDefined()
+    const blokken = container.querySelectorAll('.print-block')
+    expect(blokken).toHaveLength(2)
+    expect(
+      [...container.querySelectorAll('.print-block-name')].map((el) => el.textContent)
+    ).toEqual(['Chips', 'Post-mix'])
+  })
+
+  it('zet de blokjes in twee kolommen naast elkaar', () => {
+    const { container } = renderSheet()
+
+    expect(container.querySelector('.print-columns')).not.toBeNull()
   })
 
   it('gebruikt de verpakkingseenheid en niet wat de kiosk telt', () => {
@@ -105,11 +116,17 @@ describe('PrintableStandardsSheet', () => {
     expect(screen.getByText(/2 dozen achter in de kiosk/)).toBeDefined()
   })
 
-  it('houdt ruimte voor een storing en een naam', () => {
+  it('houdt ruimte voor een storing of opmerking', () => {
     renderSheet()
 
     expect(screen.getByText('Storing / opmerking')).toBeDefined()
-    expect(screen.getByText(/Naam:/)).toBeDefined()
+  })
+
+  it('vraagt niet om een naam', () => {
+    // Wie de lijst invult is bekend; een naamregel is alleen ruimte kwijt.
+    renderSheet()
+
+    expect(screen.queryByText(/Naam/)).toBeNull()
   })
 
   it('meldt het eerlijk als een kiosk geen normen heeft', () => {
@@ -118,13 +135,19 @@ describe('PrintableStandardsSheet', () => {
     expect(screen.getByText(/geen normen ingesteld/)).toBeDefined()
   })
 
-  it('perst de regels samen bij een volle kiosk', () => {
-    const veel = demoProducts.slice(0, 35).map((p) => [p.id, 1] as [string, number])
-    const { container } = renderSheet({
-      kiosk: kioskById('kiosk-402'),
-      groups: [group('Alles', veel)],
-    })
+  it('perst de blokjes samen bij een volle kiosk', () => {
+    // 42 artikelen over acht soorten is de ruimste kiosk die er is; dan moet er
+    // ruimte gewonnen worden, maar er blijft niets weg.
+    const veel = demoProducts.slice(0, 42)
+    const groepen = [0, 1, 2, 3, 4, 5, 6, 7].map((n) =>
+      group(
+        `Soort ${n}`,
+        veel.filter((_, i) => i % 8 === n).map((p) => [p.id, 1] as [string, number])
+      )
+    )
+    const { container } = renderSheet({ kiosk: kioskById('kiosk-402'), groups: groepen })
 
-    expect(container.querySelector('.print-kiosk-page--dense')).not.toBeNull()
+    expect(container.querySelector('.print-kiosk-page--compact')).not.toBeNull()
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(42)
   })
 })

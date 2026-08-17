@@ -82,12 +82,15 @@ test.describe('Bestellijst printen', () => {
     await expect(pages.first()).toBeVisible()
     expect(await pages.count()).toBeGreaterThan(1)
 
+    // Per soort product een eigen blokje, dus de kolomnamen staan er meerdere
+    // keren; de eerste volstaat om te zien dat de indeling klopt.
     const eerste = pages.first()
-    await expect(eerste.getByRole('columnheader', { name: 'Artikel' })).toBeVisible()
-    await expect(eerste.getByRole('columnheader', { name: 'Standaard' })).toBeVisible()
-    await expect(eerste.getByRole('columnheader', { name: 'Bestellen' })).toBeVisible()
+    await expect(eerste.getByRole('columnheader', { name: 'Artikel' }).first()).toBeVisible()
+    await expect(eerste.getByRole('columnheader', { name: 'Standaard' }).first()).toBeVisible()
+    await expect(eerste.getByRole('columnheader', { name: 'Bestellen' }).first()).toBeVisible()
     await expect(eerste.getByText(/blad 1 van/)).toBeVisible()
     await expect(eerste.getByRole('heading', { level: 2 })).toBeVisible()
+    expect(await eerste.locator('.print-block').count()).toBeGreaterThan(1)
   })
 
   test('geeft iedere kiosk zijn eigen vel met zijn eigen normen', async ({ page }) => {
@@ -110,11 +113,51 @@ test.describe('Bestellijst printen', () => {
     expect(regels.every((n) => n > 0)).toBe(true)
   })
 
+  test('houdt de ringen uit elkaar in plaats van door elkaar', async ({ page }) => {
+    // Beide ringen tellen hun kiosken vanaf sortOrder 10, dus sorteren op dat
+    // getal alleen schoof 101 en 401 om en om door elkaar.
+    await page.goto('/events/event-demo-ajax/print')
+    await expect(page.locator('.print-kiosk-page').first()).toBeVisible()
+
+    // Op de ring en niet op het kiosknummer: "120 Cubes" heet intern 1201 en
+    // hoort bij de eerste ring, dus een grens op 400 zou niets bewijzen.
+    const ringen = await page.evaluate(() =>
+      [...document.querySelectorAll('.print-kiosk-page')].map((el) =>
+        el.getAttribute('data-ring')
+      )
+    )
+
+    // Elke ring vormt één aaneengesloten blok vellen.
+    const blokken = ringen.filter((ring, index) => ring !== ringen[index - 1])
+    expect(blokken).toHaveLength(new Set(ringen).size)
+    expect(new Set(ringen).size).toBeGreaterThan(1)
+  })
+
+  test('print één ring apart', async ({ page }) => {
+    await page.goto('/events/event-demo-ajax/print')
+    await expect(page.locator('.print-kiosk-page').first()).toBeVisible()
+    const alles = await page.locator('.print-kiosk-page').count()
+
+    await page.getByRole('button', { name: 'Tweede ring' }).click()
+
+    const nummers = await page.evaluate(() =>
+      [...document.querySelectorAll('.print-kiosk-page')].map((el) =>
+        Number(el.getAttribute('data-kiosk-number'))
+      )
+    )
+    expect(nummers.length).toBeGreaterThan(0)
+    expect(nummers.length).toBeLessThan(alles)
+    expect(nummers.every((n) => n >= 400)).toBe(true)
+  })
+
   test('de bediening print niet mee', async ({ page }) => {
     await page.goto('/events/event-demo-ajax/print')
     const printButton = page.getByRole('button', { name: 'Printen' })
     await expect(printButton).toBeVisible()
     await expect(page.locator('.no-print').filter({ has: printButton })).toHaveCount(1)
+
+    const ringKnop = page.getByRole('button', { name: 'Eerste ring' })
+    await expect(page.locator('.no-print').filter({ has: ringKnop })).toHaveCount(1)
   })
 })
 

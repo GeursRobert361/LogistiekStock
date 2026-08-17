@@ -99,10 +99,18 @@ export default function EventStandardsPrintPage({
   const sheets = useMemo(() => {
     if (!data) return []
 
+    // Eerst op ring en dan pas op kiosk: beide ringen tellen hun kiosken vanaf
+    // sortOrder 10, dus sorteren op sortOrder alleen schoof 101 en 401 door
+    // elkaar heen.
+    const ringOrder = new Map(data.rings.map((ring) => [ring.id, ring.sortOrder]))
     const kiosks = data.kiosks
       .filter((kiosk) => ringId === 'alle' || kiosk.ringId === ringId)
       .filter((kiosk) => (data.standards.get(kiosk.id)?.size ?? 0) > 0)
-      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .sort(
+        (a, b) =>
+          (ringOrder.get(a.ringId) ?? 0) - (ringOrder.get(b.ringId) ?? 0) ||
+          a.sortOrder - b.sortOrder
+      )
 
     return kiosks.map((kiosk) => {
       const perProduct = data.standards.get(kiosk.id) ?? new Map<string, number>()
@@ -159,23 +167,6 @@ export default function EventStandardsPrintPage({
           ← Terug naar evenement
         </Link>
         <div className="flex items-center gap-3">
-          {data.rings.length > 1 && (
-            <label className="text-sm text-gray-700">
-              <span className="sr-only">Ring</span>
-              <select
-                value={ringId}
-                onChange={(e) => setRingId(e.target.value)}
-                className="min-h-11 rounded-xl border border-gray-300 px-2"
-              >
-                <option value="alle">Alle ringen</option>
-                {data.rings.map((ring) => (
-                  <option key={ring.id} value={ring.id}>
-                    {ring.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
           <span className="text-sm text-gray-600">
             {sheets.length} {sheets.length === 1 ? 'pagina' : "pagina's"}
           </span>
@@ -188,6 +179,32 @@ export default function EventStandardsPrintPage({
           </button>
         </div>
       </div>
+
+      {/* Je print zelden allebei de ringen tegelijk: de een gaat naar de vuller
+          van boven, de ander naar die van beneden. */}
+      {data.rings.length > 1 && (
+        <div
+          role="group"
+          aria-label="Welke ring"
+          className="no-print flex flex-wrap gap-2 border-b border-gray-200 bg-white px-4 py-3"
+        >
+          {[{ id: 'alle', name: 'Beide ringen' }, ...data.rings].map((ring) => (
+            <button
+              key={ring.id}
+              type="button"
+              aria-pressed={ringId === ring.id}
+              onClick={() => setRingId(ring.id)}
+              className={`min-h-11 rounded-xl border px-4 font-medium ${
+                ringId === ring.id
+                  ? 'border-arena-red bg-red-50 text-arena-red'
+                  : 'border-gray-300 bg-white text-gray-800'
+              }`}
+            >
+              {ring.name}
+            </button>
+          ))}
+        </div>
+      )}
 
       <div className="print-sheet">
         {sheets.length === 0 ? (
