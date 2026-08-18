@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { login, resetAppData } from './helpers'
 
 test.describe('Beheer', () => {
@@ -236,6 +236,17 @@ test.describe('Startkiosk per ring', () => {
  * deploy. Deze tests bewaken de weg die daarvoor in de plaats komt — van het
  * beheerscherm tot het telscherm waar de teller ernaar kijkt.
  */
+/**
+ * Kiezen gaat net als op het Kiosken-tab: eerst de ring, dan de tegel.
+ *
+ * Alle kiosken in één keuzelijst was niet te overzien — vijfenvijftig regels
+ * waarvan je er één zoekt.
+ */
+async function selectKiosk(page: Page, naam: string): Promise<void> {
+  await page.getByRole('button', { name: 'Tweede ring', exact: true }).click()
+  await page.getByRole('button', { name: new RegExp(`^${naam}`) }).click()
+}
+
 test.describe('Opmerkingen bij een kiosk', () => {
   test.beforeEach(async ({ page }) => {
     await resetAppData(page)
@@ -244,31 +255,41 @@ test.describe('Opmerkingen bij een kiosk', () => {
 
   test('toont wat er bij een kiosk hoort te staan', async ({ page }) => {
     await page.goto('/admin/opmerkingen')
-    await page.getByLabel('Kiosk').selectOption('kiosk-401')
+    await selectKiosk(page, 'Kiosk 401')
 
     // 401 heeft er twee: één bij een product, één bij een hele categorie.
     await expect(page.getByText('2 dozen achter in de kiosk')).toBeVisible()
     await expect(page.getByText('3 op de plank, onder elk luik 1 doos')).toBeVisible()
   })
 
+  test('laat in het overzicht zien waar al iets staat', async ({ page }) => {
+    // Het raster is het overzicht: zonder telling moet je elke kiosk los
+    // openen om te zien of er iets bij staat.
+    await page.goto('/admin/opmerkingen')
+    await page.getByRole('button', { name: 'Tweede ring', exact: true }).click()
+
+    await expect(page.getByRole('button', { name: /^Kiosk 401, 2 opmerkingen/ })).toBeVisible()
+    await expect(page.getByRole('button', { name: /^Kiosk 403, geen opmerkingen/ })).toBeVisible()
+  })
+
   test('opmerking toevoegen, wijzigen en weghalen', async ({ page }) => {
     await page.goto('/admin/opmerkingen')
-    await page.getByLabel('Kiosk').selectOption('kiosk-403')
+    await selectKiosk(page, 'Kiosk 403')
 
     await page.getByRole('button', { name: '+ Nieuw' }).click()
     await page.getByLabel('Hoort bij').selectOption('product:bierbeker-05')
-    await page.getByLabel('Opmerking').fill('Achter de koeling')
+    await page.getByLabel('Opmerking', { exact: true }).fill('Achter de koeling')
     await page.getByRole('button', { name: 'Opslaan' }).click()
 
     await expect(page.getByText('Achter de koeling')).toBeVisible()
 
     // Echt opgeslagen, niet alleen op het scherm.
     await page.reload()
-    await page.getByLabel('Kiosk').selectOption('kiosk-403')
+    await selectKiosk(page, 'Kiosk 403')
     await expect(page.getByText('Achter de koeling')).toBeVisible()
 
     await page.getByRole('button', { name: /Achter de koeling/ }).click()
-    await page.getByLabel('Opmerking').fill('Achter de koeling, onderste plank')
+    await page.getByLabel('Opmerking', { exact: true }).fill('Achter de koeling, onderste plank')
     await page.getByRole('button', { name: 'Opslaan' }).click()
     await expect(page.getByText('Achter de koeling, onderste plank')).toBeVisible()
 
@@ -279,10 +300,10 @@ test.describe('Opmerkingen bij een kiosk', () => {
 
   test('een gewijzigde opmerking staat op het telscherm', async ({ page }) => {
     await page.goto('/admin/opmerkingen')
-    await page.getByLabel('Kiosk').selectOption('kiosk-401')
+    await selectKiosk(page, 'Kiosk 401')
 
     await page.getByRole('button', { name: /2 dozen achter in de kiosk/ }).click()
-    await page.getByLabel('Opmerking').fill('Vier dozen achter in de kiosk')
+    await page.getByLabel('Opmerking', { exact: true }).fill('Vier dozen achter in de kiosk')
     await page.getByRole('button', { name: 'Opslaan' }).click()
     await expect(page.getByText('Vier dozen achter in de kiosk')).toBeVisible()
 
