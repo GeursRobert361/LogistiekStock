@@ -1,6 +1,6 @@
 import { kioskTitle } from '@/lib/kiosk'
 import { formatProductQuantity } from '@/lib/productQuantity'
-import { categoryStorageNoteFor, storageNoteFor } from '@/lib/storageNotes'
+import { EMPTY_STORAGE_NOTES, type StorageNoteLookup } from '@/lib/storageNotes'
 import { fromQuarterUnits } from '@/lib/quarterUnits'
 import type { Kiosk, Product } from '@/types'
 
@@ -40,6 +40,7 @@ export interface StandardsSheetRow {
 
 export interface StandardsSheetGroup {
   categoryName: string
+  categoryId: string
   rows: StandardsSheetRow[]
 }
 
@@ -51,6 +52,8 @@ export interface PrintableStandardsSheetProps {
   totalSheets: number
   /** Eén regel onder de kiosknaam: waar dit vel bij hoort. */
   subtitle: string
+  /** De opmerkingen over waar de voorraad ligt. */
+  storageNotes?: StorageNoteLookup
 }
 
 export function PrintableStandardsSheet({
@@ -59,22 +62,22 @@ export function PrintableStandardsSheet({
   index,
   totalSheets,
   subtitle,
+  storageNotes = EMPTY_STORAGE_NOTES,
 }: PrintableStandardsSheetProps) {
   const withNotes = groups.map((group) => ({
     ...group,
     rows: group.rows.map((row) => ({
       ...row,
       note:
-        storageNoteFor(kiosk, row.product) ??
-        categoryStorageNoteFor(kiosk, group.categoryName),
+        storageNotes.forProduct(kiosk?.id, row.product.id) ??
+        storageNotes.forCategory(kiosk?.id, group.categoryId),
     })),
   }))
 
   // Artikelen, notitieregels, de kop van elk blokje en de kolomnamen erin
   // tellen allemaal mee voor de hoogte.
   const lineCount = withNotes.reduce(
-    (sum, group) =>
-      sum + 2 + group.rows.length + group.rows.filter((row) => row.note).length,
+    (sum, group) => sum + 2 + group.rows.length + group.rows.filter((row) => row.note).length,
     0
   )
 

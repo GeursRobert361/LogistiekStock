@@ -191,6 +191,49 @@ export interface KioskProductStandardWithDetails extends KioskProductStandard {
   product: Product
 }
 
+// ─── Opmerking bij een kiosk ─────────────────────────────────────────────────
+
+/**
+ * Waar de voorraad bij deze kiosk fysiek ligt.
+ *
+ * "2 dozen achter in de kiosk", "onder elk luik 1 doos". Voor de teller en de
+ * vuller is dat het verschil tussen "er ligt niets meer" en "je moet even om
+ * het hoekje kijken", dus staat het op het scherm waar hij op dat moment naar
+ * kijkt.
+ *
+ * Wat het níet is: een aanpassing van de norm. 401 heeft er vijf staan, waarvan
+ * twee achterin — geen zeven. Geen enkele berekening kijkt hiernaar.
+ *
+ * Een regel gaat over één product óf over een hele categorie, nooit over
+ * allebei en nooit over geen van beide; de database bewaakt dat met een check.
+ * Het categoriegeval bestaat omdat "3 op de plank, onder elk luik 1 doos" over
+ * de chips als geheel gaat en niet over Blauw in het bijzonder — per smaak
+ * opschrijven zou dezelfde zin drie keer onder elkaar zetten.
+ */
+export interface KioskStorageNote {
+  id: string
+  kioskId: string
+  productId?: string
+  categoryId?: string
+  note: string
+  createdAt: string
+  updatedAt: string
+}
+
+/**
+ * Wat Beheer › Opmerkingen opstuurt.
+ *
+ * Geen id: welke regel het wordt volgt uit de kiosk plus het product of de
+ * categorie. Bestaat die regel al, dan wordt hij overschreven — twee
+ * tegenstrijdige briefjes onder dezelfde telregel helpen niemand.
+ */
+export interface KioskStorageNoteInput {
+  kioskId: string
+  productId?: string
+  categoryId?: string
+  note: string
+}
+
 // ─── Event ───────────────────────────────────────────────────────────────────
 
 /**

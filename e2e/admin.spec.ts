@@ -228,3 +228,71 @@ test.describe('Startkiosk per ring', () => {
     await expect(page.getByLabel('Startkiosk')).toHaveValue('kiosk-110')
   })
 })
+
+/**
+ * Opmerkingen over waar de voorraad bij een kiosk ligt.
+ *
+ * Ze stonden als vaste lijst in de code: een doos die verhuisde wachtte op een
+ * deploy. Deze tests bewaken de weg die daarvoor in de plaats komt — van het
+ * beheerscherm tot het telscherm waar de teller ernaar kijkt.
+ */
+test.describe('Opmerkingen bij een kiosk', () => {
+  test.beforeEach(async ({ page }) => {
+    await resetAppData(page)
+    await login(page, 'admin@demo.nl')
+  })
+
+  test('toont wat er bij een kiosk hoort te staan', async ({ page }) => {
+    await page.goto('/admin/opmerkingen')
+    await page.getByLabel('Kiosk').selectOption('kiosk-401')
+
+    // 401 heeft er twee: één bij een product, één bij een hele categorie.
+    await expect(page.getByText('2 dozen achter in de kiosk')).toBeVisible()
+    await expect(page.getByText('3 op de plank, onder elk luik 1 doos')).toBeVisible()
+  })
+
+  test('opmerking toevoegen, wijzigen en weghalen', async ({ page }) => {
+    await page.goto('/admin/opmerkingen')
+    await page.getByLabel('Kiosk').selectOption('kiosk-403')
+
+    await page.getByRole('button', { name: '+ Nieuw' }).click()
+    await page.getByLabel('Hoort bij').selectOption('product:bierbeker-05')
+    await page.getByLabel('Opmerking').fill('Achter de koeling')
+    await page.getByRole('button', { name: 'Opslaan' }).click()
+
+    await expect(page.getByText('Achter de koeling')).toBeVisible()
+
+    // Echt opgeslagen, niet alleen op het scherm.
+    await page.reload()
+    await page.getByLabel('Kiosk').selectOption('kiosk-403')
+    await expect(page.getByText('Achter de koeling')).toBeVisible()
+
+    await page.getByRole('button', { name: /Achter de koeling/ }).click()
+    await page.getByLabel('Opmerking').fill('Achter de koeling, onderste plank')
+    await page.getByRole('button', { name: 'Opslaan' }).click()
+    await expect(page.getByText('Achter de koeling, onderste plank')).toBeVisible()
+
+    await page.getByRole('button', { name: /Achter de koeling/ }).click()
+    await page.getByRole('button', { name: 'Weghalen' }).click()
+    await expect(page.getByText('Achter de koeling')).toHaveCount(0)
+  })
+
+  test('een gewijzigde opmerking staat op het telscherm', async ({ page }) => {
+    await page.goto('/admin/opmerkingen')
+    await page.getByLabel('Kiosk').selectOption('kiosk-401')
+
+    await page.getByRole('button', { name: /2 dozen achter in de kiosk/ }).click()
+    await page.getByLabel('Opmerking').fill('Vier dozen achter in de kiosk')
+    await page.getByRole('button', { name: 'Opslaan' }).click()
+    await expect(page.getByText('Vier dozen achter in de kiosk')).toBeVisible()
+
+    // En dan waar het om gaat: de teller ziet het bij het product zelf.
+    await page.goto('/events/event-demo-ajax/count/start')
+    await page.getByLabel('Ring').selectOption({ label: 'Tweede ring' })
+    await page.getByLabel('Startkiosk').selectOption('kiosk-401')
+    await page.getByRole('button', { name: /Telronde starten/ }).click()
+    await page.waitForURL(/\/kiosk\/kiosk-401/)
+
+    await expect(page.getByText('Vier dozen achter in de kiosk')).toBeVisible()
+  })
+})

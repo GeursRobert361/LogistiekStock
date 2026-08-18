@@ -1,7 +1,9 @@
 import type { IKioskRepository } from '@/repositories/interfaces/IKioskRepository'
 import type { Kiosk, Ring } from '@/types'
 import { query, queryOne, queryRequired, buildUpdate, transaction, type Row } from '@/server/db/pool'
-import { mapKiosk, mapRing, kioskToRow, ringToRow } from '@/server/db/rowMappers'
+import { mapKiosk, mapRing, mapStorageNote, kioskToRow, ringToRow } from '@/server/db/rowMappers'
+import { storageNoteProblem } from '@/lib/storageNotes'
+import { ValidationError } from '@/server/api/errors'
 
 export const kioskRepository: IKioskRepository = {
   async getRings(options) {
@@ -110,6 +112,36 @@ export const kioskRepository: IKioskRepository = {
         )
       }
     })
+  },
+
+  async getStorageNotes() {
+    const rows = await query('select * from kiosk_storage_notes')
+    return rows.map(mapStorageNote)
+  },
+
+  async saveStorageNote(input) {
+    const problem = storageNoteProblem(input)
+    if (problem) throw new ValidationError(problem)
+
+    // Twee partiële unieke indexen, elk op één van de twee doelen, dus twee
+    // conflictclausules — de `where` erbij, anders weet Postgres niet welke
+    // van de twee indexen bedoeld wordt.
+    const conflict = input.productId
+      ? '(kiosk_id, product_id) where product_id is not null'
+      : '(kiosk_id, category_id) where category_id is not null'
+
+    const row = await queryRequired(
+      `insert into kiosk_storage_notes (kiosk_id, product_id, category_id, note)
+       values ($1, $2, $3, $4)
+       on conflict ${conflict} do update set note = excluded.note
+       returning *`,
+      [input.kioskId, input.productId ?? null, input.categoryId ?? null, input.note.trim()]
+    )
+    return mapStorageNote(row)
+  },
+
+  async deleteStorageNote(id) {
+    await query('delete from kiosk_storage_notes where id = $1', [id])
   },
 }
 

@@ -8,6 +8,11 @@ import {
   type StandardsSheetGroup,
 } from '@/components/restock/PrintableStandardsSheet'
 import { formatDate } from '@/lib/utils'
+import {
+  buildStorageNoteLookup,
+  EMPTY_STORAGE_NOTES,
+  type StorageNoteLookup,
+} from '@/lib/storageNotes'
 import type { Event, Kiosk, Product, ProductCategory, Ring } from '@/types'
 import '../../../print.css'
 
@@ -33,6 +38,8 @@ interface PrintData {
   kiosks: Kiosk[]
   products: Map<string, Product>
   categories: ProductCategory[]
+  /** De opmerkingen over waar de voorraad per kiosk ligt. */
+  storageNotes: StorageNoteLookup
   /** kioskId → productId → norm in kwarteenheden. */
   standards: Map<string, Map<string, number>>
   /**
@@ -55,12 +62,13 @@ export default function EventStandardsPrintPage({
   const [error, setError] = useState<string | null>(null)
 
   const load = useCallback(async () => {
-    const [event, kioskList, ringList, productList, categoryList] = await Promise.all([
+    const [event, kioskList, ringList, productList, categoryList, noteList] = await Promise.all([
       repositories.event().getEventById(eventId),
       repositories.kiosk().getKiosksByEvent(eventId),
       repositories.kiosk().getRings(),
       repositories.product().getProducts({ activeOnly: true }),
       repositories.product().getCategories(),
+      repositories.kiosk().getStorageNotes(),
     ])
     if (!event) throw new Error(`Evenement niet gevonden: ${eventId}`)
 
@@ -105,6 +113,7 @@ export default function EventStandardsPrintPage({
       kiosks: open,
       products: new Map(productList.map((p) => [p.id, p])),
       categories: categoryList,
+      storageNotes: buildStorageNoteLookup(noteList),
       standards,
       restock,
     })
@@ -144,6 +153,7 @@ export default function EventStandardsPrintPage({
       const groups: StandardsSheetGroup[] = data.categories
         .map((category) => ({
           categoryName: category.name,
+          categoryId: category.id,
           // flatMap in plaats van map + filter: dan hoeft er geen typepredicaat
           // omheen om te vertellen dat het product bestaat.
           rows: [...perProduct]
@@ -249,6 +259,7 @@ export default function EventStandardsPrintPage({
               index={index}
               totalSheets={sheets.length}
               subtitle={subtitle}
+              storageNotes={data?.storageNotes ?? EMPTY_STORAGE_NOTES}
             />
           ))
         )}

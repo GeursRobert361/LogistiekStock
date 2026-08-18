@@ -1,12 +1,17 @@
 import { assortmentForKiosk } from './assortment'
 import { effectiveStandards } from './standardPolicies'
 import { secondRingStandards, authoritativeKioskKeys } from './secondRingStandards'
+import { productStorageNoteSeeds, categoryStorageNoteSeeds } from './storageNoteSeeds'
+// Los van de re-export onderaan: `export ... from` maakt hier geen bruikbare
+// naam aan, en de opmerkingen moeten op product- en categorie-id gelegd worden.
+import { demoProducts as demoProductList, demoCategories as demoCategoryList } from './catalogue'
 import type {
   AgendaEntry,
   Profile,
   Ring,
   Kiosk,
   KioskProductStandard,
+  KioskStorageNote,
   Event,
 } from '@/types'
 import { UserRole, EventStatus, EventType, DrinkStorageType } from '@/types'
@@ -372,6 +377,52 @@ export const demoStandards: KioskProductStandard[] = demoKiosks.flatMap((kiosk) 
  * vertrouwen.
  */
 export const kiosksWithRealStandards: ReadonlySet<string> = authoritativeKioskKeys
+
+// ─── Opmerkingen bij een kiosk ────────────────────────────────────────────
+
+/**
+ * De opmerkingen over waar voorraad ligt, op de demo-id's gelegd.
+ *
+ * In productie plant migratie 014 dezelfde lijst in `kiosk_storage_notes`;
+ * demo-modus heeft geen database, dus gebeurt het hier. Vanaf dat moment is de
+ * tabel de baas — wie in Beheer een opmerking wijzigt, wijzigt de tabel en niet
+ * deze lijst.
+ *
+ * Een regel die naar een kiosk, product of categorie wijst die hier niet
+ * bestaat valt weg in plaats van de demo-data te laten klappen: dezelfde keuze
+ * als in de migratie.
+ */
+const kioskIdByNumber = new Map(demoKiosks.map((kiosk) => [kiosk.number, kiosk.id]))
+const productIdByName = new Map(demoProductList.map((product) => [product.name, product.id]))
+const categoryIdByName = new Map(demoCategoryList.map((category) => [category.name, category.id]))
+
+function storageNote(
+  kioskId: string,
+  target: { productId?: string; categoryId?: string },
+  note: string
+): KioskStorageNote {
+  return {
+    id: `note-${kioskId}-${target.productId ?? target.categoryId ?? ''}`,
+    kioskId,
+    ...target,
+    note,
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+  }
+}
+
+export const demoStorageNotes: KioskStorageNote[] = [
+  ...productStorageNoteSeeds.flatMap((seed) => {
+    const kioskId = kioskIdByNumber.get(seed.kioskNumber)
+    const productId = productIdByName.get(seed.productName)
+    return kioskId && productId ? [storageNote(kioskId, { productId }, seed.note)] : []
+  }),
+  ...categoryStorageNoteSeeds.flatMap((seed) => {
+    const kioskId = kioskIdByNumber.get(seed.kioskNumber)
+    const categoryId = categoryIdByName.get(seed.categoryName)
+    return kioskId && categoryId ? [storageNote(kioskId, { categoryId }, seed.note)] : []
+  }),
+]
 
 // ─── Demo event ───────────────────────────────────────────────────────────
 

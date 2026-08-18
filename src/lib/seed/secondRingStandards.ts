@@ -209,9 +209,7 @@ const PAPER_DRINKS: Record<string, Record<string, number>> = {
  * Gaat mee naar de database als `kiosks.keeps_own_drink_stock`, want de
  * bijvulregel draait in productie op wat daar staat en niet op deze seed.
  */
-export const LOCAL_DRINK_STOCK_KIOSK_KEYS: ReadonlySet<string> = new Set([
-  'kiosk-ziggo-platform',
-])
+export const LOCAL_DRINK_STOCK_KIOSK_KEYS: ReadonlySet<string> = new Set(['kiosk-ziggo-platform'])
 
 /**
  * Wie telt de gekoelde drank?
@@ -429,8 +427,9 @@ const MANUAL_CUP_OVERRIDES: Record<string, Record<string, number>> = {
  * Bij de bekerlijst stonden ook drie opmerkingen over waar de bekers liggen —
  * "1 doos achter in kiosk". Die zeggen niets over de norm (401 blijft 5 en
  * wordt geen 7) en horen op het scherm van de vuller; ze staan daarom in
- * `src/lib/storageNotes.ts`. Hetzelfde geldt voor de plaatsingsregels bij de
- * chips en de Post-mix.
+ * `kiosk_storage_notes`, te wijzigen in Beheer › Opmerkingen; de startlijst
+ * staat in `src/lib/seed/storageNoteSeeds.ts`. Hetzelfde geldt voor de
+ * plaatsingsregels bij de chips en de Post-mix.
  */
 
 /** De drie chipssmaken, in de volgorde waarin ze op de lijst staan. */
@@ -541,13 +540,14 @@ export const POSTMIX_COUNTING_RULE = {
  * Het gaat dus naar `kiosk-420`; "420 Bar" (4201) is wél een eigen telpunt en
  * staat apart op de lijst. Dat die pakken in het hok links van de kiosk staan
  * en niet in de kiosk zelf, staat als opslagnotitie in
- * `src/lib/storageNotes.ts` — anders zoekt een teller bij 420 naar acht pakken
- * die daar niet staan.
+ * `kiosk_storage_notes` — anders zoekt een teller bij 420 naar acht pakken die
+ * daar niet staan.
  */
 const MANUAL_POSTMIX_OVERRIDES: Record<string, Record<string, number>> = {
   'kiosk-401': { cola: 4, 'cola-zero': 8, fanta: 4, sprite: 4 },
   'kiosk-404': { cola: 2, 'cola-zero': 4, fanta: 2, sprite: 2 },
-  // 406 Oud; de voorraad staat in het hok links van de kiosk, zie storageNotes.
+  // 406 Oud; de voorraad staat in het hok links van de kiosk, zie de opmerking
+  // bij die kiosk.
   'kiosk-406': { cola: 2, 'cola-zero': 4, fanta: 2, sprite: 2 },
   'kiosk-407': {
     cola: 1,
@@ -809,7 +809,6 @@ export const unconfirmedStandards: ReadonlyArray<{
   { kioskKey: 'kiosk-423', productId: 'heineken-00', reason: 'genoteerd als "15(?)"' },
   { kioskKey: 'kiosk-426', productId: 'heineken-00', reason: 'genoteerd als "15(?)"' },
 ]
-
 
 /** De koffiehoek zoals die op vrijwel elke lijst terugkomt. */
 const KOFFIEHOEK: Record<string, number> = {

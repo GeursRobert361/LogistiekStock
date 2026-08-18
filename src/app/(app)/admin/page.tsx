@@ -33,6 +33,12 @@ const ADMIN_LINKS: AdminLink[] = [
     permission: 'MANAGE_STANDARDS',
   },
   {
+    href: '/admin/opmerkingen',
+    label: 'Opmerkingen',
+    description: 'Waar de voorraad bij een kiosk ligt; verschijnt bij het tellen en vullen',
+    permission: 'MANAGE_STANDARDS',
+  },
+  {
     href: '/admin/import',
     label: 'Normen importeren',
     description: 'Voorraadnormen uit een CSV-bestand, met voorbeeld vooraf',

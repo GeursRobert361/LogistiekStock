@@ -2,9 +2,10 @@ import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 import { PrintableRestockStop } from '../PrintableRestockStop'
 import { demoProducts } from '@/lib/seed/catalogue'
-import { demoKiosks, demoStandards } from '@/lib/seed/demoData'
+import { demoKiosks, demoStandards, demoStorageNotes } from '@/lib/seed/demoData'
+import { buildStorageNoteLookup } from '@/lib/storageNotes'
 import { fromQuarterUnits } from '@/lib/quarterUnits'
-import type { Product, RestockRoundStop, RestockStopItem } from '@/types'
+import type { KioskStorageNote, Product, RestockRoundStop, RestockStopItem } from '@/types'
 
 /**
  * De papieren vullijst.
@@ -15,7 +16,7 @@ import type { Product, RestockRoundStop, RestockStopItem } from '@/types'
  */
 
 const products = new Map<string, Product>(demoProducts.map((p) => [p.id, p]))
-const categoryNames = new Map(demoProducts.map((p) => [p.categoryId, 'Chips']))
+const storageNotes = buildStorageNoteLookup(demoStorageNotes)
 const kioskById = (id: string) => demoKiosks.find((k) => k.id === id)
 
 function stop(id = 'stop-1', kioskId = 'kiosk-401'): RestockRoundStop {
@@ -50,7 +51,7 @@ function renderStop(overrides: Partial<Parameters<typeof PrintableRestockStop>[0
       stop={stop()}
       stopItems={[item('chips-blauw', 3)]}
       products={products}
-      categoryNames={categoryNames}
+      storageNotes={storageNotes}
       standards={standardsFor('kiosk-401')}
       kiosk={kioskById('kiosk-401')}
       index={0}
@@ -230,9 +231,22 @@ describe('PrintableRestockStop', () => {
     // Een notitie staat op een tweede regel onder de productnaam. Wie alleen
     // producten telt laat een kiosk vol notities alsnog over de rand lopen:
     // hier zijn tien producten twintig regels.
+    const tien = demoProducts.slice(0, 10)
+    const overal: KioskStorageNote[] = [...new Set(tien.map((p) => p.categoryId))].map(
+      (categoryId) => ({
+        id: `note-${categoryId}`,
+        kioskId: 'kiosk-401',
+        categoryId,
+        note: 'Onder de balie',
+        createdAt: '',
+        updatedAt: '',
+      })
+    )
+
     const { container } = renderStop({
       kiosk: kioskById('kiosk-401'),
-      stopItems: demoProducts.slice(0, 10).map((p) => item(p.id, 1)),
+      stopItems: tien.map((p) => item(p.id, 1)),
+      storageNotes: buildStorageNoteLookup(overal),
     })
 
     expect(container.querySelectorAll('.print-storage-note')).toHaveLength(10)

@@ -3,7 +3,8 @@ import { render, screen } from '@testing-library/react'
 import { ProductCountRow } from '../ProductCountRow'
 import { CategoryAccordion } from '../CategoryAccordion'
 import { demoProducts } from '@/lib/seed/catalogue'
-import type { KioskProductStandard } from '@/types'
+import { buildStorageNoteLookup } from '@/lib/storageNotes'
+import type { KioskProductStandard, KioskStorageNote } from '@/types'
 
 /**
  * De opmerking over waar de voorraad ligt, tijdens het tellen.
@@ -33,6 +34,32 @@ function standard(productId: string, quarters: number): KioskProductStandard {
     updatedAt: '2026-01-01T00:00:00Z',
   }
 }
+
+/** De opmerkingen zoals ze uit de database komen. */
+function note(fields: Partial<KioskStorageNote> & { id: string }): KioskStorageNote {
+  return {
+    kioskId: 'kiosk-401',
+    note: 'ergens',
+    createdAt: '2026-01-01T00:00:00Z',
+    updatedAt: '2026-01-01T00:00:00Z',
+    ...fields,
+  }
+}
+
+const storageNotes = buildStorageNoteLookup([
+  note({
+    id: 'n1',
+    kioskId: 'kiosk-401',
+    productId: 'bierbeker-05',
+    note: '2 dozen achter in de kiosk',
+  }),
+  note({
+    id: 'n2',
+    kioskId: 'kiosk-426',
+    categoryId: 'cat-chips',
+    note: '3 op de plank, onder elk luik 1 doos',
+  }),
+])
 
 describe('ProductCountRow', () => {
   it('toont de opmerking bij het product', () => {
@@ -87,8 +114,10 @@ describe('CategoryAccordion', () => {
     render(
       <CategoryAccordion
         categoryName="Bierbekers"
+        categoryId="cat-bierbekers"
         products={[beker, chips]}
-        kiosk={{ number: 401 }}
+        kioskId="kiosk-401"
+        storageNotes={storageNotes}
         standards={
           new Map([
             [beker.id, standard(beker.id, 20)],
@@ -110,8 +139,10 @@ describe('CategoryAccordion', () => {
     render(
       <CategoryAccordion
         categoryName="Bierbekers"
+        categoryId="cat-bierbekers"
         products={[beker]}
-        kiosk={{ number: 402 }}
+        kioskId="kiosk-402"
+        storageNotes={storageNotes}
         standards={new Map([[beker.id, standard(beker.id, 4)]])}
         counts={new Map()}
         onCountChange={noop}
@@ -126,8 +157,10 @@ describe('CategoryAccordion', () => {
     render(
       <CategoryAccordion
         categoryName="Chips"
+        categoryId="cat-chips"
         products={[chips, chipsRood, chipsOranje]}
-        kiosk={{ number: 426 }}
+        kioskId="kiosk-426"
+        storageNotes={storageNotes}
         standards={
           new Map([
             [chips.id, standard(chips.id, 24)],
@@ -151,8 +184,10 @@ describe('CategoryAccordion', () => {
     render(
       <CategoryAccordion
         categoryName="Post-mix"
+        categoryId="cat-postmix"
         products={[cola]}
-        kiosk={{ number: 401 }}
+        kioskId="kiosk-401"
+        storageNotes={storageNotes}
         standards={new Map([[cola.id, standard(cola.id, 16)]])}
         counts={new Map()}
         onCountChange={noop}
@@ -169,8 +204,10 @@ describe('CategoryAccordion', () => {
     render(
       <CategoryAccordion
         categoryName="Chips"
+        categoryId="cat-chips"
         products={[chips]}
-        kiosk={{ number: 402 }}
+        kioskId="kiosk-402"
+        storageNotes={storageNotes}
         standards={new Map([[chips.id, standard(chips.id, 8)]])}
         counts={new Map()}
         onCountChange={noop}

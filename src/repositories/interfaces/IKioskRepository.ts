@@ -1,4 +1,4 @@
-import type { Kiosk, Ring } from '@/types'
+import type { Kiosk, KioskStorageNote, KioskStorageNoteInput, Ring } from '@/types'
 
 export interface IKioskRepository {
   getRings(options?: { includeInactive?: boolean }): Promise<Ring[]>
@@ -12,4 +12,15 @@ export interface IKioskRepository {
   updateKiosk(id: string, data: Partial<Kiosk>): Promise<Kiosk>
   deleteKiosk(id: string): Promise<void>
   updateEventKiosks(eventId: string, kioskIds: string[], openIds: string[]): Promise<void>
+
+  /**
+   * De opmerkingen over waar voorraad ligt — alle kiosken in één keer.
+   *
+   * Het zijn er een handvol en het telscherm heeft ze meteen nodig, dus geen
+   * filter per kiosk: dat zou een extra ronde kosten op het moment dat iemand
+   * voor een kiosk staat.
+   */
+  getStorageNotes(): Promise<KioskStorageNote[]>
+  saveStorageNote(input: KioskStorageNoteInput): Promise<KioskStorageNote>
+  deleteStorageNote(id: string): Promise<void>
 }

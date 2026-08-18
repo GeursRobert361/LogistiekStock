@@ -3,6 +3,7 @@
 import { use, useCallback, useEffect, useMemo, useState } from 'react'
 import { kioskLabel } from '@/lib/kiosk'
 import { fractionStrategyFor } from '@/lib/counting/fractionStrategy'
+import { buildStorageNoteLookup, EMPTY_STORAGE_NOTES } from '@/lib/storageNotes'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { AppHeader } from '@/components/layout/AppHeader'
@@ -51,6 +52,7 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<ProductCategory[]>([])
   const [standards, setStandards] = useState<Map<string, KioskProductStandard>>(new Map())
+  const [storageNotes, setStorageNotes] = useState(EMPTY_STORAGE_NOTES)
   const [counts, setCounts] = useState<Map<string, number>>(new Map())
   const [kioskCount, setKioskCount] = useState<KioskCount | null>(null)
   const [notes, setNotes] = useState('')
@@ -68,12 +70,15 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
 
     async function load() {
       setIsLoading(true)
-      const [kioskData, standardList, productList, categoryList, storedSession] =
+      const [kioskData, standardList, productList, categoryList, noteList, storedSession] =
         await Promise.all([
           repositories.kiosk().getKioskById(kioskId),
           repositories.product().getStandards(kioskId),
           repositories.product().getProducts({ activeOnly: true }),
           repositories.product().getCategories(),
+          // Mee in dezelfde ronde als de rest van de stamdata: een aparte
+          // ronde zou de opmerkingen ná de eerste telling laten verschijnen.
+          repositories.kiosk().getStorageNotes(),
           loadSession(sessionId),
         ])
 
@@ -84,6 +89,7 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
       setProducts(productList)
       setCategories(categoryList)
       setStandards(new Map(standardList.map((s) => [s.productId, s])))
+      setStorageNotes(buildStorageNoteLookup(noteList))
 
       if (!profileId) return
 
@@ -390,8 +396,10 @@ export default function KioskCountPage({ params }: { params: Promise<PageParams>
             <CategoryAccordion
               key={cat.id}
               categoryName={cat.name}
+              categoryId={cat.id}
               products={cat.products}
-              kiosk={kiosk}
+              kioskId={kiosk?.id}
+              storageNotes={storageNotes}
               standards={standards}
               counts={counts}
               onCountChange={handleCountChange}

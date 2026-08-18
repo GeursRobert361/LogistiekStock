@@ -37,6 +37,12 @@ export const METHOD_PERMISSIONS: Record<string, MethodRule> = {
   'kiosk.updateKiosk': 'MANAGE_MASTER_DATA',
   'kiosk.deleteKiosk': 'MANAGE_MASTER_DATA',
   'kiosk.updateEventKiosks': 'MANAGE_EVENTS',
+  // De opmerkingen staan op het telscherm, dus iedereen op de vloer mag ze
+  // lezen. Wijzigen hoort bij hetzelfde recht als de voorraadnormen: het is
+  // kennis van de vloer, geen instelling waar een beheerder voor nodig is.
+  'kiosk.getStorageNotes': 'AUTHENTICATED',
+  'kiosk.saveStorageNote': 'MANAGE_STANDARDS',
+  'kiosk.deleteStorageNote': 'MANAGE_STANDARDS',
 
   // ─── product, categorie & norm ───────────────────────────────────────────
   'product.getCategories': 'AUTHENTICATED',

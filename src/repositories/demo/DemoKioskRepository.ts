@@ -1,6 +1,7 @@
 import type { IKioskRepository } from '../interfaces/IKioskRepository'
-import type { Kiosk, Ring } from '@/types'
+import type { Kiosk, KioskStorageNote, KioskStorageNoteInput, Ring } from '@/types'
 import { demoTables } from './demoTables'
+import { storageNoteProblem } from '@/lib/storageNotes'
 import { newId } from '@/lib/ids'
 
 export class DemoKioskRepository implements IKioskRepository {
@@ -73,5 +74,46 @@ export class DemoKioskRepository implements IKioskRepository {
       ...(openIds.length > 0 ? { activeKioskIds: openIds } : {}),
       updatedAt: new Date().toISOString(),
     })
+  }
+
+  async getStorageNotes(): Promise<KioskStorageNote[]> {
+    return demoTables.storageNotes.all()
+  }
+
+  async saveStorageNote(input: KioskStorageNoteInput): Promise<KioskStorageNote> {
+    const problem = storageNoteProblem(input)
+    if (problem) throw new Error(problem)
+
+    // Dezelfde kiosk plus hetzelfde product of dezelfde categorie is dezelfde
+    // regel; in productie doet de unieke index dit werk.
+    const existing = demoTables.storageNotes.find(
+      (note) =>
+        note.kioskId === input.kioskId &&
+        note.productId === input.productId &&
+        note.categoryId === input.categoryId
+    )
+
+    const now = new Date().toISOString()
+    if (existing) {
+      return demoTables.storageNotes.update(existing.id, {
+        note: input.note.trim(),
+        updatedAt: now,
+      })
+    }
+
+    const created: KioskStorageNote = {
+      id: `note-${newId()}`,
+      kioskId: input.kioskId,
+      ...(input.productId ? { productId: input.productId } : {}),
+      ...(input.categoryId ? { categoryId: input.categoryId } : {}),
+      note: input.note.trim(),
+      createdAt: now,
+      updatedAt: now,
+    }
+    return demoTables.storageNotes.insert(created)
+  }
+
+  async deleteStorageNote(id: string): Promise<void> {
+    demoTables.storageNotes.remove(id)
   }
 }

@@ -25,7 +25,7 @@
  * daardoor alleen in de demo-modus en nooit op de vloer — en dat is precies
  * hoe deze lijst een keer volledig groen getest kon zijn terwijl er in de app
  * geen enkele knop verscheen. De naam is wat de app in beide modi werkelijk in
- * handen heeft. Zie ook `storageNotes.ts` en `countingHints.ts`, die op
+ * handen heeft. Zie ook `storageNoteSeeds.ts` en `countingHints.ts`, die op
  * dezelfde grond op naam koppelen, en `dbIds.ts`, dat aan de serverkant seed-id
  * en UUID via de naam aan elkaar knoopt.
  *

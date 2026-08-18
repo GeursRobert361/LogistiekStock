@@ -9,6 +9,7 @@ import type {
   ProductCategory,
   Product,
   KioskProductStandard,
+  KioskStorageNote,
   Event,
   CountSession,
   KioskCount,
@@ -339,6 +340,20 @@ export function standardToRow(
     half_package_threshold_pct: data.halfPackageThresholdPercentage,
     is_active: data.isActive,
     manually_set_at: new Date().toISOString(),
+  }
+}
+
+// ─── Opmerking bij een kiosk ────────────────────────────────────────────────
+
+export function mapStorageNote(row: Row): KioskStorageNote {
+  return {
+    id: str(row.id),
+    kioskId: str(row.kiosk_id),
+    productId: optStr(row.product_id),
+    categoryId: optStr(row.category_id),
+    note: str(row.note),
+    createdAt: str(row.created_at),
+    updatedAt: str(row.updated_at),
   }
 }
 

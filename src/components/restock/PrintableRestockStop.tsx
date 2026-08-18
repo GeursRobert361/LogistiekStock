@@ -1,6 +1,6 @@
 import { kioskTitle } from '@/lib/kiosk'
 import { formatProductQuantity } from '@/lib/productQuantity'
-import { categoryStorageNoteFor, storageNoteFor } from '@/lib/storageNotes'
+import { EMPTY_STORAGE_NOTES, type StorageNoteLookup } from '@/lib/storageNotes'
 import type { Kiosk, Product, RestockRoundStop, RestockStopItem } from '@/types'
 
 /**
@@ -50,7 +50,7 @@ export interface PrintableRestockStopProps {
   stop: RestockRoundStop
   stopItems: RestockStopItem[]
   products: Map<string, Product>
-  categoryNames: Map<string, string>
+  storageNotes?: StorageNoteLookup
   /**
    * De norm van deze kiosk per product, in hele verpakkingen.
    *
@@ -74,7 +74,7 @@ export function PrintableRestockStop({
   stop,
   stopItems,
   products,
-  categoryNames,
+  storageNotes = EMPTY_STORAGE_NOTES,
   standards,
   kiosk,
   index,
@@ -94,8 +94,8 @@ export function PrintableRestockStop({
         item,
         product,
         note: product
-          ? (storageNoteFor(kiosk, product) ??
-            categoryStorageNoteFor(kiosk, categoryNames.get(product.categoryId)))
+          ? (storageNotes.forProduct(kiosk?.id, product.id) ??
+            storageNotes.forCategory(kiosk?.id, product.categoryId))
           : undefined,
       }
     })

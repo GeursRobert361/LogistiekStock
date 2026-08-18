@@ -15,7 +15,7 @@ import { FractionStrategy } from '@/types/enums'
  *
  * ── Waarom de sleutel de productnaam is ─────────────────────────────────────
  *
- * Dezelfde reden als bij `quickCountConfig`, `storageNotes` en
+ * Dezelfde reden als bij `quickCountConfig`, `storageNoteSeeds` en
  * `countingHints`: in productie is `product.id` een UUID uit de database en
  * bestaan de leesbare sleutels uit `catalogue.ts` daar niet. De naam is het
  * enige wat de app in beide modi in handen heeft.

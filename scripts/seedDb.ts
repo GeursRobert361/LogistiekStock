@@ -20,6 +20,7 @@ import {
   demoCategories,
   demoProducts,
   demoStandards,
+  demoStorageNotes,
   demoProfiles,
   demoAgenda,
   DEMO_PASSWORDS,
@@ -82,7 +83,7 @@ async function upsertByName(
 
     if (idByName.has(name)) {
       const assignments = columns.map((column, index) => `${column} = $${index + 1}`)
-      await client.query(`update ${table} set ${assignments.join(', ')} where id = $${columns.length + 1}`, [
+      await client.query(`update ${table} set ${assignments.join(', ')} where id = ${columns.length + 1}`, [
         ...Object.values(row),
         idByName.get(name),
       ])
@@ -382,6 +383,44 @@ async function seedUsers(): Promise<void> {
   }
 }
 
+/**
+ * De opmerkingen over waar de voorraad ligt — alleen op een lege tabel.
+ *
+ * Migratie 014 plant ze in een database die al kiosken en producten heeft. Bij
+ * een gloednieuwe database is die tabel op dat moment nog leeg en vindt de
+ * migratie niets, dus gebeurt het hier alsnog.
+ *
+ * Alleen wanneer er niets staat, en dat is geen detail: vanaf het moment dat er
+ * één regel in staat is Beheer › Opmerkingen de baas. Zou de seed ze telkens
+ * terugzetten, dan komt een opmerking die iemand bewust heeft weggehaald bij de
+ * eerstvolgende seed weer boven — en dan zoekt een vuller opnieuw naar een doos
+ * die er niet meer ligt.
+ */
+async function seedStorageNotes(): Promise<void> {
+  const existing = await client.query('select 1 from kiosk_storage_notes limit 1')
+  if ((existing.rowCount ?? 0) > 0) {
+    console.log('· opmerkingen overgeslagen (staan al in de database)')
+    return
+  }
+
+  let count = 0
+  for (const note of demoStorageNotes) {
+    const kioskId = kioskIds.get(note.kioskId)
+    const productId = note.productId ? productIds.get(note.productId) : undefined
+    const categoryId = note.categoryId ? categoryIds.get(note.categoryId) : undefined
+    if (!kioskId || (!productId && !categoryId)) continue
+
+    await client.query(
+      `insert into kiosk_storage_notes (kiosk_id, product_id, category_id, note)
+       values ($1, $2, $3, $4)`,
+      [kioskId, productId ?? null, categoryId ?? null, note.note]
+    )
+    count++
+  }
+
+  console.log(`✓ ${count} opmerkingen`)
+}
+
 async function main(): Promise<void> {
   await client.connect()
   try {
@@ -393,6 +432,7 @@ async function main(): Promise<void> {
     await seedCategories()
     await seedProducts()
     await seedStandards()
+    await seedStorageNotes()
 
     if (WITH_USERS) {
       await seedUsers()

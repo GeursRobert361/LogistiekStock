@@ -15,7 +15,7 @@ import {
   POSTMIX_PACKAGE_PRODUCT_IDS,
   POSTMIX_COUNTING_RULE,
 } from '../secondRingStandards'
-import { storageNotes, categoryStorageNoteFor } from '@/lib/storageNotes'
+import { productStorageNoteSeeds, categoryStorageNoteSeeds } from '../storageNoteSeeds'
 import { demoKiosks, demoStandards } from '../demoData'
 import { demoProducts, CAT_POSTMIX_ID, CAT_DRANK_ID } from '../catalogue'
 import { InputStep, DrinkStorageType } from '@/types'
@@ -233,7 +233,7 @@ describe('definitieve bekermatrix', () => {
   it('telt de opslagnotities niet bij de norm op', () => {
     // "2 doos achter in kiosk" zegt waar de bekers liggen, niet dat er twee bij
     // moeten. 401 blijft dus 5 en wordt geen 7.
-    expect(storageNotes.map((n) => n.kioskNumber)).toEqual([401, 410, 426])
+    expect(productStorageNoteSeeds.map((seed) => seed.kioskNumber)).toEqual([401, 410, 426])
     expect(norm('kiosk-401', 'bierbeker-05')).toBe(5)
     expect(norm('kiosk-410', 'bierbeker-05')).toBe(4)
     expect(norm('kiosk-426', 'bierbeker-05')).toBe(5)
@@ -359,9 +359,11 @@ describe('definitieve Post-mixmatrix', () => {
   it('vertelt bij 420 dat de pakken in het hok staan', () => {
     // Zonder die regel zoekt een teller bij 420 naar acht pakken Cola Zero die
     // niet in de kiosk zelf staan, en telt er dus te weinig.
-    expect(categoryStorageNoteFor({ number: 420 }, 'Post-mix')).toBe(
-      'In het hok links van de kiosk'
-    )
+    expect(
+      categoryStorageNoteSeeds.find(
+        (seed) => seed.kioskNumber === 420 && seed.categoryName === 'Post-mix'
+      )?.note
+    ).toBe('In het hok links van de kiosk')
   })
 
   it('laat kiosken buiten de lijst hun bestaande Post-mix houden', () => {

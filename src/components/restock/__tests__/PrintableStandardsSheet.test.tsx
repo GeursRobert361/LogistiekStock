@@ -1,11 +1,9 @@
 import { describe, it, expect } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
-import {
-  PrintableStandardsSheet,
-  type StandardsSheetGroup,
-} from '../PrintableStandardsSheet'
-import { demoProducts } from '@/lib/seed/catalogue'
-import { demoKiosks } from '@/lib/seed/demoData'
+import { PrintableStandardsSheet, type StandardsSheetGroup } from '../PrintableStandardsSheet'
+import { demoProducts, demoCategories } from '@/lib/seed/catalogue'
+import { demoKiosks, demoStorageNotes } from '@/lib/seed/demoData'
+import { buildStorageNoteLookup } from '@/lib/storageNotes'
 import { toQuarterUnits } from '@/lib/quarterUnits'
 
 /**
@@ -19,12 +17,17 @@ import { toQuarterUnits } from '@/lib/quarterUnits'
 const kioskById = (id: string) => demoKiosks.find((k) => k.id === id)
 const product = (id: string) => demoProducts.find((p) => p.id === id)!
 
+const storageNotes = buildStorageNoteLookup(demoStorageNotes)
+
 function group(
   categoryName: string,
   rows: Array<[string, number] | [string, number, number]>
 ): StandardsSheetGroup {
   return {
     categoryName,
+    // Het id hoort bij de naam; de opmerkingen gaan op id. Een verzonnen
+    // categorie (de indelingstests gebruiken die) krijgt een verzonnen id.
+    categoryId: demoCategories.find((c) => c.name === categoryName)?.id ?? `cat-${categoryName}`,
     rows: rows.map(([productId, packages, restockPackages]) => ({
       product: product(productId),
       targetQuantityQuarters: toQuarterUnits(packages),
@@ -33,9 +36,7 @@ function group(
   }
 }
 
-function renderSheet(
-  overrides: Partial<Parameters<typeof PrintableStandardsSheet>[0]> = {}
-) {
+function renderSheet(overrides: Partial<Parameters<typeof PrintableStandardsSheet>[0]> = {}) {
   return render(
     <PrintableStandardsSheet
       kiosk={kioskById('kiosk-401')}
@@ -49,6 +50,7 @@ function renderSheet(
       index={0}
       totalSheets={23}
       subtitle="StockFlow — Bestellijst · Ajax – FC Sion · 27 augustus 2026"
+      storageNotes={storageNotes}
       {...overrides}
     />
   )

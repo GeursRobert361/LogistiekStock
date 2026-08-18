@@ -2,16 +2,19 @@
 
 import { useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
-import { categoryStorageNoteFor, storageNoteFor } from '@/lib/storageNotes'
+import { EMPTY_STORAGE_NOTES, type StorageNoteLookup } from '@/lib/storageNotes'
 import { countingHintFor } from '@/lib/countingHints'
 import { ProductCountRow } from './ProductCountRow'
-import type { Product, Kiosk, KioskProductStandard } from '@/types'
+import type { Product, KioskProductStandard } from '@/types'
 
 interface CategoryAccordionProps {
   categoryName: string
+  categoryId: string
   products: Product[]
   /** De kiosk die geteld wordt; nodig voor de opmerkingen over waar iets ligt. */
-  kiosk?: Pick<Kiosk, 'number'> | null
+  kioskId?: string | null
+  /** De opmerkingen over waar iets ligt. Leeg zolang ze nog niet geladen zijn. */
+  storageNotes?: StorageNoteLookup
   standards: Map<string, KioskProductStandard>
   /** productId → kwarteenheden. Ontbrekende sleutel = nog niet geteld. */
   counts: Map<string, number>
@@ -24,8 +27,10 @@ interface CategoryAccordionProps {
 
 export function CategoryAccordion({
   categoryName,
+  categoryId,
   products,
-  kiosk,
+  kioskId,
+  storageNotes = EMPTY_STORAGE_NOTES,
   standards,
   counts,
   onCountChange,
@@ -39,7 +44,7 @@ export function CategoryAccordion({
   // gaat over hóe er geteld wordt en geldt overal, de opmerking over waar het
   // spul bij déze kiosk ligt.
   const hint = countingHintFor(categoryName)
-  const categoryNote = categoryStorageNoteFor(kiosk, categoryName)
+  const categoryNote = storageNotes.forCategory(kioskId, categoryId)
 
   const containsFocus =
     focusProductId !== null && products.some((p) => p.id === focusProductId)
@@ -120,7 +125,7 @@ export function CategoryAccordion({
                   onCountChange={onCountChange}
                   onCountClear={onCountClear}
                   halfPackageThresholdPercentage={std?.halfPackageThresholdPercentage ?? 80}
-                  storageNote={storageNoteFor(kiosk, product)}
+                  storageNote={storageNotes.forProduct(kioskId, product.id)}
                 />
               </div>
             )

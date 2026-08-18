@@ -10,13 +10,15 @@
  * Vandaar op het scherm en niet alleen in een werkinstructie: de regel is nodig
  * op het moment dat er geteld wordt.
  *
- * Gekoppeld op categorienaam, net als de opmerkingen in `storageNotes.ts`: in
- * productie hebben categorieën hun eigen UUID's en is de naam wat de app
- * werkelijk in handen heeft.
+ * Gekoppeld op categorienaam: in productie hebben categorieën hun eigen UUID's
+ * en is de naam wat de app werkelijk in handen heeft.
  *
- * Dit is bewust een vaste lijst in de code en geen beheerscherm. Het zijn
- * vaste werkafspraken, geen instellingen; een tabel plus een formulier erbij
- * kost meer dan het oplevert zolang er één regel in staat.
+ * Dit is bewust een vaste lijst in de code en geen beheerscherm — anders dan de
+ * opmerkingen over waar de voorraad ligt, die inmiddels in de database staan en
+ * via Beheer › Opmerkingen te wijzigen zijn. Het verschil: dit zijn vaste
+ * werkafspraken die overal gelden en die niet meeverhuizen met een doos. Een
+ * tabel plus een formulier erbij kost meer dan het oplevert zolang er één regel
+ * in staat.
  */
 
 export interface CountingHint {

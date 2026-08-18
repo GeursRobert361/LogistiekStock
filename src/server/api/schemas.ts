@@ -241,6 +241,19 @@ export const ARGUMENT_SCHEMAS: Record<string, z.ZodTypeAny> = {
   'event.updateEventStatus': z.tuple([uuid, enumOf(EventStatus)]),
   'event.deleteEvent': z.tuple([uuid]),
 
+  // Opmerkingen bij een kiosk
+  'kiosk.saveStorageNote': z.tuple([
+    z.object({
+      kioskId: uuid,
+      // Precies één van de twee; de repository weigert de rest, hier gaat het
+      // alleen over de vorm.
+      productId: uuid.optional(),
+      categoryId: uuid.optional(),
+      note: text.min(1),
+    }),
+  ]),
+  'kiosk.deleteStorageNote': z.tuple([uuid]),
+
   // Normen
   'product.upsertStandard': z.tuple([standard]),
   'product.bulkUpsertStandards': z.tuple([z.array(standard)]),

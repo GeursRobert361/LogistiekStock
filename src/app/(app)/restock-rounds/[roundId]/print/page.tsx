@@ -12,6 +12,7 @@ import {
 import { kioskTitle } from '@/lib/kiosk'
 import { formatDate } from '@/lib/utils'
 import { fromQuarterUnits } from '@/lib/quarterUnits'
+import { buildStorageNoteLookup, type StorageNoteLookup } from '@/lib/storageNotes'
 import type { Event, Kiosk, Product, Ring } from '@/types'
 import '../../../print.css'
 
@@ -31,7 +32,7 @@ import '../../../print.css'
 interface PrintData {
   plan: RoundPlan
   products: Map<string, Product>
-  categoryNames: Map<string, string>
+  storageNotes: StorageNoteLookup
   kiosks: Map<string, Kiosk>
   /** kioskId → productId → norm in hele verpakkingen. */
   standards: Map<string, Map<string, number>>
@@ -53,10 +54,10 @@ export default function RestockRoundPrintPage({
 
   const load = useCallback(async () => {
     // Precies dezelfde bron als het digitale scherm; alleen lezen.
-    const [plan, productList, categories, kioskList, rings] = await Promise.all([
+    const [plan, productList, noteList, kioskList, rings] = await Promise.all([
       getRoundPlan(roundId),
       repositories.product().getProducts({ activeOnly: false }),
-      repositories.product().getCategories({ includeInactive: true }),
+      repositories.kiosk().getStorageNotes(),
       repositories.kiosk().getKiosks(),
       repositories.kiosk().getRings(),
     ])
@@ -84,7 +85,7 @@ export default function RestockRoundPrintPage({
     setData({
       plan,
       products: new Map(productList.map((p) => [p.id, p])),
-      categoryNames: new Map(categories.map((c) => [c.id, c.name])),
+      storageNotes: buildStorageNoteLookup(noteList),
       kiosks: new Map(kioskList.map((k) => [k.id, k])),
       standards,
       ring: rings.find((r) => r.id === plan.round.ringId),
@@ -118,7 +119,7 @@ export default function RestockRoundPrintPage({
     )
   }
 
-  const { plan, products, categoryNames, kiosks, standards, ring, event } = data
+  const { plan, products, storageNotes, kiosks, standards, ring, event } = data
   const { round, stops } = plan
 
   // Alleen voorgedrukt wanneer het zonder extra query kan: de ingelogde
@@ -181,7 +182,7 @@ export default function RestockRoundPrintPage({
               stop={stop}
               stopItems={plan.stopItems.filter((item) => item.restockRoundStopId === stop.id)}
               products={products}
-              categoryNames={categoryNames}
+              storageNotes={storageNotes}
               standards={standards.get(stop.kioskId) ?? new Map()}
               kiosk={kiosks.get(stop.kioskId)}
               index={index}
